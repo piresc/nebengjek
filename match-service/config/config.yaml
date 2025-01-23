@@ -1,0 +1,42 @@
+# Server Configuration
+server:
+  address: ":50051"
+  rest_port: ":8081"
+
+# gRPC Service Configuration
+grpc:
+  auth_service_address: "auth-service:50051"
+  billing_service_address: "billing-service:50051"
+
+# NSQ Configuration (for async operations)
+nsq:
+  address: "nsqd:4150"
+  topics:
+    driver_location: "driver_location"
+    match_status: "match_status"
+
+# New Relic Configuration
+newrelic:
+  app_name: "match-service"
+  license_key: "${NR_LICENSE_KEY}"
+
+# Google Secret Manager Configuration
+secret_manager:
+  project_id: "${GCP_PROJECT_ID}"
+  secrets:
+    db_connection: "projects/${GCP_PROJECT_ID}/secrets/match-db-connection/versions/latest"
+    api_key: "projects/${GCP_PROJECT_ID}/secrets/match-api-key/versions/latest"
+
+# Database Configuration
+database:
+  host: "${DB_HOST}"
+  port: "${DB_PORT}"
+  name: "${DB_NAME}"
+  user: "${DB_USER}"
+  password: "${DB_PASSWORD}"
+
+# Matching Configuration
+matching:
+  max_radius_km: 5.0
+  max_wait_time_seconds: 300
+  min_driver_rating: 4.0

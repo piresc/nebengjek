@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package match;
+
+option go_package = "github.com/piresc/nebengjek/match-service/proto";
+
+service MatchService {
+  rpc RequestMatch(MatchRequest) returns (MatchResponse) {}
+  rpc UpdateDriverLocation(LocationUpdate) returns (LocationUpdateResponse) {}
+  rpc GetNearbyDrivers(NearbyDriversRequest) returns (NearbyDriversResponse) {}
+}
+
+message MatchRequest {
+  string passenger_id = 1;
+  Location pickup_location = 2;
+  Location dropoff_location = 3;
+}
+
+message MatchResponse {
+  string match_id = 1;
+  string driver_id = 2;
+  string status = 3;
+  float estimated_time = 4;
+  float estimated_price = 5;
+}
+
+message Location {
+  double latitude = 1;
+  double longitude = 2;
+}
+
+message LocationUpdate {
+  string driver_id = 1;
+  Location location = 2;
+  string status = 3; // "available", "busy", "offline"
+}
+
+message LocationUpdateResponse {
+  bool success = 1;
+}
+
+message NearbyDriversRequest {
+  Location location = 1;
+  double radius = 2; // in kilometers
+}
+
+message NearbyDriversResponse {
+  repeated DriverInfo drivers = 1;
+}
+
+message DriverInfo {
+  string driver_id = 1;
+  Location current_location = 2;
+  float distance = 3; // distance from requested location in kilometers
+  string status = 4;
+}

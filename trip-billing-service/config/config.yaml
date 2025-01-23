@@ -1,0 +1,44 @@
+# Server Configuration
+server:
+  address: ":50051"
+  rest_port: ":8082"
+
+# gRPC Service Configuration
+grpc:
+  auth_service_address: "auth-service:50051"
+  match_service_address: "match-service:50051"
+
+# NSQ Configuration (for async operations)
+nsq:
+  address: "nsqd:4150"
+  topics:
+    payment_status: "payment_status"
+    trip_events: "trip_events"
+
+# New Relic Configuration
+newrelic:
+  app_name: "trip-billing-service"
+  license_key: "${NR_LICENSE_KEY}"
+
+# Google Secret Manager Configuration
+secret_manager:
+  project_id: "${GCP_PROJECT_ID}"
+  secrets:
+    db_connection: "projects/${GCP_PROJECT_ID}/secrets/trip-billing-db-connection/versions/latest"
+    api_key: "projects/${GCP_PROJECT_ID}/secrets/trip-billing-api-key/versions/latest"
+
+# Database Configuration
+database:
+  host: "${DB_HOST}"
+  port: "${DB_PORT}"
+  name: "${DB_NAME}"
+  user: "${DB_USER}"
+  password: "${DB_PASSWORD}"
+
+# Billing Configuration
+billing:
+  base_fare: 2.50
+  per_km_rate: 1.20
+  per_minute_rate: 0.35
+  currency: "USD"
+  surge_multiplier_max: 2.5
