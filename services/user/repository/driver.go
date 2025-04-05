@@ -3,12 +3,51 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
-// Continuation of PostgresUserRepository implementation
+// Driver-specific methods for UserRepo implementation
+
+// UpdateDriverLocation updates a driver's current location
+func (r *UserRepo) UpdateDriverLocation(ctx context.Context, driverID string, location *models.Location) error {
+	// Ensure timestamp is set
+	if location.Timestamp.IsZero() {
+		location.Timestamp = time.Now()
+	}
+
+	// Insert new location
+	_, err := r.db.Exec(ctx, `
+		INSERT INTO driver_locations (user_id, latitude, longitude, address, timestamp)
+		VALUES ($1, $2, $3, $4, $5)
+	`, driverID, location.Latitude, location.Longitude, location.Address, location.Timestamp)
+	if err != nil {
+		return fmt.Errorf("failed to update driver location: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateDriverAvailability updates a driver's availability status
+func (r *UserRepo) UpdateDriverAvailability(ctx context.Context, driverID string, isAvailable bool) error {
+	result, err := r.db.Exec(ctx, `
+		UPDATE drivers SET is_available = $1
+		WHERE user_id = $2
+	`, isAvailable, driverID)
+	if err != nil {
+		return fmt.Errorf("failed to update driver availability: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("driver not found")
+	}
+
+	return nil
+}
 
 // GetNearbyDrivers retrieves available drivers near a location within a radius (continued)
-func (r *PostgresUserRepository) getNearbyDriversDocuments(ctx context.Context, driverID string) ([]string, error) {
+func (r *UserRepo) getNearbyDriversDocuments(ctx context.Context, driverID string) ([]string, error) {
 	// Get driver documents
 	docRows, err := r.db.Query(ctx, `
 		SELECT document_url FROM driver_documents
@@ -32,7 +71,7 @@ func (r *PostgresUserRepository) getNearbyDriversDocuments(ctx context.Context, 
 }
 
 // VerifyDriver marks a driver as verified
-func (r *PostgresUserRepository) VerifyDriver(ctx context.Context, driverID string) error {
+func (r *UserRepo) VerifyDriver(ctx context.Context, driverID string) error {
 	// Begin transaction
 	tx, err := r.db.Begin(ctx)
 	if err != nil {

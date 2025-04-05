@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/nebengjek/internal/pkg/config"
+	"github.com/piresc/nebengjek/internal/pkg/config"
 )
 
 func main() {

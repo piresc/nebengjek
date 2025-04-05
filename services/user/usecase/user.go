@@ -1,4 +1,4 @@
-package services
+package usecase
 
 import (
 	"context"
@@ -8,40 +8,22 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/piresc/nebengjek/internal/pkg/models"
-	"github.com/piresc/nebengjek/services/user/repository"
+	"github.com/piresc/nebengjek/services/user"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// UserService defines the interface for user business logic operations
-type UserService interface {
-	// User operations
-	RegisterUser(ctx context.Context, user *models.User) error
-	AuthenticateUser(ctx context.Context, email, password string) (*models.User, error)
-	GetUserByID(ctx context.Context, id string) (*models.User, error)
-	UpdateUserProfile(ctx context.Context, user *models.User) error
-	DeactivateUser(ctx context.Context, id string) error
-	ListUsers(ctx context.Context, offset, limit int) ([]*models.User, error)
-
-	// Driver-specific operations
-	RegisterDriver(ctx context.Context, user *models.User) error
-	UpdateDriverLocation(ctx context.Context, driverID string, location *models.Location) error
-	UpdateDriverAvailability(ctx context.Context, driverID string, isAvailable bool) error
-	GetNearbyDrivers(ctx context.Context, location *models.Location, radiusKm float64) ([]*models.User, error)
-	VerifyDriver(ctx context.Context, driverID string) error
+// UserUC implements UserUC interface
+type UserUC struct {
+	repo user.UserRepo
 }
 
-// userService implements UserService interface
-type userService struct {
-	repo repository.UserRepository
-}
-
-// NewUserService creates a new user service
-func NewUserService(repo repository.UserRepository) UserService {
-	return &userService{repo: repo}
+// NewUserUC creates a new user UC
+func NewUserUC(repo user.UserRepo) *UserUC {
+	return &UserUC{repo: repo}
 }
 
 // RegisterUser registers a new user
-func (s *userService) RegisterUser(ctx context.Context, user *models.User) error {
+func (s *UserUC) RegisterUser(ctx context.Context, user *models.User) error {
 	// Validate user data
 	if err := validateUserData(user); err != nil {
 		return err
@@ -75,7 +57,7 @@ func (s *userService) RegisterUser(ctx context.Context, user *models.User) error
 }
 
 // AuthenticateUser authenticates a user by email and password
-func (s *userService) AuthenticateUser(ctx context.Context, email, password string) (*models.User, error) {
+func (s *UserUC) AuthenticateUser(ctx context.Context, email, password string) (*models.User, error) {
 	// Get user by email
 	user, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
@@ -100,7 +82,7 @@ func (s *userService) AuthenticateUser(ctx context.Context, email, password stri
 }
 
 // GetUserByID retrieves a user by ID
-func (s *userService) GetUserByID(ctx context.Context, id string) (*models.User, error) {
+func (s *UserUC) GetUserByID(ctx context.Context, id string) (*models.User, error) {
 	user, err := s.repo.GetUserByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -113,7 +95,7 @@ func (s *userService) GetUserByID(ctx context.Context, id string) (*models.User,
 }
 
 // UpdateUserProfile updates a user's profile
-func (s *userService) UpdateUserProfile(ctx context.Context, user *models.User) error {
+func (s *UserUC) UpdateUserProfile(ctx context.Context, user *models.User) error {
 	// Validate user data
 	if err := validateUserData(user); err != nil {
 		return err
@@ -155,7 +137,7 @@ func (s *userService) UpdateUserProfile(ctx context.Context, user *models.User) 
 }
 
 // DeactivateUser deactivates a user account
-func (s *userService) DeactivateUser(ctx context.Context, id string) error {
+func (s *UserUC) DeactivateUser(ctx context.Context, id string) error {
 	// Get existing user
 	user, err := s.repo.GetUserByID(ctx, id)
 	if err != nil {
@@ -171,7 +153,7 @@ func (s *userService) DeactivateUser(ctx context.Context, id string) error {
 }
 
 // ListUsers retrieves a list of users with pagination
-func (s *userService) ListUsers(ctx context.Context, offset, limit int) ([]*models.User, error) {
+func (s *UserUC) ListUsers(ctx context.Context, offset, limit int) ([]*models.User, error) {
 	users, err := s.repo.ListUsers(ctx, offset, limit)
 	if err != nil {
 		return nil, err
@@ -186,7 +168,7 @@ func (s *userService) ListUsers(ctx context.Context, offset, limit int) ([]*mode
 }
 
 // RegisterDriver registers a new driver
-func (s *userService) RegisterDriver(ctx context.Context, user *models.User) error {
+func (s *UserUC) RegisterDriver(ctx context.Context, user *models.User) error {
 	// Validate user data
 	if err := validateUserData(user); err != nil {
 		return err
@@ -209,7 +191,7 @@ func (s *userService) RegisterDriver(ctx context.Context, user *models.User) err
 }
 
 // UpdateDriverLocation updates a driver's current location
-func (s *userService) UpdateDriverLocation(ctx context.Context, driverID string, location *models.Location) error {
+func (s *UserUC) UpdateDriverLocation(ctx context.Context, driverID string, location *models.Location) error {
 	// Validate location data
 	if err := validateLocationData(location); err != nil {
 		return err
@@ -236,7 +218,7 @@ func (s *userService) UpdateDriverLocation(ctx context.Context, driverID string,
 }
 
 // UpdateDriverAvailability updates a driver's availability status
-func (s *userService) UpdateDriverAvailability(ctx context.Context, driverID string, isAvailable bool) error {
+func (s *UserUC) UpdateDriverAvailability(ctx context.Context, driverID string, isAvailable bool) error {
 	// Get existing user
 	user, err := s.repo.GetUserByID(ctx, driverID)
 	if err != nil {
@@ -258,7 +240,7 @@ func (s *userService) UpdateDriverAvailability(ctx context.Context, driverID str
 }
 
 // GetNearbyDrivers retrieves available drivers near a location within a radius
-func (s *userService) GetNearbyDrivers(ctx context.Context, location *models.Location, radiusKm float64) ([]*models.User, error) {
+func (s *UserUC) GetNearbyDrivers(ctx context.Context, location *models.Location, radiusKm float64) ([]*models.User, error) {
 	// Validate location data
 	if err := validateLocationData(location); err != nil {
 		return nil, err
@@ -284,7 +266,7 @@ func (s *userService) GetNearbyDrivers(ctx context.Context, location *models.Loc
 }
 
 // VerifyDriver marks a driver as verified
-func (s *userService) VerifyDriver(ctx context.Context, driverID string) error {
+func (s *UserUC) VerifyDriver(ctx context.Context, driverID string) error {
 	// Get existing user
 	user, err := s.repo.GetUserByID(ctx, driverID)
 	if err != nil {

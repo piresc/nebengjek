@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v4/pgxpool"
+	_ "github.com/jackc/pgx/v4/stdlib" // pgx driver for sqlx
+	"github.com/jmoiron/sqlx"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
 // PostgresClient represents a PostgreSQL database client
 type PostgresClient struct {
-	pool *pgxpool.Pool
+	db *sqlx.DB
 }
 
 // NewPostgresClient creates a new PostgreSQL client
@@ -27,49 +28,41 @@ func NewPostgresClient(config models.DatabaseConfig) (*PostgresClient, error) {
 		config.SSLMode,
 	)
 
-	// Configure connection pool
-	poolConfig, err := pgxpool.ParseConfig(connString)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse postgres config: %w", err)
-	}
-
-	// Set max connections
-	if config.MaxConns > 0 {
-		poolConfig.MaxConns = int32(config.MaxConns)
-	}
-
-	// Set idle connections
-	if config.IdleConns > 0 {
-		poolConfig.MinConns = int32(config.IdleConns)
-	}
-
-	// Set connection lifetime, health check, etc.
-	poolConfig.MaxConnLifetime = 1 * time.Hour
-	poolConfig.HealthCheckPeriod = 1 * time.Minute
-
-	// Create connection pool
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	pool, err := pgxpool.ConnectConfig(ctx, poolConfig)
+	// Create connection with sqlx
+	db, err := sqlx.Connect("pgx", connString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to postgres: %w", err)
 	}
 
-	// Verify connection
-	if err := pool.Ping(ctx); err != nil {
+	// Configure connection pool
+	if config.MaxConns > 0 {
+		db.SetMaxOpenConns(config.MaxConns)
+	}
+
+	if config.IdleConns > 0 {
+		db.SetMaxIdleConns(config.IdleConns)
+	}
+
+	// Set connection lifetime
+	db.SetConnMaxLifetime(1 * time.Hour)
+
+	// Verify connection with context
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
 		return nil, fmt.Errorf("failed to ping postgres: %w", err)
 	}
 
-	return &PostgresClient{pool: pool}, nil
+	return &PostgresClient{db: db}, nil
 }
 
-// GetPool returns the underlying connection pool
-func (p *PostgresClient) GetPool() *pgxpool.Pool {
-	return p.pool
+// GetDB returns the underlying sqlx DB instance
+func (p *PostgresClient) GetDB() *sqlx.DB {
+	return p.db
 }
 
-// Close closes the database connection pool
+// Close closes the database connection
 func (p *PostgresClient) Close() {
-	p.pool.Close()
+	p.db.Close()
 }
