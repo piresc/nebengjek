@@ -1,33 +1,27 @@
-package nsq
+package nats
 
 import (
 	"encoding/json"
 	"fmt"
 	"log"
 
-	"github.com/nsqio/go-nsq"
+	"github.com/nats-io/nats.go"
 )
 
-// Producer handles publishing messages to NSQ topics
+// Producer handles publishing messages to NATS topics
 type Producer struct {
-	producer *nsq.Producer
+	conn *nats.Conn
 }
 
-// NewProducer creates a new NSQ producer
+// NewProducer creates a new NATS producer
 func NewProducer(address string) (*Producer, error) {
-	config := nsq.NewConfig()
-	producer, err := nsq.NewProducer(address, config)
+	// Connect to NATS server
+	conn, err := nats.Connect(address)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create NSQ producer: %w", err)
+		return nil, fmt.Errorf("failed to connect to NATS server: %w", err)
 	}
 
-	// Ping the NSQ daemon to ensure connectivity
-	err = producer.Ping()
-	if err != nil {
-		return nil, fmt.Errorf("failed to ping NSQ daemon: %w", err)
-	}
-
-	return &Producer{producer: producer}, nil
+	return &Producer{conn: conn}, nil
 }
 
 // Publish sends a message to the specified topic
@@ -37,7 +31,7 @@ func (p *Producer) Publish(topic string, message interface{}) error {
 		return fmt.Errorf("failed to marshal message: %w", err)
 	}
 
-	err = p.producer.Publish(topic, msgBytes)
+	err = p.conn.Publish(topic, msgBytes)
 	if err != nil {
 		return fmt.Errorf("failed to publish message: %w", err)
 	}
@@ -47,17 +41,22 @@ func (p *Producer) Publish(topic string, message interface{}) error {
 }
 
 // PublishAsync sends a message to the specified topic asynchronously
-func (p *Producer) PublishAsync(topic string, message interface{}, doneChan chan *nsq.ProducerTransaction) error {
+func (p *Producer) PublishAsync(topic string, message interface{}) error {
 	msgBytes, err := json.Marshal(message)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
 	}
 
-	p.producer.PublishAsync(topic, msgBytes, doneChan)
+	// NATS doesn't have a direct async publish like NSQ, but it's already non-blocking
+	err = p.conn.Publish(topic, msgBytes)
+	if err != nil {
+		return fmt.Errorf("failed to publish message: %w", err)
+	}
+
 	return nil
 }
 
-// Stop gracefully stops the producer
+// Stop gracefully closes the NATS connection
 func (p *Producer) Stop() {
-	p.producer.Stop()
+	p.conn.Close()
 }

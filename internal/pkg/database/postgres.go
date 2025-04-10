@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/jackc/pgx/v4/stdlib" // pgx driver for sqlx
 	"github.com/jmoiron/sqlx"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )

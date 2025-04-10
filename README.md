@@ -1,205 +1,134 @@
-# NebengJek Backend
+# NebengJek
 
-A microservices-based backend system for NebengJek, a ride-sharing feature within the MyTelkomsel app.
+A lightweight, real-time ride-hailing and social matching platform integrated with MyTelkomsel.  
+**Key Features**: MSISDN-based auth, driver-customer matching, dynamic pricing, and role-based workflows.
 
-## Architecture Overview
-### High-Level Design
+---
 
-```mermaid
-flowchart TB
-    subgraph Client
-        MyTelkomsel[MyTelkomsel App]
-    end
+## 📋 Table of Contents
+- [Architecture Overview](#-architecture-overview)
+- [Tech Stack](#-tech-stack)
+- [Services Breakdown](#-services-breakdown)
+- [Data Flow](#-data-flow)
+- [Deployment](#-deployment)
+- [Testing](#-testing)
+- [Configuration](#-configuration)
+- [Security](#-security)
+- [Scalability](#-scalability)
+- [Assumptions](#-assumptions)
+- [Contributing](#-contributing)
 
-    subgraph Load Balancer
-        NGINX[NGINX Load Balancer]
-    end
+---
 
-    subgraph Services
-        Auth[Auth Service]
-        Match[Match Service]
-        Trip[Trip/Billing Service]
-        Payment[Payment Service]
-    end
+## 🏗️ Architecture Overview
 
-    subgraph Message Queue
-        NSQ[NSQ Message Queue]
-    end
+*Microservices-based backend optimized for low latency and scalability.*
 
-    subgraph Databases
-        Redis[(Redis - Location Cache)]
-        PostgreSQL[(PostgreSQL)]
-    end
+### Core Components
+| **Component**        | **Description**                                                                 |
+|-----------------------|---------------------------------------------------------------------------------|
+| **API Gateway**       | Routes requests, validates JWT tokens, and enforces rate limits (Kong/APISIX). |
+| **User Service**      | Manages MSISDN-based auth, OTP verification, and role separation (driver/customer). |
+| **Location Service**  | Handles real-time geospatial data using PostgreSQL (PostGIS) and Redis caching. |
+| **Matching Service**  | Matches drivers/customers within 1 km using NATS for event-driven communication. |
+| **Billing Service**   | Calculates fares (3000 IDR/km) and processes payments with Telkomsel’s 5% fee. |
+| **Notification Service** | Sends SMS/push alerts via Telkomsel’s APIs.                                  |
 
-    subgraph Monitoring
-        NewRelic[New Relic]
-    end
+---
 
-    MyTelkomsel --> NGINX
-    NGINX --> Auth
-    NGINX --> Match
-    NGINX --> Trip
-    NGINX --> Payment
+## 🛠️ Tech Stack
+- **Language**: Go (Golang)
+- **Databases**: 
+  - PostgreSQL (+ PostGIS for geospatial queries)
+  - Redis (caching and real-time location indexing)
+- **Messaging**: NATS (lightweight message broker)
+- **API Framework**: Echo
+- **Infrastructure**: 
+  - Docker & Kubernetes (deployment)
+  - AWS/GCP (cloud hosting)
+- **Security**: JWT, HTTPS/TLS
 
-    Auth --> PostgreSQL
-    Match --> Redis
-    Match --> PostgreSQL
-    Trip --> PostgreSQL
-    Payment --> PostgreSQL
+---
 
-    Auth --> NSQ
-    Match --> NSQ
-    Trip --> NSQ
-    Payment --> NSQ
+## 🔍 Services Breakdown
+### 1. **User Service**  
+- **Endpoints**:  
+  - `POST /auth/login`: Generates OTP via SMS.  
+  - `POST /auth/verify`: Validates OTP and issues JWT.  
+- **Key Features**:  
+  - Role-based access control (`driver`/`customer`).  
+  - PostgreSQL schema for user data with role-specific tables.  
 
-    Auth --> NewRelic
-    Match --> NewRelic
-    Trip --> NewRelic
-    Payment --> NewRelic
-```
+### 2. **Location Service**  
+- **Endpoints**:  
+  - `POST /locations`: Stores driver/customer coordinates.  
+  - `GET /locations/nearby`: Finds nearby drivers using PostGIS.  
+- **Key Features**:  
+  - Real-time Redis caching for 1 km radius queries.  
 
-### Key Features
-- Real-time location tracking using Redis for caching
-- Dynamic fare calculation (3000 IDR/km)
-- Driver fare adjustment capability (≤100%)
-- 5% admin fee deduction
-- Asynchronous event processing using NSQ
-- Load balancing with NGINX
-- Monitoring with New Relic
+### 3. **Matching Service**  
+- **Workflow**:  
+  - Listens to NATS topics (`location_updates`, `match_requests`).  
+  - Triggers notifications on successful matches.  
 
-### Technology Stack
-- **Programming Languages**: Go, Node.js
-- **Databases**: PostgreSQL, Redis
-- **Message Queue**: NSQ
-- **Load Balancer**: NGINX
-- **Monitoring**: New Relic
-- **Container Orchestration**: Docker, Docker Compose
-- **API Protocol**: gRPC, REST
+### 4. **Billing Service**  
+- **Logic**:  
+  - Calculates fare based on distance (PostGIS `ST_Distance`).  
+  - Allows drivers to adjust final charges (100% or lower).  
 
-### Security Features
-- JWT-based authentication
-- Rate limiting
-- Input validation
-- Secure communication over TLS
-- Secret management using Google Secret Manager
+---
 
-### Scalability Features
-- Horizontal scaling capability
-- Caching with Redis
-- Load balancing
-- Message queue for async processing
-- Database connection pooling
+## 🌐 Data Flow
+1. **Driver activates beacon** → Updates `is_available` in PostgreSQL.  
+2. **Customer requests ride** → Matching Service polls nearby drivers via PostGIS.  
+3. **Match confirmed** → Notification Service sends SMS.  
+4. **Trip ends** → Billing Service computes fare and deducts 5% admin fee.  
 
-## Architecture Overview
+---
 
-### High-Level Design
+## 🚀 Deployment
+### Docker & Kubernetes
 
-The system consists of four main microservices:
-1. Auth Service - Handles user authentication and profile management
-2. Match Service - Manages driver-customer matching within 1km radius
-3. Trip/Billing Service - Handles trip management and cost calculation
-4. Payment Service - Processes payments and settlements
+---
 
-### Technology Stack
+## 🧪 Testing
+### Run Tests
+### Unit tests
 
-- Go for microservices (implementing Clean Architecture)
-- PostgreSQL for data storage
-- Redis for caching and real-time location data
-- NSQ for message queuing
-- gRPC for inter-service communication
-- Docker for containerization
-- Nginx for API Gateway/Load Balancer
-- New Relic for monitoring and observability
-- Google Secret Manager for secrets management
+### Test Cases
+- ✅ OTP validation  
+- ✅ Driver-customer matching logic  
+- ✅ PostGIS distance calculations  
 
-### Clean Architecture
+---
 
-Each microservice follows the Clean Architecture pattern with the following layers:
-- Domain Layer (entities and interfaces)
-- Repository Layer (data access)
-- Usecase Layer (business logic)
-- Delivery Layer (HTTP/gRPC handlers)
+## 🔒 Security
+- **JWT Tokens**: Role-based claims for endpoint access.  
+- **Rate Limiting**: 10 requests/minute for OTP endpoints.  
+- **Encryption**: TLS for APIs; encrypted fields in PostgreSQL.  
 
-## Project Structure
+---
 
-```
-nebengjek-backend/
-├─ auth-service/
-│  ├─ domain/
-│  ├─ repository/
-│  ├─ usecase/
-│  ├─ delivery/
-│  └─ proto/
-├─ match-service/
-├─ trip-billing-service/
-├─ payment-service/
-├─ infrastructure/
-└─ docs/
-```
+## 📈 Scalability
+- **Auto-Scaling**: Kubernetes HPA for high-traffic services.  
+- **Caching**: Redis reduces PostgreSQL load for location queries.  
 
-## Getting Started
+---
 
-### Prerequisites
+## 📌 Assumptions
+- Telkomsel provides SMS/APIs for OTP and notifications.  
+- Drivers/customers enable background location sharing.  
+- PostgreSQL instance has PostGIS extension enabled.  
 
-- Go 1.19 or later
-- Docker and Docker Compose
-- PostgreSQL
-- Redis
-- NSQ
-- protoc (Protocol Buffers compiler)
+---
 
-### Setup Instructions
+## 🤝 Contributing
+1. Fork the repository.  
+2. Create a feature branch (`git checkout -b feature/your-idea`).  
+3. Commit changes (`git commit -m 'Add feature'`).  
+4. Push to the branch (`git push origin feature/your-idea`).  
+5. Open a Pull Request.  
 
-1. Clone the repository
-```bash
-git clone https://github.com/YourUsername/nebengjek-backend.git
-cd nebengjek-backend
-```
+---
 
-2. Install dependencies for each service
-```bash
-cd auth-service && go mod download
-cd ../match-service && go mod download
-cd ../trip-billing-service && go mod download
-cd ../payment-service && go mod download
-```
-
-3. Set up environment variables
-- Copy `config.yaml.example` to `config.yaml` in each service's config directory
-- Update the configurations with your settings
-- Configure Google Secret Manager credentials if needed
-
-4. Start the services using Docker Compose
-```bash
-docker-compose up
-```
-
-## Development
-
-### Generating Protocol Buffers
-
-After modifying any `.proto` files, regenerate the Go code:
-
-```bash
-protoc --go_out=. --go_opt=paths=source_relative \
-    --go-grpc_out=. --go-grpc_opt=paths=source_relative \
-    proto/*.proto
-```
-
-### Running Tests
-
-Each service includes its own test suite. To run tests:
-
-```bash
-go test ./...
-```
-
-## Monitoring
-
-- New Relic APM is integrated for performance monitoring
-- Metrics, logs, and traces are automatically collected
-- Access the New Relic dashboard for detailed insights
-
-## License
-
-MIT
+📄 **License**: MIT

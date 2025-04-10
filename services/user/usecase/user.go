@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/utils"
 	"github.com/piresc/nebengjek/services/user"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // UserUC implements UserUC interface
@@ -29,17 +29,17 @@ func (s *UserUC) RegisterUser(ctx context.Context, user *models.User) error {
 		return err
 	}
 
+	// Validate MSISDN format
+	isValid, formattedMSISDN, err := utils.ValidateMSISDN(user.MSISDN)
+	if err != nil || !isValid {
+		return fmt.Errorf("invalid MSISDN format or not a Telkomsel number")
+	}
+	user.MSISDN = formattedMSISDN
+
 	// Generate UUID if not provided
 	if user.ID == "" {
 		user.ID = uuid.New().String()
 	}
-
-	// Hash password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return fmt.Errorf("failed to hash password: %w", err)
-	}
-	user.Password = string(hashedPassword)
 
 	// Set default values
 	user.CreatedAt = time.Now()
@@ -56,40 +56,12 @@ func (s *UserUC) RegisterUser(ctx context.Context, user *models.User) error {
 	return s.repo.CreateUser(ctx, user)
 }
 
-// AuthenticateUser authenticates a user by email and password
-func (s *UserUC) AuthenticateUser(ctx context.Context, email, password string) (*models.User, error) {
-	// Get user by email
-	user, err := s.repo.GetUserByEmail(ctx, email)
-	if err != nil {
-		return nil, fmt.Errorf("invalid email or password")
-	}
-
-	// Check if user is active
-	if !user.IsActive {
-		return nil, fmt.Errorf("user account is deactivated")
-	}
-
-	// Verify password
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
-	if err != nil {
-		return nil, fmt.Errorf("invalid email or password")
-	}
-
-	// Clear password before returning
-	user.Password = ""
-
-	return user, nil
-}
-
 // GetUserByID retrieves a user by ID
 func (s *UserUC) GetUserByID(ctx context.Context, id string) (*models.User, error) {
 	user, err := s.repo.GetUserByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-
-	// Clear password before returning
-	user.Password = ""
 
 	return user, nil
 }
@@ -108,18 +80,16 @@ func (s *UserUC) UpdateUserProfile(ctx context.Context, user *models.User) error
 	}
 
 	// Update only allowed fields
-	existingUser.Email = user.Email
-	existingUser.PhoneNumber = user.PhoneNumber
 	existingUser.FullName = user.FullName
 	existingUser.UpdatedAt = time.Now()
 
-	// Update password if provided
-	if user.Password != "" {
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-		if err != nil {
-			return fmt.Errorf("failed to hash password: %w", err)
+	// Update MSISDN if provided and valid
+	if user.MSISDN != "" && user.MSISDN != existingUser.MSISDN {
+		isValid, formattedMSISDN, err := utils.ValidateMSISDN(user.MSISDN)
+		if err != nil || !isValid {
+			return fmt.Errorf("invalid MSISDN format or not a Telkomsel number")
 		}
-		existingUser.Password = string(hashedPassword)
+		existingUser.MSISDN = formattedMSISDN
 	}
 
 	// Update driver info if user is a driver
@@ -129,7 +99,6 @@ func (s *UserUC) UpdateUserProfile(ctx context.Context, user *models.User) error
 		existingUser.DriverInfo.VehicleModel = user.DriverInfo.VehicleModel
 		existingUser.DriverInfo.VehicleColor = user.DriverInfo.VehicleColor
 		existingUser.DriverInfo.LicenseNumber = user.DriverInfo.LicenseNumber
-		existingUser.DriverInfo.Documents = user.DriverInfo.Documents
 	}
 
 	// Update user
@@ -159,11 +128,6 @@ func (s *UserUC) ListUsers(ctx context.Context, offset, limit int) ([]*models.Us
 		return nil, err
 	}
 
-	// Clear passwords before returning
-	for _, user := range users {
-		user.Password = ""
-	}
-
 	return users, nil
 }
 
@@ -173,6 +137,13 @@ func (s *UserUC) RegisterDriver(ctx context.Context, user *models.User) error {
 	if err := validateUserData(user); err != nil {
 		return err
 	}
+
+	// Validate MSISDN format
+	isValid, formattedMSISDN, err := utils.ValidateMSISDN(user.MSISDN)
+	if err != nil || !isValid {
+		return fmt.Errorf("invalid MSISDN format or not a Telkomsel number")
+	}
+	user.MSISDN = formattedMSISDN
 
 	// Validate driver data
 	if err := validateDriverData(user.DriverInfo); err != nil {
@@ -190,103 +161,6 @@ func (s *UserUC) RegisterDriver(ctx context.Context, user *models.User) error {
 	return s.RegisterUser(ctx, user)
 }
 
-// UpdateDriverLocation updates a driver's current location
-func (s *UserUC) UpdateDriverLocation(ctx context.Context, driverID string, location *models.Location) error {
-	// Validate location data
-	if err := validateLocationData(location); err != nil {
-		return err
-	}
-
-	// Get existing user
-	user, err := s.repo.GetUserByID(ctx, driverID)
-	if err != nil {
-		return err
-	}
-
-	// Check if user is a driver
-	if user.Role != "driver" {
-		return fmt.Errorf("user is not a driver")
-	}
-
-	// Set timestamp if not provided
-	if location.Timestamp.IsZero() {
-		location.Timestamp = time.Now()
-	}
-
-	// Update driver location
-	return s.repo.UpdateDriverLocation(ctx, driverID, location)
-}
-
-// UpdateDriverAvailability updates a driver's availability status
-func (s *UserUC) UpdateDriverAvailability(ctx context.Context, driverID string, isAvailable bool) error {
-	// Get existing user
-	user, err := s.repo.GetUserByID(ctx, driverID)
-	if err != nil {
-		return err
-	}
-
-	// Check if user is a driver
-	if user.Role != "driver" {
-		return fmt.Errorf("user is not a driver")
-	}
-
-	// Check if driver is verified
-	if !user.DriverInfo.Verified {
-		return fmt.Errorf("driver is not verified")
-	}
-
-	// Update driver availability
-	return s.repo.UpdateDriverAvailability(ctx, driverID, isAvailable)
-}
-
-// GetNearbyDrivers retrieves available drivers near a location within a radius
-func (s *UserUC) GetNearbyDrivers(ctx context.Context, location *models.Location, radiusKm float64) ([]*models.User, error) {
-	// Validate location data
-	if err := validateLocationData(location); err != nil {
-		return nil, err
-	}
-
-	// Validate radius
-	if radiusKm <= 0 {
-		return nil, fmt.Errorf("radius must be positive")
-	}
-
-	// Get nearby drivers
-	drivers, err := s.repo.GetNearbyDrivers(ctx, location, radiusKm)
-	if err != nil {
-		return nil, err
-	}
-
-	// Clear passwords before returning
-	for _, driver := range drivers {
-		driver.Password = ""
-	}
-
-	return drivers, nil
-}
-
-// VerifyDriver marks a driver as verified
-func (s *UserUC) VerifyDriver(ctx context.Context, driverID string) error {
-	// Get existing user
-	user, err := s.repo.GetUserByID(ctx, driverID)
-	if err != nil {
-		return err
-	}
-
-	// Check if user is a driver
-	if user.Role != "driver" {
-		return fmt.Errorf("user is not a driver")
-	}
-
-	// Check if driver is already verified
-	if user.DriverInfo.Verified {
-		return fmt.Errorf("driver is already verified")
-	}
-
-	// Verify driver
-	return s.repo.VerifyDriver(ctx, driverID)
-}
-
 // Helper functions for validation
 
 func validateUserData(user *models.User) error {
@@ -294,12 +168,8 @@ func validateUserData(user *models.User) error {
 		return errors.New("user cannot be nil")
 	}
 
-	if user.Email == "" {
-		return errors.New("email is required")
-	}
-
-	if user.PhoneNumber == "" {
-		return errors.New("phone number is required")
+	if user.MSISDN == "" {
+		return errors.New("MSISDN is required")
 	}
 
 	if user.FullName == "" {
@@ -332,22 +202,6 @@ func validateDriverData(driver *models.Driver) error {
 
 	if driver.LicenseNumber == "" {
 		return errors.New("license number is required")
-	}
-
-	return nil
-}
-
-func validateLocationData(location *models.Location) error {
-	if location == nil {
-		return errors.New("location cannot be nil")
-	}
-
-	if location.Latitude < -90 || location.Latitude > 90 {
-		return errors.New("latitude must be between -90 and 90")
-	}
-
-	if location.Longitude < -180 || location.Longitude > 180 {
-		return errors.New("longitude must be between -180 and 180")
 	}
 
 	return nil

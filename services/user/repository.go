@@ -6,20 +6,17 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
-// UserRepository defines the interface for user data access operations
+// UserRepo defines the user repository interface
 type UserRepo interface {
-	// User operations
+	// User management
 	CreateUser(ctx context.Context, user *models.User) error
 	GetUserByID(ctx context.Context, id string) (*models.User, error)
-	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
-	GetUserByPhoneNumber(ctx context.Context, phoneNumber string) (*models.User, error)
+	GetUserByMSISDN(ctx context.Context, msisdn string) (*models.User, error)
 	UpdateUser(ctx context.Context, user *models.User) error
-	DeleteUser(ctx context.Context, id string) error
 	ListUsers(ctx context.Context, offset, limit int) ([]*models.User, error)
 
-	// Driver-specific operations
-	UpdateDriverLocation(ctx context.Context, driverID string, location *models.Location) error
-	UpdateDriverAvailability(ctx context.Context, driverID string, isAvailable bool) error
-	GetNearbyDrivers(ctx context.Context, location *models.Location, radiusKm float64) ([]*models.User, error)
-	VerifyDriver(ctx context.Context, driverID string) error
+	// OTP management
+	CreateOTP(ctx context.Context, otp *models.OTP) error
+	GetOTP(ctx context.Context, msisdn, code string) (*models.OTP, error)
+	MarkOTPVerified(ctx context.Context, id string) error
 }

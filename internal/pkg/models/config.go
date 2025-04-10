@@ -2,64 +2,72 @@ package models
 
 // Config represents application configuration
 type Config struct {
-	App      AppConfig      `mapstructure:"app"`
-	Server   ServerConfig   `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
-	Redis    RedisConfig    `mapstructure:"redis"`
-	NSQ      NSQConfig      `mapstructure:"nsq"`
-	JWT      JWTConfig      `mapstructure:"jwt"`
+	App      AppConfig
+	Server   ServerConfig
+	Database DatabaseConfig
+	Redis    RedisConfig
+	NATS     NATSConfig
+	JWT      JWTConfig
+	Pricing  PricingConfig
 }
 
 // AppConfig contains application-specific configuration
 type AppConfig struct {
-	Name        string `mapstructure:"name"`
-	Environment string `mapstructure:"environment"`
-	Debug       bool   `mapstructure:"debug"`
-	Version     string `mapstructure:"version"`
+	Name        string
+	Environment string
+	Debug       bool
+	Version     string
 }
 
 // ServerConfig contains HTTP/gRPC server configuration
 type ServerConfig struct {
-	Host            string `mapstructure:"host"`
-	Port            int    `mapstructure:"port"`
-	GRPCPort        int    `mapstructure:"grpc_port"`
-	ReadTimeout     int    `mapstructure:"read_timeout"`
-	WriteTimeout    int    `mapstructure:"write_timeout"`
-	ShutdownTimeout int    `mapstructure:"shutdown_timeout"`
+	Host            string
+	Port            int
+	GRPCPort        int
+	ReadTimeout     int
+	WriteTimeout    int
+	ShutdownTimeout int
 }
 
 // DatabaseConfig contains database connection configuration
 type DatabaseConfig struct {
-	Driver    string `mapstructure:"driver"`
-	Host      string `mapstructure:"host"`
-	Port      int    `mapstructure:"port"`
-	Username  string `mapstructure:"username"`
-	Password  string `mapstructure:"password"`
-	Database  string `mapstructure:"database"`
-	SSLMode   string `mapstructure:"ssl_mode"`
-	MaxConns  int    `mapstructure:"max_conns"`
-	IdleConns int    `mapstructure:"idle_conns"`
+	Driver    string
+	Host      string
+	Port      int
+	Username  string
+	Password  string
+	Database  string
+	SSLMode   string
+	MaxConns  int
+	IdleConns int
 }
 
 // RedisConfig contains Redis connection configuration
 type RedisConfig struct {
-	Host     string `mapstructure:"host"`
-	Port     int    `mapstructure:"port"`
-	Password string `mapstructure:"password"`
-	DB       int    `mapstructure:"db"`
-	PoolSize int    `mapstructure:"pool_size"`
+	Host     string
+	Port     int
+	Password string
+	DB       int
+	PoolSize int
 }
 
-// NSQConfig contains NSQ connection configuration
-type NSQConfig struct {
-	LookupAddresses []string `mapstructure:"lookup_addresses"`
-	ProducerAddress string   `mapstructure:"producer_address"`
-	ConsumerAddress string   `mapstructure:"consumer_address"`
+// NATSConfig contains NATS connection configuration
+type NATSConfig struct {
+	URL string
 }
 
 // JWTConfig contains JWT authentication configuration
 type JWTConfig struct {
-	Secret     string `mapstructure:"secret"`
-	Expiration int    `mapstructure:"expiration"` // in minutes
-	Issuer     string `mapstructure:"issuer"`
+	Secret     string
+	Expiration int // in minutes
+	Issuer     string
+}
+
+type PricingConfig struct {
+	RatePerKm     float64 `json:"rate_per_km"`
+	Currency      string  `json:"currency"`
+	BaseFare      float64 `json:"base_fare"`
+	PerKmRate     float64 `json:"per_km_rate"`
+	PerMinuteRate float64 `json:"per_minute_rate"`
+	SurgeFactor   float64 `json:"surge_factor"`
 }

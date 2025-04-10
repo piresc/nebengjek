@@ -18,17 +18,15 @@ func NewUserHandler(userUC user.UserUC) *UserHandler {
 // RegisterRoutes registers the user API routes
 func (h *UserHandler) RegisterRoutes(e *echo.Echo) {
 	// User routes
-	e.POST("/users", h.CreateUser)
 	e.GET("/users/:id", h.GetUser)
 	e.PUT("/users/:id", h.UpdateUser)
 	e.DELETE("/users/:id", h.DeactivateUser)
 	e.GET("/users", h.ListUsers)
-	e.POST("/auth/login", h.Login)
+
+	// Auth routes - as per README specifications
+	e.POST("/auth/login", h.GenerateOTP) // Generates OTP via SMS
+	e.POST("/auth/verify", h.VerifyOTP)  // Validates OTP and issues JWT
 
 	// Driver routes
 	e.POST("/drivers", h.RegisterDriver)
-	e.PUT("/drivers/:id/location", h.UpdateDriverLocation)
-	e.PUT("/drivers/:id/availability", h.UpdateDriverAvailability)
-	e.GET("/drivers/nearby", h.GetNearbyDrivers)
-	e.PUT("/drivers/:id/verify", h.VerifyDriver)
 }

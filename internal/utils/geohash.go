@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/mmcloughlin/geohash"
@@ -21,10 +20,7 @@ func EncodeLocation(location models.Location, precision uint) string {
 
 // DecodeGeohash converts a geohash string to latitude and longitude
 func DecodeGeohash(hash string) (latitude, longitude float64, err error) {
-	latitude, longitude, err = geohash.Decode(hash)
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to decode geohash: %w", err)
-	}
+	latitude, longitude = geohash.Decode(hash)
 	return latitude, longitude, nil
 }
 
