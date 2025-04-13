@@ -9,21 +9,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/internal/utils"
-	"github.com/piresc/nebengjek/services/user"
 )
 
-// UserUC implements UserUC interface
-type UserUC struct {
-	repo user.UserRepo
-}
-
-// NewUserUC creates a new user UC
-func NewUserUC(repo user.UserRepo) *UserUC {
-	return &UserUC{repo: repo}
-}
-
 // RegisterUser registers a new user
-func (s *UserUC) RegisterUser(ctx context.Context, user *models.User) error {
+func (u *UserUC) RegisterUser(ctx context.Context, user *models.User) error {
 	// Validate user data
 	if err := validateUserData(user); err != nil {
 		return err
@@ -53,12 +42,12 @@ func (s *UserUC) RegisterUser(ctx context.Context, user *models.User) error {
 	}
 
 	// Create user
-	return s.repo.CreateUser(ctx, user)
+	return u.userRepo.CreateUser(ctx, user)
 }
 
 // GetUserByID retrieves a user by ID
-func (s *UserUC) GetUserByID(ctx context.Context, id string) (*models.User, error) {
-	user, err := s.repo.GetUserByID(ctx, id)
+func (u *UserUC) GetUserByID(ctx context.Context, id string) (*models.User, error) {
+	user, err := u.userRepo.GetUserByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -67,14 +56,14 @@ func (s *UserUC) GetUserByID(ctx context.Context, id string) (*models.User, erro
 }
 
 // UpdateUserProfile updates a user's profile
-func (s *UserUC) UpdateUserProfile(ctx context.Context, user *models.User) error {
+func (u *UserUC) UpdateUserProfile(ctx context.Context, user *models.User) error {
 	// Validate user data
 	if err := validateUserData(user); err != nil {
 		return err
 	}
 
 	// Get existing user
-	existingUser, err := s.repo.GetUserByID(ctx, user.ID)
+	existingUser, err := u.userRepo.GetUserByID(ctx, user.ID)
 	if err != nil {
 		return err
 	}
@@ -102,13 +91,13 @@ func (s *UserUC) UpdateUserProfile(ctx context.Context, user *models.User) error
 	}
 
 	// Update user
-	return s.repo.UpdateUser(ctx, existingUser)
+	return u.userRepo.UpdateUser(ctx, existingUser)
 }
 
 // DeactivateUser deactivates a user account
-func (s *UserUC) DeactivateUser(ctx context.Context, id string) error {
+func (u *UserUC) DeactivateUser(ctx context.Context, id string) error {
 	// Get existing user
-	user, err := s.repo.GetUserByID(ctx, id)
+	user, err := u.userRepo.GetUserByID(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -118,12 +107,12 @@ func (s *UserUC) DeactivateUser(ctx context.Context, id string) error {
 	user.UpdatedAt = time.Now()
 
 	// Update user
-	return s.repo.UpdateUser(ctx, user)
+	return u.userRepo.UpdateUser(ctx, user)
 }
 
 // ListUsers retrieves a list of users with pagination
-func (s *UserUC) ListUsers(ctx context.Context, offset, limit int) ([]*models.User, error) {
-	users, err := s.repo.ListUsers(ctx, offset, limit)
+func (u *UserUC) ListUsers(ctx context.Context, offset, limit int) ([]*models.User, error) {
+	users, err := u.userRepo.ListUsers(ctx, offset, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +121,7 @@ func (s *UserUC) ListUsers(ctx context.Context, offset, limit int) ([]*models.Us
 }
 
 // RegisterDriver registers a new driver
-func (s *UserUC) RegisterDriver(ctx context.Context, user *models.User) error {
+func (u *UserUC) RegisterDriver(ctx context.Context, user *models.User) error {
 	// Validate user data
 	if err := validateUserData(user); err != nil {
 		return err
@@ -158,7 +147,7 @@ func (s *UserUC) RegisterDriver(ctx context.Context, user *models.User) error {
 	user.DriverInfo.IsAvailable = false
 
 	// Register user
-	return s.RegisterUser(ctx, user)
+	return u.userRepo.CreateUser(ctx, user)
 }
 
 // Helper functions for validation

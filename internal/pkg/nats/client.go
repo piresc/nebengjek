@@ -22,6 +22,11 @@ func NewClient(url string) (*Client, error) {
 	return &Client{conn: conn}, nil
 }
 
+// GetDB returns the underlying sqlx DB instance
+func (c *Client) GetConn() *nats.Conn {
+	return c.conn
+}
+
 // Publish sends a message to the specified subject
 func (c *Client) Publish(subject string, data []byte) error {
 	err := c.conn.Publish(subject, data)

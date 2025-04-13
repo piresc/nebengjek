@@ -7,40 +7,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/internal/utils"
-	"github.com/piresc/nebengjek/services/rides"
 )
-
-// RideHandler handles ride-related HTTP requests
-type RideHandler struct {
-	rideUC rides.RideUseCase
-}
-
-// NewRideHandler creates a new ride handler
-func NewRideHandler(rideUC rides.RideUseCase) *RideHandler {
-	return &RideHandler{rideUC: rideUC}
-}
-
-// RegisterRoutes registers the ride routes
-func (h *RideHandler) RegisterRoutes(e *echo.Echo) {
-	// Ride request routes
-	e.POST("/rides", h.CreateRideRequest)       // Create a new ride request
-	e.DELETE("/rides/:id", h.CancelRideRequest) // Cancel a ride request
-
-	// Driver routes
-	e.PUT("/rides/:id/accept", h.AcceptRide)     // Driver accepts a ride
-	e.PUT("/rides/:id/reject", h.RejectRide)     // Driver rejects a ride
-	e.PUT("/rides/:id/start", h.StartRide)       // Driver starts a ride
-	e.PUT("/rides/:id/complete", h.CompleteRide) // Driver completes a ride
-
-	// Ride status routes
-	e.GET("/rides/:id", h.GetRideStatus)                              // Get ride status
-	e.GET("/rides/passenger/:id/active", h.GetActiveRideForPassenger) // Get active ride for passenger
-	e.GET("/rides/driver/:id/active", h.GetActiveRideForDriver)       // Get active ride for driver
-	e.GET("/rides/history", h.GetRideHistory)                         // Get ride history
-
-	// Rating routes
-	e.POST("/rides/:id/rate", h.RateRide) // Rate a ride
-}
 
 // CreateRideRequest handles ride request creation
 func (h *RideHandler) CreateRideRequest(c echo.Context) error {
@@ -62,7 +29,7 @@ func (h *RideHandler) CreateRideRequest(c echo.Context) error {
 	}
 
 	// Create ride request
-	trip, err := h.rideUC.CreateRideRequest(
+	trip, err := h.RideUC.CreateRideRequest(
 		c.Request().Context(),
 		req.PassengerID,
 		&req.PickupLocation,
@@ -90,7 +57,7 @@ func (h *RideHandler) CancelRideRequest(c echo.Context) error {
 	}
 
 	// Cancel ride request
-	if err := h.rideUC.CancelRideRequest(c.Request().Context(), tripID, userID); err != nil {
+	if err := h.RideUC.CancelRideRequest(c.Request().Context(), tripID, userID); err != nil {
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, err.Error())
 	}
 
@@ -121,7 +88,7 @@ func (h *RideHandler) AcceptRide(c echo.Context) error {
 	}
 
 	// Accept ride
-	if err := h.rideUC.AcceptRide(c.Request().Context(), tripID, req.DriverID); err != nil {
+	if err := h.RideUC.AcceptRide(c.Request().Context(), tripID, req.DriverID); err != nil {
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, err.Error())
 	}
 
@@ -152,7 +119,7 @@ func (h *RideHandler) RejectRide(c echo.Context) error {
 	}
 
 	// Reject ride
-	if err := h.rideUC.RejectRide(c.Request().Context(), tripID, req.DriverID); err != nil {
+	if err := h.RideUC.RejectRide(c.Request().Context(), tripID, req.DriverID); err != nil {
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, err.Error())
 	}
 
@@ -183,7 +150,7 @@ func (h *RideHandler) StartRide(c echo.Context) error {
 	}
 
 	// Start ride
-	if err := h.rideUC.StartRide(c.Request().Context(), tripID, req.DriverID); err != nil {
+	if err := h.RideUC.StartRide(c.Request().Context(), tripID, req.DriverID); err != nil {
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, err.Error())
 	}
 
@@ -214,12 +181,12 @@ func (h *RideHandler) CompleteRide(c echo.Context) error {
 	}
 
 	// Complete ride
-	if err := h.rideUC.CompleteRide(c.Request().Context(), tripID, req.DriverID); err != nil {
+	if err := h.RideUC.CompleteRide(c.Request().Context(), tripID, req.DriverID); err != nil {
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, err.Error())
 	}
 
 	// Get updated ride with fare
-	trip, err := h.rideUC.GetRideStatus(c.Request().Context(), tripID)
+	trip, err := h.RideUC.GetRideStatus(c.Request().Context(), tripID)
 	if err != nil {
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, err.Error())
 	}
@@ -236,7 +203,7 @@ func (h *RideHandler) GetRideStatus(c echo.Context) error {
 	}
 
 	// Get ride status
-	trip, err := h.rideUC.GetRideStatus(c.Request().Context(), tripID)
+	trip, err := h.RideUC.GetRideStatus(c.Request().Context(), tripID)
 	if err != nil {
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, err.Error())
 	}
@@ -253,7 +220,7 @@ func (h *RideHandler) GetActiveRideForPassenger(c echo.Context) error {
 	}
 
 	// Get active ride
-	trip, err := h.rideUC.GetActiveRideForPassenger(c.Request().Context(), passengerID)
+	trip, err := h.RideUC.GetActiveRideForPassenger(c.Request().Context(), passengerID)
 	if err != nil {
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, err.Error())
 	}
@@ -274,7 +241,7 @@ func (h *RideHandler) GetActiveRideForDriver(c echo.Context) error {
 	}
 
 	// Get active ride
-	trip, err := h.rideUC.GetActiveRideForDriver(c.Request().Context(), driverID)
+	trip, err := h.RideUC.GetActiveRideForDriver(c.Request().Context(), driverID)
 	if err != nil {
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, err.Error())
 	}
@@ -328,7 +295,7 @@ func (h *RideHandler) GetRideHistory(c echo.Context) error {
 	}
 
 	// Get ride history
-	trips, err := h.rideUC.GetRideHistory(c.Request().Context(), userID, role, startTime, endTime)
+	trips, err := h.RideUC.GetRideHistory(c.Request().Context(), userID, role, startTime, endTime)
 	if err != nil {
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, err.Error())
 	}
@@ -370,7 +337,7 @@ func (h *RideHandler) RateRide(c echo.Context) error {
 	}
 
 	// Rate ride
-	if err := h.rideUC.RateRide(c.Request().Context(), tripID, req.UserID, req.Role, req.Rating); err != nil {
+	if err := h.RideUC.RateRide(c.Request().Context(), tripID, req.UserID, req.Role, req.Rating); err != nil {
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, err.Error())
 	}
 

@@ -5,16 +5,10 @@ import (
 	"fmt"
 
 	"github.com/piresc/nebengjek/internal/utils"
-	"github.com/piresc/nebengjek/services/billing"
 )
 
 // LocationRepoImpl implements the LocationRepo interface
 type LocationRepoImpl struct{}
-
-// NewLocationRepository creates a new location repository for billing service
-func NewLocationRepository() billing.LocationRepo {
-	return &LocationRepoImpl{}
-}
 
 // CalculateDistance calculates the distance between two locations
 func (r *LocationRepoImpl) CalculateDistance(ctx context.Context, startLocation, endLocation string) (float64, error) {

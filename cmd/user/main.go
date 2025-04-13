@@ -7,6 +7,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/config"
 	"github.com/piresc/nebengjek/internal/pkg/database"
+	"github.com/piresc/nebengjek/internal/pkg/nats"
+	"github.com/piresc/nebengjek/services/user/gateways"
 	"github.com/piresc/nebengjek/services/user/handler"
 	"github.com/piresc/nebengjek/services/user/repository"
 	"github.com/piresc/nebengjek/services/user/usecase"
@@ -14,7 +16,8 @@ import (
 
 func main() {
 	appName := "user-service"
-	configs := config.InitConfig(appName)
+	envPath := ".env"
+	configs := config.InitConfig(envPath)
 
 	// Initialize PostgreSQL database connection
 	postgresClient, err := database.NewPostgresClient(configs.Database)
@@ -23,9 +26,17 @@ func main() {
 	}
 	defer postgresClient.Close()
 
+	// Initialize NATS
+	natsClient, err := nats.NewClient(configs.NATS.URL)
+	if err != nil {
+		log.Fatalf("Failed to connect to NATS: %v", err)
+	}
+	defer natsClient.Close()
+
 	// Initialize repository, service, and handler
-	userRepo := repository.NewUserRepository(configs, postgresClient.GetDB())
-	userUC := usecase.NewUserUC(userRepo)
+	userRepo := repository.NewUserRepo(configs, postgresClient.GetDB())
+	userGW := gateways.NewUserGW(natsClient.GetConn())
+	userUC := usecase.NewUserUC(*userRepo, *userGW)
 	userHandler := handler.NewUserHandler(userUC)
 
 	// Initialize Echo router

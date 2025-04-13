@@ -8,7 +8,7 @@ import (
 type User struct {
 	ID         string    `json:"id" bson:"_id" db:"id"`
 	MSISDN     string    `json:"msisdn" bson:"msisdn" db:"msisdn"`
-	FullName   string    `json:"full_name" bson:"full_name" db:"full_name"`
+	FullName   string    `json:"fullname" bson:"fullname" db:"fullname"`
 	Role       string    `json:"role" bson:"role" db:"role"` // driver or customer
 	CreatedAt  time.Time `json:"created_at" bson:"created_at" db:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at" bson:"updated_at" db:"updated_at"`

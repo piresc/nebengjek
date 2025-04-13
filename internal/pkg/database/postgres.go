@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib" // Standard library bindings for pgx
 	"github.com/jmoiron/sqlx"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )

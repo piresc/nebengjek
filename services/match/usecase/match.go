@@ -129,7 +129,7 @@ func (uc *MatchUC) handleMatchRequest(messageBody []byte) error {
 		PickupLocation:  request.PickupLocation,
 		DropoffLocation: request.DropoffLocation,
 		RequestedAt:     request.Timestamp,
-		Status:          models.TripStatusRequested,
+		Status:          models.triptatusRequested,
 	}
 
 	// Process the match request
@@ -156,7 +156,7 @@ func (uc *MatchUC) CreateMatchRequest(ctx context.Context, trip *models.Trip) er
 	// If a match was found, update the trip status and notify
 	if matchedTrip != nil && matchedTrip.DriverID != "" {
 		// Update the trip status to matched
-		err = uc.repo.UpdateMatchStatus(ctx, matchedTrip.ID, models.TripStatusMatched)
+		err = uc.repo.UpdateMatchStatus(ctx, matchedTrip.ID, models.triptatusMatched)
 		if err != nil {
 			return fmt.Errorf("failed to update match status: %w", err)
 		}
@@ -180,7 +180,7 @@ func (uc *MatchUC) ProcessLocationUpdate(ctx context.Context, driverID string, l
 	// This is a simplified approach - in a real system, you might use a more sophisticated matching algorithm
 	// or a separate background process for matching
 
-	// Get pending match requests (trips with status REQUESTED)
+	// Get pending match requests (trip with status REQUESTED)
 	// For simplicity, we're not implementing this here, but in a real system,
 	// you would query for pending requests and try to match them with the driver
 
@@ -205,25 +205,25 @@ func (uc *MatchUC) FindMatchForPassenger(ctx context.Context, passengerID string
 	selectedDriver := drivers[0]
 
 	// Get the pending trip for this passenger
-	pendingTrips, err := uc.repo.GetPendingMatchesByPassengerID(ctx, passengerID)
+	pendingtrip, err := uc.repo.GetPendingMatchesByPassengerID(ctx, passengerID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get pending trips: %w", err)
+		return nil, fmt.Errorf("failed to get pending trip: %w", err)
 	}
 
-	if len(pendingTrips) == 0 {
+	if len(pendingtrip) == 0 {
 		return nil, fmt.Errorf("no pending trip found for passenger")
 	}
 
 	// Get the most recent pending trip
-	trip := pendingTrips[0]
+	trip := pendingtrip[0]
 
 	// Update the trip with the selected driver
 	trip.DriverID = selectedDriver.ID
-	trip.Status = models.TripStatusMatched
+	trip.Status = models.triptatusMatched
 	trip.MatchedAt = timePtr(time.Now())
 
 	// Update the trip in the database
-	err = uc.repo.UpdateMatchStatus(ctx, trip.ID, models.TripStatusMatched)
+	err = uc.repo.UpdateMatchStatus(ctx, trip.ID, models.triptatusMatched)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update match status: %w", err)
 	}
@@ -245,18 +245,18 @@ func (uc *MatchUC) AcceptMatch(ctx context.Context, tripID string, driverID stri
 	}
 
 	// Verify that the trip is in MATCHED status
-	if trip.Status != models.TripStatusMatched {
+	if trip.Status != models.triptatusMatched {
 		return fmt.Errorf("trip is not in MATCHED status")
 	}
 
 	// Update the trip status to ACCEPTED
-	err = uc.repo.UpdateMatchStatus(ctx, tripID, models.TripStatusAccepted)
+	err = uc.repo.UpdateMatchStatus(ctx, tripID, models.triptatusAccepted)
 	if err != nil {
 		return fmt.Errorf("failed to update match status: %w", err)
 	}
 
 	// Send notification about the acceptance
-	trip.Status = models.TripStatusAccepted
+	trip.Status = models.triptatusAccepted
 	uc.sendMatchNotification(trip)
 
 	return nil
@@ -276,18 +276,18 @@ func (uc *MatchUC) RejectMatch(ctx context.Context, tripID string, driverID stri
 	}
 
 	// Verify that the trip is in MATCHED status
-	if trip.Status != models.TripStatusMatched {
+	if trip.Status != models.triptatusMatched {
 		return fmt.Errorf("trip is not in MATCHED status")
 	}
 
 	// Update the trip status to REJECTED
-	err = uc.repo.UpdateMatchStatus(ctx, tripID, models.TripStatusRejected)
+	err = uc.repo.UpdateMatchStatus(ctx, tripID, models.triptatusRejected)
 	if err != nil {
 		return fmt.Errorf("failed to update match status: %w", err)
 	}
 
 	// Send notification about the rejection
-	trip.Status = models.TripStatusRejected
+	trip.Status = models.triptatusRejected
 	uc.sendMatchNotification(trip)
 
 	// Try to find another driver for this passenger
@@ -316,20 +316,20 @@ func (uc *MatchUC) CancelMatch(ctx context.Context, tripID string, userID string
 	}
 
 	// Verify that the trip is in a cancellable status
-	if trip.Status != models.TripStatusRequested &&
-		trip.Status != models.TripStatusMatched &&
-		trip.Status != models.TripStatusAccepted {
+	if trip.Status != models.triptatusRequested &&
+		trip.Status != models.triptatusMatched &&
+		trip.Status != models.triptatusAccepted {
 		return fmt.Errorf("trip cannot be cancelled in its current status")
 	}
 
 	// Update the trip status to CANCELLED
-	err = uc.repo.UpdateMatchStatus(ctx, tripID, models.TripStatusCancelled)
+	err = uc.repo.UpdateMatchStatus(ctx, tripID, models.triptatusCancelled)
 	if err != nil {
 		return fmt.Errorf("failed to update match status: %w", err)
 	}
 
 	// Send notification about the cancellation
-	trip.Status = models.TripStatusCancelled
+	trip.Status = models.triptatusCancelled
 	uc.sendMatchNotification(trip)
 
 	return nil

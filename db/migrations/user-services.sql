@@ -3,10 +3,8 @@
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(36) PRIMARY KEY,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    phone_number VARCHAR(20) UNIQUE NOT NULL,
-    full_name VARCHAR(255) NOT NULL,
-    password VARCHAR(255) NOT NULL,
+    msisdn VARCHAR(20) UNIQUE NOT NULL,
+    fullname VARCHAR(255) NOT NULL,
     role VARCHAR(20) NOT NULL, -- 'driver' or 'passenger'
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
@@ -25,14 +23,6 @@ CREATE TABLE IF NOT EXISTS drivers (
     verified BOOLEAN NOT NULL DEFAULT FALSE,
     verified_at TIMESTAMP,
     is_available BOOLEAN NOT NULL DEFAULT FALSE
-);
-
--- Driver documents table
-CREATE TABLE IF NOT EXISTS driver_documents (
-    id SERIAL PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    document_url VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 -- Driver locations table

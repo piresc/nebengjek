@@ -29,7 +29,7 @@ type LocationUpdateType string
 const (
 	// PeriodicUpdate is sent every 30-60 seconds in the background
 	PeriodicUpdate LocationUpdateType = "periodic"
-	// EventBasedUpdate is sent when app state changes or user initiates a ride request
+	// EventBasedUpdate is sent when app state changes or user initiates a trip request
 	EventBasedUpdate LocationUpdateType = "event_based"
 )
 
@@ -40,7 +40,7 @@ type LocationUpdate struct {
 	Location   models.Location    `json:"location"`
 	Timestamp  time.Time          `json:"timestamp"`
 	UpdateType LocationUpdateType `json:"update_type"`
-	EventType  string             `json:"event_type,omitempty"` // For event-based updates: app_state_change, ride_request, etc.
+	EventType  string             `json:"event_type,omitempty"` // For event-based updates: app_state_change, trip_request, etc.
 }
 
 // LocationService implements location service functionality

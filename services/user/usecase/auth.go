@@ -12,7 +12,7 @@ import (
 )
 
 // GenerateOTP generates a new OTP for the given MSISDN
-func (s *UserUC) GenerateOTP(ctx context.Context, msisdn string) error {
+func (u *UserUC) GenerateOTP(ctx context.Context, msisdn string) error {
 	// Validate MSISDN format and check if it's a Telkomsel number
 	isValid, formattedMSISDN, err := utils.ValidateMSISDN(msisdn)
 	if err != nil || !isValid {
@@ -33,7 +33,7 @@ func (s *UserUC) GenerateOTP(ctx context.Context, msisdn string) error {
 	}
 
 	// Save OTP to database
-	if err := s.repo.CreateOTP(ctx, otp); err != nil {
+	if err := u.userRepo.CreateOTP(ctx, otp); err != nil {
 		return fmt.Errorf("failed to create OTP: %w", err)
 	}
 
@@ -45,7 +45,7 @@ func (s *UserUC) GenerateOTP(ctx context.Context, msisdn string) error {
 }
 
 // VerifyOTP verifies the OTP for the given MSISDN
-func (s *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*models.AuthResponse, error) {
+func (u *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*models.AuthResponse, error) {
 	// Validate MSISDN format
 	isValid, formattedMSISDN, err := utils.ValidateMSISDN(msisdn)
 	if err != nil || !isValid {
@@ -53,7 +53,7 @@ func (s *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*models.Au
 	}
 
 	// Get OTP from database
-	otp, err := s.repo.GetOTP(ctx, formattedMSISDN, code)
+	otp, err := u.userRepo.GetOTP(ctx, formattedMSISDN, code)
 	if err != nil {
 		return nil, fmt.Errorf("invalid OTP: %w", err)
 	}
@@ -67,14 +67,8 @@ func (s *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*models.Au
 	if otp.IsVerified {
 		return nil, fmt.Errorf("OTP already used")
 	}
-
-	// Mark OTP as verified
-	if err := s.repo.MarkOTPVerified(ctx, otp.ID); err != nil {
-		return nil, fmt.Errorf("failed to mark OTP as verified: %w", err)
-	}
-
 	// Get or create user
-	user, err := s.repo.GetUserByMSISDN(ctx, formattedMSISDN)
+	user, err := u.userRepo.GetUserByMSISDN(ctx, formattedMSISDN)
 	if err != nil {
 		// User doesn't exist, create a new one
 		user = &models.User{
@@ -87,7 +81,7 @@ func (s *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*models.Au
 			Rating:    0,
 		}
 
-		if err := s.repo.CreateUser(ctx, user); err != nil {
+		if err := u.userRepo.CreateUser(ctx, user); err != nil {
 			return nil, fmt.Errorf("failed to create user: %w", err)
 		}
 	}
@@ -96,6 +90,10 @@ func (s *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*models.Au
 	token, expiresAt, err := generateJWTToken(user)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate token: %w", err)
+	}
+	// Mark OTP as verified
+	if err := u.userRepo.MarkOTPVerified(ctx, otp.ID); err != nil {
+		return nil, fmt.Errorf("failed to mark OTP as verified: %w", err)
 	}
 
 	// Return auth response

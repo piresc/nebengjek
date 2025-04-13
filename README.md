@@ -1,6 +1,6 @@
 # NebengJek
 
-A lightweight, real-time ride-hailing and social matching platform integrated with MyTelkomsel.  
+A lightweight, real-time trip-hailing and social matching platform integrated with MyTelkomsel.  
 **Key Features**: MSISDN-based auth, driver-customer matching, dynamic pricing, and role-based workflows.
 
 ---
@@ -80,7 +80,7 @@ A lightweight, real-time ride-hailing and social matching platform integrated wi
 
 ## 🌐 Data Flow
 1. **Driver activates beacon** → Updates `is_available` in PostgreSQL.  
-2. **Customer requests ride** → Matching Service polls nearby drivers via PostGIS.  
+2. **Customer requests trip** → Matching Service polls nearby drivers via PostGIS.  
 3. **Match confirmed** → Notification Service sends SMS.  
 4. **Trip ends** → Billing Service computes fare and deducts 5% admin fee.  
 
@@ -132,3 +132,5 @@ A lightweight, real-time ride-hailing and social matching platform integrated wi
 ---
 
 📄 **License**: MIT
+
+so the userflow would be, user and driver login using user services(http), and then user and driver turn the beacon, meaning that they want to get find any customer or driver, these using matching-services to matching between these 2(cust and driver), and then one of the driver confirm which user will they get(nats? http?), and then after that confirm in the matching-services, both of them start tracking their gps location using location-services(web-socket), and send nats too? to the trip services? or later?, and then when they are in the destionation, both of them closee the web-socket, and then send the nats to trip-services? and payment-serivices? and after that send it nats to trip services?

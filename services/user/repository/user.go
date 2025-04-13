@@ -5,29 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
-
-type UserRepo struct {
-	cfg *models.Config
-	db  *sqlx.DB
-}
-
-func NewUserRepository(
-	cfg *models.Config,
-	db *sqlx.DB,
-) *UserRepo {
-	log.Println("Initializing user repository")
-	return &UserRepo{
-		cfg: cfg,
-		db:  db,
-	}
-}
 
 // CreateUser creates a new user in the database
 func (r *UserRepo) CreateUser(ctx context.Context, user *models.User) error {
@@ -50,10 +32,9 @@ func (r *UserRepo) CreateUser(ctx context.Context, user *models.User) error {
 
 	// Insert user
 	query := `
-		INSERT INTO users (
-			id, phone_number, full_name, role, 
+		INSERT INTO users (id, msisdn, fullname, role, 
 			created_at, updated_at, is_active, rating
-		) VALUES (:id, :phone_number, :full_name, :role, 
+		) VALUES (:id, :msisdn, :fullname, :role, 
 			:created_at, :updated_at, :is_active, :rating)
 	`
 	_, err = tx.NamedExecContext(ctx, query, user)

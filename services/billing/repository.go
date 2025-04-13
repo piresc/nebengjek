@@ -12,13 +12,3 @@ type BillingRepo interface {
 	UpdatePaymentStatus(ctx context.Context, paymentID string, status string) error
 	CreateTransaction(ctx context.Context, transaction *models.Transaction) error
 }
-
-// LocationRepo defines the interface for location operations
-type LocationRepo interface {
-	CalculateDistance(ctx context.Context, startLocation, endLocation string) (float64, error)
-}
-
-// BillingUseCase defines the interface for billing use cases
-type BillingUseCase interface {
-	ProcessPayment(ctx context.Context, payment *models.Payment) error
-}

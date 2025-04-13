@@ -1,0 +1,209 @@
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:14-alpine
+    container_name: nebengjek-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nebengjek
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - local
+
+  # Redis cache
+  redis:
+    image: redis:alpine
+    container_name: nebengjek-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - local
+
+  # NATS message broker
+  nats:
+    image: nats:latest
+    container_name: nebengjek-nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    healthcheck:
+      test: ["CMD", "/bin/sh", "-c", "echo 'PING' | nc localhost 4222"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - local
+
+  # User Service
+  user-service:
+    container_name: "nebengjek_user"
+    build:
+      context: .
+      dockerfile: ./cmd/user/Dockerfile
+    ports:
+      - "9990:9990"
+    env_file:
+      - ./cmd/user/.env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: nebengjek
+      REDIS_HOST: redis
+      NATS_URL: nats://nats:4222
+    depends_on:
+      - postgres
+      - redis
+      - nats
+    volumes:
+      - ./logs:/app/logs
+    restart: always
+    networks:
+      - local
+  
+  # Trip Management Service
+  trip-management-service:
+    container_name: "nebengjek_trip_management"
+    build:
+      context: .
+      dockerfile: ./cmd/trip-management/Dockerfile
+    ports:
+      - "9991:9991"
+    env_file:
+      - ./cmd/trip-management/.env
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      NATS_URL: nats://nats:4222
+    depends_on:
+      - postgres
+      - redis
+      - nats
+    volumes:
+      - ./logs:/app/logs
+    restart: always
+    networks:
+      - local
+    # trips Service
+  
+  # trips Service
+  trip-service:
+    container_name: "nebengjek_trips"
+    build:
+      context: .
+      dockerfile: ./cmd/trips/Dockerfile
+    ports:
+      - "9992:9992"
+    env_file:
+      - ./cmd/trips/.env
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      NATS_URL: nats://nats:4222
+    depends_on:
+      - postgres
+      - redis
+      - nats
+    volumes:
+      - ./logs:/app/logs
+    restart: always
+    networks:
+      - local
+
+  
+    # Match Service
+  
+  # Match Service
+  match-service:
+    container_name: "nebengjek_match"
+    build:
+      context: .
+      dockerfile: ./cmd/match/Dockerfile
+    ports:
+      - "9993:9993"
+    env_file:
+      - ./cmd/match/.env
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      NATS_URL: nats://nats:4222
+    depends_on:
+      - postgres
+      - redis
+      - nats
+    volumes:
+      - ./logs:/app/logs
+    restart: always
+    networks:
+      - local
+  
+  # Location Service
+  location-service:
+    container_name: "nebengjek_location"
+    build:
+      context: .
+      dockerfile: ./cmd/location/Dockerfile
+    ports:
+      - "9994:9994"
+    env_file:
+      - ./cmd/location/.env
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      NATS_URL: nats://nats:4222
+    depends_on:
+      - postgres
+      - redis
+      - nats
+    volumes:
+      - ./logs:/app/logs
+    restart: always
+    networks:
+      - local
+  
+  # Billing Service
+  billing-service:
+    container_name: "nebengjek_billing"
+    build:
+      context: .
+      dockerfile: ./cmd/billing/Dockerfile
+    ports:
+      - "9995:9995"
+    env_file:
+      - ./cmd/billing/.env
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      NATS_URL: nats://nats:4222
+    depends_on:
+      - postgres
+      - redis
+      - nats
+    volumes:
+      - ./logs:/app/logs
+    restart: always
+    networks:
+      - local
+
+volumes:
+  postgres_data:
+
+networks:
+  local:
+    driver: bridge

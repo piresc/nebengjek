@@ -31,7 +31,7 @@ func (h *MatchHandler) CreateMatchRequest(c echo.Context) error {
 		PassengerID:     request.PassengerID,
 		PickupLocation:  request.PickupLocation,
 		DropoffLocation: request.DropoffLocation,
-		Status:          models.TripStatusRequested,
+		Status:          models.triptatusRequested,
 	}
 
 	// Create match request

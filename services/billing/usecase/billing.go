@@ -14,19 +14,17 @@ import (
 
 // BillingUC implements the billing.BillingUseCase interface
 type BillingUC struct {
-	cfg          *models.Config
-	repo         billing.BillingRepo
-	locationRepo billing.LocationRepo
-	natsClient   *nats.Conn
+	cfg        *models.Config
+	repo       billing.BillingRepo
+	natsClient *nats.Conn
 }
 
 // NewBillingUC creates a new billing use case
-func NewBillingUC(cfg *models.Config, repo billing.BillingRepo, locationRepo billing.LocationRepo, nc *nats.Conn) billing.BillingUseCase {
+func NewBillingUC(cfg *models.Config, repo billing.BillingRepo, nc *nats.Conn) billing.BillingUseCase {
 	return &BillingUC{
-		cfg:          cfg,
-		repo:         repo,
-		locationRepo: locationRepo,
-		natsClient:   nc,
+		cfg:        cfg,
+		repo:       repo,
+		natsClient: nc,
 	}
 }
 
@@ -39,13 +37,7 @@ func (uc *BillingUC) ProcessPayment(ctx context.Context, payment *models.Payment
 	if payment.StartLocation == "" || payment.EndLocation == "" {
 		return fmt.Errorf("start and end locations are required")
 	}
-
-	// Calculate trip distance
-	distance, err := uc.locationRepo.CalculateDistance(ctx, payment.StartLocation, payment.EndLocation)
-	if err != nil {
-		return fmt.Errorf("failed to calculate distance: %w", err)
-	}
-
+	distance := 10.0 // Replace with actual distance calculation logic
 	// Calculate fare with 5% admin fee deduction
 	baseFare := distance * uc.cfg.Pricing.RatePerKm
 	payment.Amount = baseFare * 0.95

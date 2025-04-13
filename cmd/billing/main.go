@@ -33,8 +33,7 @@ func main() {
 
 	// Initialize repository, service, and handler
 	billingRepo := repository.NewBillingRepository(postgresClient.GetDB())
-	locationRepo := repository.NewLocationRepository()
-	billingUC := usecase.NewBillingUC(configs, billingRepo, locationRepo, natsClient)
+	billingUC := usecase.NewBillingUC(configs, billingRepo, natsClient)
 	billingHandler := handler.NewBillingHandler(billingUC)
 
 	// Initialize Echo router

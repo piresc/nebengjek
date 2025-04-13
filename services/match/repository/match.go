@@ -74,7 +74,7 @@ func (r *MatchRepo) CreateMatch(ctx context.Context, trip *models.Trip) error {
 
 	// Insert pickup location
 	pickupQuery := `
-		INSERT INTO trip_locations (
+		INSERT INTO trips_locations (
 			trip_id, type, latitude, longitude, address
 		) VALUES (
 			$1, 'pickup', $2, $3, $4
@@ -94,7 +94,7 @@ func (r *MatchRepo) CreateMatch(ctx context.Context, trip *models.Trip) error {
 
 	// Insert dropoff location
 	dropoffQuery := `
-		INSERT INTO trip_locations (
+		INSERT INTO trips_locations (
 			trip_id, type, latitude, longitude, address
 		) VALUES (
 			$1, 'dropoff', $2, $3, $4
@@ -135,22 +135,22 @@ func (r *MatchRepo) UpdateMatchStatus(ctx context.Context, tripID string, status
 
 	switch status {
 	case models.TripStatusMatched:
-		query = `UPDATE trips SET status = $1, matched_at = $2 WHERE id = $3`
+		query = `UPDATE trip SET status = $1, matched_at = $2 WHERE id = $3`
 		args = []interface{}{status, time.Now(), tripID}
 	case models.TripStatusAccepted:
-		query = `UPDATE trips SET status = $1, accepted_at = $2 WHERE id = $3`
+		query = `UPDATE trip SET status = $1, accepted_at = $2 WHERE id = $3`
 		args = []interface{}{status, time.Now(), tripID}
 	case models.TripStatusRejected, models.TripStatusCancelled:
-		query = `UPDATE trips SET status = $1, cancelled_at = $2 WHERE id = $3`
+		query = `UPDATE trip SET status = $1, cancelled_at = $2 WHERE id = $3`
 		args = []interface{}{status, time.Now(), tripID}
 	case models.TripStatusInProgress:
-		query = `UPDATE trips SET status = $1, started_at = $2 WHERE id = $3`
+		query = `UPDATE trip SET status = $1, started_at = $2 WHERE id = $3`
 		args = []interface{}{status, time.Now(), tripID}
 	case models.TripStatusCompleted:
-		query = `UPDATE trips SET status = $1, completed_at = $2 WHERE id = $3`
+		query = `UPDATE trip SET status = $1, completed_at = $2 WHERE id = $3`
 		args = []interface{}{status, time.Now(), tripID}
 	default:
-		query = `UPDATE trips SET status = $1 WHERE id = $2`
+		query = `UPDATE trip SET status = $1 WHERE id = $2`
 		args = []interface{}{status, tripID}
 	}
 
@@ -179,7 +179,7 @@ func (r *MatchRepo) UpdateMatchStatus(ctx context.Context, tripID string, status
 // GetMatchByID retrieves a match by ID
 func (r *MatchRepo) GetMatchByID(ctx context.Context, id string) (*models.Trip, error) {
 	// Query trip
-	query := `SELECT * FROM trips WHERE id = $1`
+	query := `SELECT * FROM trip WHERE id = $1`
 	var trip models.Trip
 	err := r.db.GetContext(ctx, &trip, query, id)
 	if err != nil {
@@ -217,26 +217,26 @@ func (r *MatchRepo) GetMatchByID(ctx context.Context, id string) (*models.Trip, 
 // GetPendingMatchesByDriverID retrieves pending matches for a driver
 func (r *MatchRepo) GetPendingMatchesByDriverID(ctx context.Context, driverID string) ([]*models.Trip, error) {
 	query := `
-		SELECT * FROM trips 
+		SELECT * FROM trip 
 		WHERE driver_id = $1 AND status IN ($2, $3)
 		ORDER BY requested_at DESC
 	`
 
-	var trips []*models.Trip
+	var trip []*models.Trip
 	err := r.db.SelectContext(
 		ctx,
-		&trips,
+		&trip,
 		query,
 		driverID,
 		models.TripStatusMatched,
 		models.TripStatusRequested,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get pending trips: %w", err)
+		return nil, fmt.Errorf("failed to get pending trip: %w", err)
 	}
 
 	// Get locations for each trip
-	for _, trip := range trips {
+	for _, trip := range trip {
 		// Query pickup location
 		pickupQuery := `
 			SELECT latitude, longitude, address, timestamp
@@ -260,21 +260,21 @@ func (r *MatchRepo) GetPendingMatchesByDriverID(ctx context.Context, driverID st
 		}
 	}
 
-	return trips, nil
+	return trip, nil
 }
 
 // GetPendingMatchesByPassengerID retrieves pending matches for a passenger
 func (r *MatchRepo) GetPendingMatchesByPassengerID(ctx context.Context, passengerID string) ([]*models.Trip, error) {
 	query := `
-		SELECT * FROM trips 
+		SELECT * FROM trip 
 		WHERE passenger_id = $1 AND status IN ($2, $3, $4)
 		ORDER BY requested_at DESC
 	`
 
-	var trips []*models.Trip
+	var trip []*models.Trip
 	err := r.db.SelectContext(
 		ctx,
-		&trips,
+		&trip,
 		query,
 		passengerID,
 		models.TripStatusRequested,
@@ -282,11 +282,11 @@ func (r *MatchRepo) GetPendingMatchesByPassengerID(ctx context.Context, passenge
 		models.TripStatusAccepted,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get pending trips: %w", err)
+		return nil, fmt.Errorf("failed to get pending trip: %w", err)
 	}
 
 	// Get locations for each trip
-	for _, trip := range trips {
+	for _, trip := range trip {
 		// Query pickup location
 		pickupQuery := `
 			SELECT latitude, longitude, address, timestamp
@@ -310,5 +310,5 @@ func (r *MatchRepo) GetPendingMatchesByPassengerID(ctx context.Context, passenge
 		}
 	}
 
-	return trips, nil
+	return trip, nil
 }

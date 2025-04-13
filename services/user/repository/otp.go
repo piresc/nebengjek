@@ -82,7 +82,7 @@ func (r *UserRepo) MarkOTPVerified(ctx context.Context, id string) error {
 // GetUserByMSISDN retrieves a user by MSISDN
 func (r *UserRepo) GetUserByMSISDN(ctx context.Context, msisdn string) (*models.User, error) {
 	query := `
-		SELECT id, msisdn, email, full_name, role, created_at, updated_at, is_active, rating
+		SELECT id, msisdn, fullname, role, created_at, updated_at, is_active, rating
 		FROM users
 		WHERE msisdn = $1
 	`

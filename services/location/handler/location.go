@@ -236,7 +236,7 @@ func (h *LocationHandler) UpdateLocationOnEvent(c echo.Context) error {
 		UserID    string          `json:"user_id"`
 		Role      string          `json:"role"` // driver or customer
 		Location  models.Location `json:"location"`
-		EventType string          `json:"event_type"` // app_state_change, ride_request, etc.
+		EventType string          `json:"event_type"` // app_state_change, trip_request, etc.
 	}
 
 	var req EventUpdateRequest

@@ -16,11 +16,11 @@ participant Customer as C
 
 D -> S: Activate availability (beacon)
 S -> S: Register driver location
-C -> S: Request ride
+C -> S: Request trip
 S -> S: Find drivers within 1km
-S -> D: Send ride request
+S -> D: Send trip request
 S -> C: Send potential match
-D --> S: Accept/Reject ride
+D --> S: Accept/Reject trip
 C --> S: Accept/Reject match
 
 alt Both Accept
@@ -47,7 +47,7 @@ end
 1. **Driver workflow**:  
    - Drivers activate their availability to work (searching for customers within a 1 km radius).  
 2. **Customer workflow**:  
-   - Customers request a ride, and the system finds potential drivers within 1 km.  
+   - Customers request a trip, and the system finds potential drivers within 1 km.  
 3. **Matching**:  
    - When a match occurs, both parties receive a notification and decide to accept/reject.  
 4. **Trip initiation**:  
