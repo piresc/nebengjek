@@ -10,24 +10,34 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/piresc/nebengjek/internal/pkg/database"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
 // MatchRepo implements the match repository interface
 type MatchRepo struct {
-	cfg *models.Config
-	db  *sqlx.DB
+	cfg         *models.Config
+	db          *sqlx.DB
+	redisClient *database.RedisClient
 }
+
+// Constants for Redis keys
+const (
+	AvailableDriversKey    = "available_drivers"    // Geo set for available drivers
+	AvailablePassengersKey = "available_passengers" // Geo set for available passengers
+)
 
 // NewMatchRepository creates a new match repository
 func NewMatchRepository(
 	cfg *models.Config,
 	db *sqlx.DB,
+	redisClient *database.RedisClient,
 ) *MatchRepo {
 	log.Println("Initializing match repository")
 	return &MatchRepo{
-		cfg: cfg,
-		db:  db,
+		cfg:         cfg,
+		db:          db,
+		redisClient: redisClient,
 	}
 }
 
@@ -86,7 +96,6 @@ func (r *MatchRepo) CreateMatch(ctx context.Context, trip *models.Trip) error {
 		trip.ID,
 		trip.PickupLocation.Latitude,
 		trip.PickupLocation.Longitude,
-		trip.PickupLocation.Address,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert pickup location: %w", err)
@@ -106,7 +115,6 @@ func (r *MatchRepo) CreateMatch(ctx context.Context, trip *models.Trip) error {
 		trip.ID,
 		trip.DropoffLocation.Latitude,
 		trip.DropoffLocation.Longitude,
-		trip.DropoffLocation.Address,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert dropoff location: %w", err)
@@ -311,4 +319,145 @@ func (r *MatchRepo) GetPendingMatchesByPassengerID(ctx context.Context, passenge
 	}
 
 	return trip, nil
+}
+
+// AddAvailableDriver adds a driver to the Redis geospatial index
+func (r *MatchRepo) AddAvailableDriver(ctx context.Context, driverMSISDN string, location *models.Location) error {
+	err := r.redisClient.GeoAdd(
+		ctx,
+		AvailableDriversKey,
+		location.Longitude,
+		location.Latitude,
+		driverMSISDN,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to add driver to geo index: %w", err)
+	}
+	return nil
+}
+
+// RemoveAvailableDriver removes a driver from the Redis geospatial index
+func (r *MatchRepo) RemoveAvailableDriver(ctx context.Context, driverMSISDN string) error {
+	err := r.redisClient.Delete(ctx, fmt.Sprintf("%s:%s", AvailableDriversKey, driverMSISDN))
+	if err != nil {
+		return fmt.Errorf("failed to remove driver from geo index: %w", err)
+	}
+	return nil
+}
+
+// FindNearbyDrivers finds available drivers within the specified radius
+func (r *MatchRepo) FindNearbyDrivers(ctx context.Context, location *models.Location, radiusKm float64) ([]string, error) {
+	results, err := r.redisClient.GeoRadius(
+		ctx,
+		AvailableDriversKey,
+		location.Longitude,
+		location.Latitude,
+		radiusKm,
+		"km",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find nearby drivers: %w", err)
+	}
+
+	driverIDs := make([]string, len(results))
+	for i, result := range results {
+		driverIDs[i] = result.Name
+	}
+
+	return driverIDs, nil
+}
+
+// ProcessLocationUpdate processes a location update for a driver
+func (r *MatchRepo) ProcessLocationUpdate(ctx context.Context, driverID string, location *models.Location) error {
+	// Update driver's location in Redis
+	err := r.redisClient.GeoAdd(
+		ctx,
+		AvailableDriversKey,
+		location.Longitude,
+		location.Latitude,
+		driverID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update driver location: %w", err)
+	}
+	return nil
+}
+
+// FindMatchForPassenger finds a match for a passenger
+func (r *MatchRepo) FindMatchForPassenger(ctx context.Context, passengerID string, location *models.Location, radiusKm float64) (*models.Trip, error) {
+	// Find nearby drivers
+	driverIDs, err := r.FindNearbyDrivers(ctx, location, radiusKm)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find nearby drivers: %w", err)
+	}
+
+	// Create a new trip
+	trip := &models.Trip{
+		PassengerMSISDN: passengerID,
+		PickupLocation:  *location,
+		Status:          models.TripStatusRequested,
+		RequestedAt:     time.Now(),
+	}
+
+	// Assign the first available driver
+	if len(driverIDs) > 0 {
+		trip.DriverMSISDN = driverIDs[0]
+		trip.Status = models.TripStatusMatched
+		now := time.Now()
+		trip.MatchedAt = &now
+	}
+
+	// Save the trip to the database
+	err = r.CreateMatch(ctx, trip)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create trip: %w", err)
+	}
+
+	return trip, nil
+}
+
+// AddAvailablePassenger adds a passenger to the Redis geospatial index
+func (r *MatchRepo) AddAvailablePassenger(ctx context.Context, passengerID string, location *models.Location) error {
+	err := r.redisClient.GeoAdd(
+		ctx,
+		AvailablePassengersKey,
+		location.Longitude,
+		location.Latitude,
+		passengerID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to add passenger to geo index: %w", err)
+	}
+	return nil
+}
+
+// RemoveAvailablePassenger removes a passenger from the Redis geospatial index
+func (r *MatchRepo) RemoveAvailablePassenger(ctx context.Context, passengerID string) error {
+	err := r.redisClient.Delete(ctx, fmt.Sprintf("%s:%s", AvailablePassengersKey, passengerID))
+	if err != nil {
+		return fmt.Errorf("failed to remove passenger from geo index: %w", err)
+	}
+	return nil
+}
+
+// FindNearbyPassengers finds available passengers within the specified radius
+func (r *MatchRepo) FindNearbyPassengers(ctx context.Context, location *models.Location, radiusKm float64) ([]string, error) {
+	results, err := r.redisClient.GeoRadius(
+		ctx,
+		AvailablePassengersKey,
+		location.Longitude,
+		location.Latitude,
+		radiusKm,
+		"km",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find nearby passengers: %w", err)
+	}
+
+	passengerIDs := make([]string, len(results))
+	for i, result := range results {
+		passengerIDs[i] = result.Name
+	}
+
+	return passengerIDs, nil
 }

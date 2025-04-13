@@ -77,7 +77,6 @@ func (r *UserRepo) CreateUser(ctx context.Context, user *models.User) error {
 				"user_id":   user.ID,
 				"latitude":  user.DriverInfo.CurrentLocation.Latitude,
 				"longitude": user.DriverInfo.CurrentLocation.Longitude,
-				"address":   user.DriverInfo.CurrentLocation.Address,
 				"timestamp": user.DriverInfo.CurrentLocation.Timestamp,
 			}
 

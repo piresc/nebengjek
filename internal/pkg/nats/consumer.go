@@ -1,7 +1,6 @@
 package nats
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 
@@ -51,15 +50,6 @@ func NewConsumer(topic, queueGroup, address string, handler MessageHandler) (*Co
 	}
 
 	return &Consumer{conn: conn, subscription: subscription}, nil
-}
-
-// UnmarshalMessage deserializes a JSON message into the provided struct
-func UnmarshalMessage(messageBody []byte, v interface{}) error {
-	err := json.Unmarshal(messageBody, v)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal message: %w", err)
-	}
-	return nil
 }
 
 // Stop gracefully stops the consumer

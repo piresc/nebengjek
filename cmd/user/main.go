@@ -8,7 +8,7 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/config"
 	"github.com/piresc/nebengjek/internal/pkg/database"
 	"github.com/piresc/nebengjek/internal/pkg/nats"
-	"github.com/piresc/nebengjek/services/user/gateways"
+	"github.com/piresc/nebengjek/services/user/gateway"
 	"github.com/piresc/nebengjek/services/user/handler"
 	"github.com/piresc/nebengjek/services/user/repository"
 	"github.com/piresc/nebengjek/services/user/usecase"
@@ -16,7 +16,7 @@ import (
 
 func main() {
 	appName := "user-service"
-	envPath := ".env"
+	envPath := "./cmd/user/.env"
 	configs := config.InitConfig(envPath)
 
 	// Initialize PostgreSQL database connection
@@ -35,7 +35,7 @@ func main() {
 
 	// Initialize repository, service, and handler
 	userRepo := repository.NewUserRepo(configs, postgresClient.GetDB())
-	userGW := gateways.NewUserGW(natsClient.GetConn())
+	userGW := gateway.NewUserGW(natsClient.GetConn())
 	userUC := usecase.NewUserUC(*userRepo, *userGW)
 	userHandler := handler.NewUserHandler(userUC)
 

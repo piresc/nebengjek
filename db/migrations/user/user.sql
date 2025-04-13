@@ -25,17 +25,6 @@ CREATE TABLE IF NOT EXISTS drivers (
     is_available BOOLEAN NOT NULL DEFAULT FALSE
 );
 
--- Driver locations table
-CREATE TABLE IF NOT EXISTS driver_locations (
-    id SERIAL PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    latitude FLOAT NOT NULL,
-    longitude FLOAT NOT NULL,
-    address VARCHAR(255),
-    timestamp TIMESTAMP NOT NULL,
-    -- Add index for geospatial queries
-    INDEX (user_id, timestamp DESC)
-);
 
 -- Add indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);

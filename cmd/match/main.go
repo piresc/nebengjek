@@ -14,7 +14,8 @@ import (
 
 func main() {
 	appName := "match-service"
-	configs := config.InitConfig(appName)
+	envPath := ".env"
+	configs := config.InitConfig(envPath)
 
 	// Initialize PostgreSQL database connection
 	postgresClient, err := database.NewPostgresClient(configs.Database)
@@ -23,21 +24,28 @@ func main() {
 	}
 	defer postgresClient.Close()
 
-	// Initialize repositories
-	matchRepo := repository.NewMatchRepository(configs, postgresClient.GetDB())
-	// Initialize use case
-	matchUC := usecase.NewMatchUseCase(configs, matchRepo)
-
-	// Initialize NATS consumers
-	err = matchUC.InitConsumers()
+	// Initialize Redis client
+	redisClient, err := database.NewRedisClient(configs.Redis)
 	if err != nil {
-		log.Fatalf("Failed to initialize NATS consumers: %v", err)
+		log.Fatalf("Failed to connect to Redis: %v", err)
 	}
+	defer redisClient.Close()
+
+	// Initialize repositories
+	matchRepo := repository.NewMatchRepository(configs, postgresClient.GetDB(), redisClient)
+
+	// Initialize use case
+	matchUC := usecase.NewMatchUC(matchRepo)
 
 	// Initialize Echo router and handler
 	e := echo.New()
-	matchHandler := handler.NewMatchHandler(matchUC)
+	matchHandler := handler.NewMatchHandler(matchUC, configs)
 	matchHandler.RegisterRoutes(e)
+
+	// Initialize NATS consumers
+	if err := matchHandler.InitNATSConsumers(); err != nil {
+		log.Fatalf("Failed to initialize NATS consumers: %v", err)
+	}
 
 	// Start server
 	log.Printf("Starting %s on port %d", appName, configs.Server.Port)

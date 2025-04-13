@@ -1,4 +1,4 @@
-package gateways
+package gateway
 
 import (
 	"github.com/nats-io/nats.go"

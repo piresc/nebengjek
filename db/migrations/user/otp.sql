@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS otps (
 -- Update users table to use MSISDN as primary identifier
 ALTER TABLE users
     ADD COLUMN IF NOT EXISTS msisdn VARCHAR(20) UNIQUE,
-    DROP COLUMN IF EXISTS password;
 
 -- Add indexes for MSISDN lookups
 CREATE INDEX IF NOT EXISTS idx_users_msisdn ON users(msisdn);

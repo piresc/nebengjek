@@ -15,13 +15,14 @@ const (
 	TripStatusCancelled  TripStatus = "CANCELLED"
 	TripStatusInProgress TripStatus = "IN_PROGRESS"
 	TripStatusCompleted  TripStatus = "COMPLETED"
+	TripStatusProposed   TripStatus = "PROPOSED"
 )
 
 // Trip represents a ride-sharing trip
 type Trip struct {
 	ID              string     `json:"id" bson:"_id" db:"id"`
-	PassengerID     string     `json:"passenger_id" bson:"passenger_id" db:"passenger_id"`
-	DriverID        string     `json:"driver_id,omitempty" bson:"driver_id,omitempty" db:"driver_id"`
+	PassengerMSISDN string     `json:"passenger_id" bson:"passenger_id" db:"passenger_id"`
+	DriverMSISDN    string     `json:"driver_id,omitempty" bson:"driver_id,omitempty" db:"driver_id"`
 	PickupLocation  Location   `json:"pickup_location" bson:"pickup_location"`
 	DropoffLocation Location   `json:"dropoff_location" bson:"dropoff_location"`
 	RequestedAt     time.Time  `json:"requested_at" bson:"requested_at" db:"requested_at"`
