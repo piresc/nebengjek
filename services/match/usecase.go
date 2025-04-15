@@ -7,4 +7,5 @@ import (
 // MatchUC defines the interface for match business logic
 type MatchUC interface {
 	HandleBeaconEvent(event models.BeaconEvent) error
+	ConfirmMatchStatus(matchID string, mp models.MatchProposal) error
 }

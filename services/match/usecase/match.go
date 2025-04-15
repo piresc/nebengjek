@@ -122,6 +122,11 @@ func (uc *MatchUC) CreateMatch(ctx context.Context, match *models.Match) error {
 		return fmt.Errorf("failed to create match: %w", err)
 	}
 
+	// Store match proposal in Redis with 5-minute expiration
+	if err := uc.matchRepo.StoreMatchProposal(ctx, createdMatch); err != nil {
+		return fmt.Errorf("failed to store match proposal: %w", err)
+	}
+
 	// Create match proposal
 	matchProposal := models.MatchProposal{
 		ID:             createdMatch.ID,
@@ -133,8 +138,77 @@ func (uc *MatchUC) CreateMatch(ctx context.Context, match *models.Match) error {
 	}
 
 	// Publish match proposal event
-	if err := uc.matchGW.PublishMatchEvent(ctx, matchProposal); err != nil {
+	if err := uc.matchGW.PublishMatchFound(ctx, matchProposal); err != nil {
 		return fmt.Errorf("failed to publish match proposal: %w", err)
+	}
+
+	return nil
+}
+
+// ConfirmMatchStatus handles match confirmation from either driver or passenger
+func (uc *MatchUC) ConfirmMatchStatus(matchID string, mp models.MatchProposal) error {
+	ctx := context.Background()
+
+	// Get current match to validate user IDs
+	match, err := uc.matchRepo.GetMatch(ctx, matchID)
+	if err != nil {
+		return fmt.Errorf("failed to get match: %w", err)
+	}
+
+	// Validate that the user is part of this match
+	if mp.DriverID != match.DriverID && mp.PassengerID != match.PassengerID {
+		return fmt.Errorf("user is not part of this match")
+	}
+
+	// Use atomic operation to update status
+	if err := uc.matchRepo.ConfirmMatchAtomically(ctx, matchID, mp.MatchStatus); err != nil {
+		return fmt.Errorf("failed to confirm match: %w", err)
+	}
+
+	if mp.MatchStatus == models.MatchStatusAccepted {
+		// Publish match acceptance event
+		acceptEvent := models.MatchProposal{
+			ID:          matchID,
+			PassengerID: match.PassengerID,
+			DriverID:    match.DriverID,
+			MatchStatus: models.MatchStatusAccepted,
+		}
+		if err := uc.matchGW.PublishMatchAccept(ctx, acceptEvent); err != nil {
+			return fmt.Errorf("failed to publish match acceptance: %w", err)
+		}
+
+		// Get all pending matches for this passenger
+		matches, err := uc.matchRepo.ListMatchesByPassenger(ctx, match.PassengerID)
+		if err != nil {
+			return fmt.Errorf("failed to list passenger matches: %w", err)
+		}
+
+		// Notify other drivers that their matches were rejected
+		for _, otherMatch := range matches {
+			// Skip the accepted match
+			if otherMatch.ID == matchID {
+				continue
+			}
+			// Only notify if the match is still pending
+			if otherMatch.Status == models.MatchStatusPending {
+				rejectEvent := models.MatchProposal{
+					ID:          otherMatch.ID,
+					PassengerID: otherMatch.PassengerID,
+					DriverID:    otherMatch.DriverID,
+					MatchStatus: models.MatchStatusRejected,
+				}
+				// Update match status to rejected
+				if err := uc.matchRepo.UpdateMatchStatus(ctx, otherMatch.ID, models.MatchStatusRejected); err != nil {
+					log.Printf("Failed to update rejected match status: %v", err)
+					continue
+				}
+				// Publish rejection event
+				if err := uc.matchGW.PublishMatchRejected(ctx, rejectEvent); err != nil {
+					log.Printf("Failed to publish match rejection: %v", err)
+					continue
+				}
+			}
+		}
 	}
 
 	return nil

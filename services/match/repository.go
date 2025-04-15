@@ -17,6 +17,7 @@ type MatchRepo interface {
 
 	// Redis match proposal operations
 	StoreMatchProposal(ctx context.Context, match *models.Match) error
+	ConfirmMatchAtomically(ctx context.Context, matchID string, status models.MatchStatus) error
 
 	// Location-based operations
 	AddAvailableDriver(ctx context.Context, driverID string, location *models.Location) error

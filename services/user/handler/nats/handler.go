@@ -41,7 +41,7 @@ func NewHandler(wsManager *websocket.WebSocketManager, natsURL string) (*Handler
 
 // initConsumers initializes all NATS consumers
 func (h *Handler) initConsumers() error {
-	// Subscribe to match events
+	// Subscribe to match found events
 	matchSub, err := h.natsClient.Subscribe(constants.SubjectMatchFound, func(msg *nats.Msg) {
 		if err := h.handleMatchEvent(msg.Data); err != nil {
 			fmt.Printf("Error handling match event: %v\n", err)
@@ -51,6 +51,28 @@ func (h *Handler) initConsumers() error {
 		return fmt.Errorf("failed to subscribe to match events: %w", err)
 	}
 	h.subs = append(h.subs, matchSub)
+
+	// Subscribe to match accepted events
+	matchAcceptSub, err := h.natsClient.Subscribe(constants.SubjectMatchAccepted, func(msg *nats.Msg) {
+		if err := h.handleMatchAcceptedEvent(msg.Data); err != nil {
+			fmt.Printf("Error handling match accepted event: %v\n", err)
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to match accepted events: %w", err)
+	}
+	h.subs = append(h.subs, matchAcceptSub)
+
+	// Subscribe to match rejected events
+	matchRejectSub, err := h.natsClient.Subscribe(constants.SubjectMatchRejected, func(msg *nats.Msg) {
+		if err := h.handleMatchRejectedEvent(msg.Data); err != nil {
+			fmt.Printf("Error handling match rejected event: %v\n", err)
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to match rejected events: %w", err)
+	}
+	h.subs = append(h.subs, matchRejectSub)
 
 	// Subscribe to trip events
 	tripSub, err := h.natsClient.Subscribe(constants.SubjectTripStarted, func(msg *nats.Msg) {
@@ -81,8 +103,33 @@ func (h *Handler) handleMatchEvent(msg []byte) error {
 	}
 
 	// Notify both driver and passenger
-	h.wsManager.NotifyClient(event.DriverID, constants.EventMatchFound, event)
-	h.wsManager.NotifyClient(event.PassengerID, constants.EventMatchFound, event)
+	h.wsManager.NotifyClient(event.DriverID, constants.SubjectMatchFound, event)
+	h.wsManager.NotifyClient(event.PassengerID, constants.SubjectMatchFound, event)
+	return nil
+}
+
+// handleMatchAcceptedEvent processes match accepted events
+func (h *Handler) handleMatchAcceptedEvent(msg []byte) error {
+	var event models.MatchProposal
+	if err := json.Unmarshal(msg, &event); err != nil {
+		return fmt.Errorf("failed to unmarshal match accepted event: %w", err)
+	}
+
+	// Notify both driver and passenger about the acceptance
+	h.wsManager.NotifyClient(event.DriverID, constants.EventMatchAccepted, event)
+	h.wsManager.NotifyClient(event.PassengerID, constants.EventMatchAccepted, event)
+	return nil
+}
+
+// handleMatchRejectedEvent processes match rejected events
+func (h *Handler) handleMatchRejectedEvent(msg []byte) error {
+	var event models.MatchProposal
+	if err := json.Unmarshal(msg, &event); err != nil {
+		return fmt.Errorf("failed to unmarshal match rejected event: %w", err)
+	}
+
+	// Only notify the driver whose match was rejected
+	h.wsManager.NotifyClient(event.DriverID, constants.EventMatchRejected, event)
 	return nil
 }
 

@@ -3,69 +3,66 @@ package middleware
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/utils"
 )
 
 // JWTAuthMiddleware creates a middleware for JWT authentication
-func JWTAuthMiddleware(config models.JWTConfig) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Get the Authorization header
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is required"})
-			return
-		}
-
-		// Check if the Authorization header has the correct format
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization format"})
-			return
-		}
-
-		// Extract the token
-		tokenString := parts[1]
-
-		// Parse and validate the token
-		claims := &Claims{}
-		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-			// Validate the signing method
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+func JWTAuthMiddleware(config models.JWTConfig) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			// Get the Authorization header
+			authHeader := c.Request().Header.Get("Authorization")
+			if authHeader == "" {
+				return utils.UnauthorizedResponse(c, "Authorization header is required")
 			}
-			return []byte(config.Secret), nil
-		})
 
-		// Handle token parsing errors
-		if err != nil {
-			var validationError *jwt.ValidationError
-			if errors.As(err, &validationError) {
-				if validationError.Errors&jwt.ValidationErrorExpired != 0 {
-					c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token has expired"})
-					return
+			// Check if the Authorization header has the correct format
+			parts := strings.Split(authHeader, " ")
+			if len(parts) != 2 || parts[0] != "Bearer" {
+				return utils.UnauthorizedResponse(c, "Invalid authorization format")
+			}
+
+			// Extract the token
+			tokenString := parts[1]
+
+			// Parse and validate the token
+			claims := &Claims{}
+			token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+				// Validate the signing method
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 				}
+				return []byte(config.Secret), nil
+			})
+
+			// Handle token parsing errors
+			if err != nil {
+				var validationError *jwt.ValidationError
+				if errors.As(err, &validationError) {
+					if validationError.Errors&jwt.ValidationErrorExpired != 0 {
+						return utils.UnauthorizedResponse(c, "Token has expired")
+					}
+				}
+				return utils.UnauthorizedResponse(c, "Invalid token")
 			}
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-			return
+
+			// Check if the token is valid
+			if !token.Valid {
+				return utils.UnauthorizedResponse(c, "Invalid token")
+			}
+
+			// Set the user ID and role in the context
+			c.Set("user_id", claims.UserID)
+			c.Set("user_role", claims.Role)
+
+			return next(c)
 		}
-
-		// Check if the token is valid
-		if !token.Valid {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-			return
-		}
-
-		// Set the user ID and role in the context
-		c.Set("user_id", claims.UserID)
-		c.Set("user_role", claims.Role)
-
-		c.Next()
 	}
 }
 

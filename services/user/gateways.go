@@ -9,4 +9,5 @@ import (
 // UserGW defines the user gateaways interface
 type UserGW interface {
 	PublishBeaconEvent(ctx context.Context, beaconReq *models.BeaconRequest) error
+	MatchAccept(mp *models.MatchProposal) error
 }

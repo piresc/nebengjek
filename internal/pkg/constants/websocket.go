@@ -46,4 +46,5 @@ const (
 	ErrorMatchNotFound     = "match_not_found"
 	ErrorTripNotFound      = "trip_not_found"
 	ErrorPaymentFailed     = "payment_failed"
+	ErrorMatchUpdateFailed = "match_update_failed"
 )

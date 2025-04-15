@@ -16,5 +16,8 @@ type UserUC interface {
 	GenerateOTP(ctx context.Context, msisdn string) error
 	VerifyOTP(ctx context.Context, msisdn, otp string) (*models.AuthResponse, error)
 	RegisterDriver(ctx context.Context, user *models.User) error
+
+	// handle match
 	UpdateBeaconStatus(ctx context.Context, beaconReq *models.BeaconRequest) error
+	ConfirmMatch(ctx context.Context, mp *models.MatchProposal) error
 }

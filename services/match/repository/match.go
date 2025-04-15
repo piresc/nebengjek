@@ -432,3 +432,72 @@ func (r *MatchRepo) ListMatchesByPassenger(ctx context.Context, passengerID stri
 
 	return matches, nil
 }
+
+// ConfirmMatchAtomically updates match status atomically with optimistic locking
+func (r *MatchRepo) ConfirmMatchAtomically(ctx context.Context, matchID string, status models.MatchStatus) error {
+	// Begin transaction
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Get current match status with FOR UPDATE lock
+	var currentStatus string
+	var driverID string
+	err = tx.QueryRowContext(ctx, `
+        SELECT status::text, driver_id
+        FROM matches 
+        WHERE id = $1 
+        FOR UPDATE
+    `, matchID).Scan(&currentStatus, &driverID)
+	if err != nil {
+		return fmt.Errorf("failed to get current match status: %w", err)
+	}
+
+	// Check if match can be confirmed
+	if currentStatus != string(models.MatchStatusPending) {
+		return fmt.Errorf("match cannot be confirmed: current status is %s", currentStatus)
+	}
+
+	// Update match status
+	result, err := tx.ExecContext(ctx, `
+        UPDATE matches 
+        SET status = $1, updated_at = NOW() 
+        WHERE id = $2 AND status = $3
+    `, status, matchID, models.MatchStatusPending)
+	if err != nil {
+		return fmt.Errorf("failed to update match status: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("match status was changed by another transaction")
+	}
+
+	// Remove both users from available pools
+	if err := r.RemoveAvailableDriver(ctx, driverID); err != nil {
+		return fmt.Errorf("failed to remove driver from available pool: %w", err)
+	}
+
+	// Get passenger ID to remove from available pool
+	var passengerID string
+	err = tx.QueryRowContext(ctx, "SELECT passenger_id FROM matches WHERE id = $1", matchID).Scan(&passengerID)
+	if err != nil {
+		return fmt.Errorf("failed to get passenger ID: %w", err)
+	}
+
+	if err := r.RemoveAvailablePassenger(ctx, passengerID); err != nil {
+		return fmt.Errorf("failed to remove passenger from available pool: %w", err)
+	}
+
+	// Commit transaction
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}

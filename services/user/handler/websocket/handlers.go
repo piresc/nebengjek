@@ -47,6 +47,8 @@ func (m *WebSocketManager) handleMessage(client *WebSocketClient, msg []byte) er
 	switch wsMsg.Event {
 	case constants.EventBeaconUpdate:
 		return m.handleBeaconUpdate(client, wsMsg.Data)
+	case constants.EventMatchAccepted:
+		return m.handleMatchAccept(client, wsMsg.Data)
 	case constants.EventLocationUpdate:
 		return m.handleLocationUpdate(client.UserID, wsMsg.Data)
 	default:
@@ -69,6 +71,27 @@ func (m *WebSocketManager) handleBeaconUpdate(client *WebSocketClient, data json
 	return m.sendMessage(client.Conn, constants.EventBeaconUpdate, models.BeaconResponse{
 		Message: "Beacon status updated successfully",
 	})
+}
+
+// handleMatchAccept processes match acceptance from drivers
+func (m *WebSocketManager) handleMatchAccept(client *WebSocketClient, data json.RawMessage) error {
+	// Verify that the client is a driver
+	if client.Role != "driver" {
+		return m.sendErrorMessage(client.Conn, constants.ErrorUnauthorized, "Only drivers can accept matches")
+	}
+
+	var matchProposalAccept models.MatchProposal
+	if err := json.Unmarshal(data, &matchProposalAccept); err != nil {
+		return m.sendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Invalid match proposal format")
+	}
+
+	// Update beacon status
+	err := m.userUC.ConfirmMatch(context.Background(), &matchProposalAccept)
+	if err != nil {
+		log.Printf("Error confirming match for driver %s: %v", client.UserID, err)
+		return m.sendErrorMessage(client.Conn, constants.ErrorMatchUpdateFailed, err.Error())
+	}
+	return nil
 }
 
 // handleLocationUpdate processes location updates from clients

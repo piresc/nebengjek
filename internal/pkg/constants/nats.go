@@ -7,9 +7,10 @@ const (
 	SubjectUserUpdated = "user.updated"
 
 	// Match Service
-	SubjectMatchFound    = "match.found"
-	SubjectMatchAccepted = "match.accepted"
-	SubjectMatchRejected = "match.rejected"
+	SubjectMatchFound           = "match.found"
+	SubjectMatchRequestAccepted = "match.request.accept"
+	SubjectMatchAccepted        = "match.accepted"
+	SubjectMatchRejected        = "match.rejected"
 
 	// Location Service
 	SubjectLocationUpdate  = "location.update"
