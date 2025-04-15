@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
@@ -12,5 +13,6 @@ func (g *UserGW) PublishBeaconEvent(event *models.BeaconEvent) error {
 	if err != nil {
 		return err
 	}
+	fmt.Printf("Publishing beacon event: %s\n", string(data))
 	return g.nc.Publish("user.beacon", data)
 }

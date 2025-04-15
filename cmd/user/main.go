@@ -26,6 +26,13 @@ func main() {
 	}
 	defer postgresClient.Close()
 
+	// Initialize Redis client
+	redisClient, err := database.NewRedisClient(configs.Redis)
+	if err != nil {
+		log.Fatalf("Failed to connect to Redis: %v", err)
+	}
+	defer redisClient.Close()
+
 	// Initialize NATS
 	natsClient, err := nats.NewClient(configs.NATS.URL)
 	if err != nil {
@@ -34,10 +41,15 @@ func main() {
 	defer natsClient.Close()
 
 	// Initialize repository, service, and handler
-	userRepo := repository.NewUserRepo(configs, postgresClient.GetDB())
+	userRepo := repository.NewUserRepo(configs, postgresClient.GetDB(), redisClient)
 	userGW := gateway.NewUserGW(natsClient.GetConn())
-	userUC := usecase.NewUserUC(*userRepo, *userGW)
-	userHandler := handler.NewUserHandler(userUC)
+	userUC := usecase.NewUserUC(*userRepo, *userGW, configs.JWT)
+
+	// Initialize handlers
+	userHandler, err := handler.NewHandler(userUC, configs.NATS.URL, configs.JWT)
+	if err != nil {
+		log.Fatalf("Failed to create handler: %v", err)
+	}
 
 	// Initialize Echo router
 	e := echo.New()

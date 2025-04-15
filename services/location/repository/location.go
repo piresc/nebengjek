@@ -23,34 +23,6 @@ func NewLocationRepository(db *sqlx.DB) location.LocationRepo {
 	}
 }
 
-// UpdateDriverLocation updates a driver's current location
-func (r *LocationRepo) UpdateDriverLocation(ctx context.Context, driverID string, location *models.Location) error {
-	// Ensure timestamp is set
-	if location.Timestamp.IsZero() {
-		location.Timestamp = time.Now()
-	}
-
-	// Create a map for location data
-	locationData := map[string]interface{}{
-		"user_id":   driverID,
-		"latitude":  location.Latitude,
-		"longitude": location.Longitude,
-		"address":   location.Address,
-		"timestamp": location.Timestamp,
-	}
-
-	// Insert new location record
-	_, err := r.db.NamedExecContext(ctx, `
-		INSERT INTO driver_locations (user_id, latitude, longitude, address, timestamp)
-		VALUES (:user_id, :latitude, :longitude, :address, :timestamp)
-	`, locationData)
-	if err != nil {
-		return fmt.Errorf("failed to update driver location: %w", err)
-	}
-
-	return nil
-}
-
 // UpdateDriverAvailability updates a driver's availability status
 func (r *LocationRepo) UpdateDriverAvailability(ctx context.Context, driverID string, isAvailable bool) error {
 	// Update driver availability

@@ -37,8 +37,8 @@ func (h *MatchHandler) handleBeaconEvent(msg []byte) error {
 		return err
 	}
 
-	log.Printf("Received beacon event: MSISDN=%s, Role=%s, IsActive=%v",
-		event.MSISDN, event.Role, event.IsActive)
+	log.Printf("Received beacon event: userID=%s, Role=%s, IsActive=%v",
+		event.UserID, event.Role, event.IsActive)
 
 	// Forward the event to usecase for processing
 	return h.matchUC.HandleBeaconEvent(event)

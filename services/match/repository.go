@@ -6,22 +6,26 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
-// MatchRepo defines the interface for match data access operations
+// MatchRepository defines the interface for match data access operations
 type MatchRepo interface {
-	// Match operations
-	CreateMatch(ctx context.Context, trip *models.Trip) error
-	UpdateMatchStatus(ctx context.Context, tripID string, status models.TripStatus) error
-	GetMatchByID(ctx context.Context, id string) (*models.Trip, error)
-	GetPendingMatchesByDriverID(ctx context.Context, driverID string) ([]*models.Trip, error)
-	GetPendingMatchesByPassengerID(ctx context.Context, passengerID string) ([]*models.Trip, error)
+	// Match CRUD operations
+	CreateMatch(ctx context.Context, match *models.Match) (*models.Match, error)
+	GetMatch(ctx context.Context, matchID string) (*models.Match, error)
+	UpdateMatchStatus(ctx context.Context, matchID string, status models.MatchStatus) error
+	ListMatchesByDriver(ctx context.Context, driverID string) ([]*models.Match, error)
+	ListMatchesByPassenger(ctx context.Context, passengerID string) ([]*models.Match, error)
 
-	// Driver availability operations
+	// Redis match proposal operations
+	StoreMatchProposal(ctx context.Context, match *models.Match) error
+
+	// Location-based operations
 	AddAvailableDriver(ctx context.Context, driverID string, location *models.Location) error
 	RemoveAvailableDriver(ctx context.Context, driverID string) error
-	FindNearbyDrivers(ctx context.Context, location *models.Location, radiusKm float64) ([]string, error)
+	FindNearbyDrivers(ctx context.Context, location *models.Location, radiusKm float64) ([]*models.NearbyUser, error)
 
-	// Passenger management
 	AddAvailablePassenger(ctx context.Context, passengerID string, location *models.Location) error
 	RemoveAvailablePassenger(ctx context.Context, passengerID string) error
-	FindNearbyPassengers(ctx context.Context, location *models.Location, radiusKm float64) ([]string, error)
+	FindNearbyPassengers(ctx context.Context, location *models.Location, radiusKm float64) ([]*models.NearbyUser, error)
+
+	ProcessLocationUpdate(ctx context.Context, driverID string, location *models.Location) error
 }

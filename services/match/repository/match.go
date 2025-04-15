@@ -2,14 +2,14 @@ package repository
 
 import (
 	"context"
-	"database/sql"
-	"errors"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/database"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
@@ -20,12 +20,6 @@ type MatchRepo struct {
 	db          *sqlx.DB
 	redisClient *database.RedisClient
 }
-
-// Constants for Redis keys
-const (
-	AvailableDriversKey    = "available_drivers"    // Geo set for available drivers
-	AvailablePassengersKey = "available_passengers" // Geo set for available passengers
-)
 
 // NewMatchRepository creates a new match repository
 func NewMatchRepository(
@@ -42,94 +36,101 @@ func NewMatchRepository(
 }
 
 // CreateMatch creates a new match (trip) in the database
-func (r *MatchRepo) CreateMatch(ctx context.Context, trip *models.Trip) error {
+func (r *MatchRepo) CreateMatch(ctx context.Context, match *models.Match) (*models.Match, error) {
 	// Generate UUID if not provided
-	if trip.ID == "" {
-		trip.ID = uuid.New().String()
+	if match.ID == "" {
+		match.ID = uuid.New().String()
 	}
 
 	// Set timestamps
 	now := time.Now()
-	if trip.RequestedAt.IsZero() {
-		trip.RequestedAt = now
+	if match.CreatedAt.IsZero() {
+		match.CreatedAt = now
 	}
-	if trip.Status == "" {
-		trip.Status = models.TripStatusRequested
+	match.UpdatedAt = now
+	if match.Status == "" {
+		match.Status = models.MatchStatusPending
 	}
-	if trip.Status == models.TripStatusMatched && trip.MatchedAt == nil {
-		trip.MatchedAt = &now
-	}
+
+	// Create DTO for database operation
+	dto := match.ToDTO()
 
 	// Begin transaction
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	// Insert trip
+	// Insert match
 	query := `
-		INSERT INTO trips (
-			id, passenger_id, driver_id, status, requested_at, matched_at,
-			distance, duration, notes
+		INSERT INTO matches (
+			id, driver_id, passenger_id, 
+			driver_location, passenger_location,
+			status, created_at, updated_at
 		) VALUES (
-			:id, :passenger_id, :driver_id, :status, :requested_at, :matched_at,
-			:distance, :duration, :notes
+			:id, :driver_id, :passenger_id,
+			point(:driver_longitude, :driver_latitude), 
+			point(:passenger_longitude, :passenger_latitude),
+			:status, :created_at, :updated_at
 		)
 	`
-	_, err = tx.NamedExecContext(ctx, query, trip)
+	_, err = tx.NamedExecContext(ctx, query, dto)
 	if err != nil {
-		return fmt.Errorf("failed to insert trip: %w", err)
-	}
-
-	// Insert pickup location
-	pickupQuery := `
-		INSERT INTO trips_locations (
-			trip_id, type, latitude, longitude, address
-		) VALUES (
-			$1, 'pickup', $2, $3, $4
-		)
-	`
-	_, err = tx.ExecContext(
-		ctx,
-		pickupQuery,
-		trip.ID,
-		trip.PickupLocation.Latitude,
-		trip.PickupLocation.Longitude,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to insert pickup location: %w", err)
-	}
-
-	// Insert dropoff location
-	dropoffQuery := `
-		INSERT INTO trips_locations (
-			trip_id, type, latitude, longitude, address
-		) VALUES (
-			$1, 'dropoff', $2, $3, $4
-		)
-	`
-	_, err = tx.ExecContext(
-		ctx,
-		dropoffQuery,
-		trip.ID,
-		trip.DropoffLocation.Latitude,
-		trip.DropoffLocation.Longitude,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to insert dropoff location: %w", err)
+		return nil, fmt.Errorf("failed to insert match: %w", err)
 	}
 
 	// Commit transaction
 	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	return nil
+	return match, nil
+}
+
+// GetMatch retrieves a match by ID
+func (r *MatchRepo) GetMatch(ctx context.Context, matchID string) (*models.Match, error) {
+	query := `
+		SELECT 
+			id, driver_id, passenger_id,
+			(driver_location[0])::float8 as driver_longitude,
+			(driver_location[1])::float8 as driver_latitude,
+			(passenger_location[0])::float8 as passenger_longitude,
+			(passenger_location[1])::float8 as passenger_latitude,
+			status, created_at, updated_at
+		FROM matches
+		WHERE id = $1
+	`
+
+	var dto models.MatchDTO
+	err := r.db.QueryRowContext(ctx, query, matchID).Scan(
+		&dto.ID, &dto.DriverID, &dto.PassengerID,
+		&dto.DriverLongitude, &dto.DriverLatitude,
+		&dto.PassengerLongitude, &dto.PassengerLatitude,
+		&dto.Status, &dto.CreatedAt, &dto.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get match: %w", err)
+	}
+
+	// Convert DTO to Match
+	return dto.ToMatch(), nil
 }
 
 // UpdateMatchStatus updates the status of a match
-func (r *MatchRepo) UpdateMatchStatus(ctx context.Context, tripID string, status models.TripStatus) error {
+func (r *MatchRepo) UpdateMatchStatus(ctx context.Context, matchID string, status models.MatchStatus) error {
+	// Get current match to update the DTO
+	match, err := r.GetMatch(ctx, matchID)
+	if err != nil {
+		return fmt.Errorf("failed to get match: %w", err)
+	}
+
+	// Update status and timestamp
+	match.Status = status
+	match.UpdatedAt = time.Now()
+	dto := match.ToDTO()
+
 	// Begin transaction
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -137,34 +138,11 @@ func (r *MatchRepo) UpdateMatchStatus(ctx context.Context, tripID string, status
 	}
 	defer tx.Rollback()
 
-	// Update status and corresponding timestamp
-	var query string
-	var args []interface{}
-
-	switch status {
-	case models.TripStatusMatched:
-		query = `UPDATE trip SET status = $1, matched_at = $2 WHERE id = $3`
-		args = []interface{}{status, time.Now(), tripID}
-	case models.TripStatusAccepted:
-		query = `UPDATE trip SET status = $1, accepted_at = $2 WHERE id = $3`
-		args = []interface{}{status, time.Now(), tripID}
-	case models.TripStatusRejected, models.TripStatusCancelled:
-		query = `UPDATE trip SET status = $1, cancelled_at = $2 WHERE id = $3`
-		args = []interface{}{status, time.Now(), tripID}
-	case models.TripStatusInProgress:
-		query = `UPDATE trip SET status = $1, started_at = $2 WHERE id = $3`
-		args = []interface{}{status, time.Now(), tripID}
-	case models.TripStatusCompleted:
-		query = `UPDATE trip SET status = $1, completed_at = $2 WHERE id = $3`
-		args = []interface{}{status, time.Now(), tripID}
-	default:
-		query = `UPDATE trip SET status = $1 WHERE id = $2`
-		args = []interface{}{status, tripID}
-	}
-
-	result, err := tx.ExecContext(ctx, query, args...)
+	// Update using DTO
+	query := `UPDATE matches SET status = :status, updated_at = :updated_at WHERE id = :id`
+	result, err := tx.NamedExecContext(ctx, query, dto)
 	if err != nil {
-		return fmt.Errorf("failed to update trip status: %w", err)
+		return fmt.Errorf("failed to update match status: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
@@ -173,7 +151,7 @@ func (r *MatchRepo) UpdateMatchStatus(ctx context.Context, tripID string, status
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("trip not found")
+		return fmt.Errorf("match not found")
 	}
 
 	// Commit transaction
@@ -184,172 +162,94 @@ func (r *MatchRepo) UpdateMatchStatus(ctx context.Context, tripID string, status
 	return nil
 }
 
-// GetMatchByID retrieves a match by ID
-func (r *MatchRepo) GetMatchByID(ctx context.Context, id string) (*models.Trip, error) {
-	// Query trip
-	query := `SELECT * FROM trip WHERE id = $1`
-	var trip models.Trip
-	err := r.db.GetContext(ctx, &trip, query, id)
+// AddAvailableDriver adds a driver to the available drivers geo set
+func (r *MatchRepo) AddAvailableDriver(ctx context.Context, driverID string, location *models.Location) error {
+	// Store in geo set
+	err := r.redisClient.GeoAdd(ctx, constants.KeyDriverGeo, location.Longitude, location.Latitude, driverID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("trip not found")
-		}
-		return nil, fmt.Errorf("failed to get trip: %w", err)
+		return fmt.Errorf("failed to add driver location: %w", err)
 	}
 
-	// Query pickup location
-	pickupQuery := `
-		SELECT latitude, longitude, address, timestamp
-		FROM trip_locations
-		WHERE trip_id = $1 AND type = 'pickup'
-	`
-	err = r.db.GetContext(ctx, &trip.PickupLocation, pickupQuery, id)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("failed to get pickup location: %w", err)
-	}
-
-	// Query dropoff location
-	dropoffQuery := `
-		SELECT latitude, longitude, address, timestamp
-		FROM trip_locations
-		WHERE trip_id = $1 AND type = 'dropoff'
-	`
-	err = r.db.GetContext(ctx, &trip.DropoffLocation, dropoffQuery, id)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("failed to get dropoff location: %w", err)
-	}
-
-	return &trip, nil
-}
-
-// GetPendingMatchesByDriverID retrieves pending matches for a driver
-func (r *MatchRepo) GetPendingMatchesByDriverID(ctx context.Context, driverID string) ([]*models.Trip, error) {
-	query := `
-		SELECT * FROM trip 
-		WHERE driver_id = $1 AND status IN ($2, $3)
-		ORDER BY requested_at DESC
-	`
-
-	var trip []*models.Trip
-	err := r.db.SelectContext(
-		ctx,
-		&trip,
-		query,
-		driverID,
-		models.TripStatusMatched,
-		models.TripStatusRequested,
-	)
+	// Add to available drivers set
+	err = r.redisClient.SAdd(ctx, constants.KeyAvailableDrivers, driverID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get pending trip: %w", err)
+		return fmt.Errorf("failed to add driver to available set: %w", err)
 	}
 
-	// Get locations for each trip
-	for _, trip := range trip {
-		// Query pickup location
-		pickupQuery := `
-			SELECT latitude, longitude, address, timestamp
-			FROM trip_locations
-			WHERE trip_id = $1 AND type = 'pickup'
-		`
-		err = r.db.GetContext(ctx, &trip.PickupLocation, pickupQuery, trip.ID)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("failed to get pickup location: %w", err)
-		}
-
-		// Query dropoff location
-		dropoffQuery := `
-			SELECT latitude, longitude, address, timestamp
-			FROM trip_locations
-			WHERE trip_id = $1 AND type = 'dropoff'
-		`
-		err = r.db.GetContext(ctx, &trip.DropoffLocation, dropoffQuery, trip.ID)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("failed to get dropoff location: %w", err)
-		}
+	// Store individual driver location
+	locationKey := fmt.Sprintf(constants.KeyDriverLocation, driverID)
+	locationData := map[string]interface{}{
+		constants.FieldLatitude:  location.Latitude,
+		constants.FieldLongitude: location.Longitude,
+		constants.FieldTimestamp: time.Now().Unix(),
 	}
-
-	return trip, nil
-}
-
-// GetPendingMatchesByPassengerID retrieves pending matches for a passenger
-func (r *MatchRepo) GetPendingMatchesByPassengerID(ctx context.Context, passengerID string) ([]*models.Trip, error) {
-	query := `
-		SELECT * FROM trip 
-		WHERE passenger_id = $1 AND status IN ($2, $3, $4)
-		ORDER BY requested_at DESC
-	`
-
-	var trip []*models.Trip
-	err := r.db.SelectContext(
-		ctx,
-		&trip,
-		query,
-		passengerID,
-		models.TripStatusRequested,
-		models.TripStatusMatched,
-		models.TripStatusAccepted,
-	)
+	err = r.redisClient.HMSet(ctx, locationKey, locationData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get pending trip: %w", err)
+		return fmt.Errorf("failed to store driver location: %w", err)
 	}
 
-	// Get locations for each trip
-	for _, trip := range trip {
-		// Query pickup location
-		pickupQuery := `
-			SELECT latitude, longitude, address, timestamp
-			FROM trip_locations
-			WHERE trip_id = $1 AND type = 'pickup'
-		`
-		err = r.db.GetContext(ctx, &trip.PickupLocation, pickupQuery, trip.ID)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("failed to get pickup location: %w", err)
-		}
-
-		// Query dropoff location
-		dropoffQuery := `
-			SELECT latitude, longitude, address, timestamp
-			FROM trip_locations
-			WHERE trip_id = $1 AND type = 'dropoff'
-		`
-		err = r.db.GetContext(ctx, &trip.DropoffLocation, dropoffQuery, trip.ID)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("failed to get dropoff location: %w", err)
-		}
-	}
-
-	return trip, nil
-}
-
-// AddAvailableDriver adds a driver to the Redis geospatial index
-func (r *MatchRepo) AddAvailableDriver(ctx context.Context, driverMSISDN string, location *models.Location) error {
-	err := r.redisClient.GeoAdd(
-		ctx,
-		AvailableDriversKey,
-		location.Longitude,
-		location.Latitude,
-		driverMSISDN,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to add driver to geo index: %w", err)
-	}
 	return nil
 }
 
-// RemoveAvailableDriver removes a driver from the Redis geospatial index
-func (r *MatchRepo) RemoveAvailableDriver(ctx context.Context, driverMSISDN string) error {
-	err := r.redisClient.Delete(ctx, fmt.Sprintf("%s:%s", AvailableDriversKey, driverMSISDN))
+// RemoveAvailableDriver removes a driver from the available drivers sets
+func (r *MatchRepo) RemoveAvailableDriver(ctx context.Context, driverID string) error {
+	// Remove from geo set
+	err := r.redisClient.ZRem(ctx, constants.KeyDriverGeo, driverID)
 	if err != nil {
-		return fmt.Errorf("failed to remove driver from geo index: %w", err)
+		return fmt.Errorf("failed to remove driver location: %w", err)
 	}
+
+	// Remove from available set
+	err = r.redisClient.SRem(ctx, constants.KeyAvailableDrivers, driverID)
+	if err != nil {
+		return fmt.Errorf("failed to remove driver from available set: %w", err)
+	}
+
+	// Remove individual location
+	locationKey := fmt.Sprintf(constants.KeyDriverLocation, driverID)
+	err = r.redisClient.Delete(ctx, locationKey)
+	if err != nil {
+		return fmt.Errorf("failed to remove driver location data: %w", err)
+	}
+
+	return nil
+}
+
+// StoreMatchProposal stores a match proposal in Redis
+func (r *MatchRepo) StoreMatchProposal(ctx context.Context, match *models.Match) error {
+	matchData, err := json.Marshal(match)
+	if err != nil {
+		return fmt.Errorf("failed to marshal match data: %w", err)
+	}
+
+	key := fmt.Sprintf(constants.KeyMatchProposal, match.ID)
+	err = r.redisClient.Set(ctx, key, matchData, 5*time.Minute)
+	if err != nil {
+		return fmt.Errorf("failed to store match proposal: %w", err)
+	}
+
+	// Store references for both driver and passenger
+	driverKey := fmt.Sprintf(constants.KeyDriverMatch, match.DriverID)
+	passengerKey := fmt.Sprintf(constants.KeyPassengerMatch, match.PassengerID)
+
+	err = r.redisClient.Set(ctx, driverKey, match.ID, 5*time.Minute)
+	if err != nil {
+		return fmt.Errorf("failed to store driver match reference: %w", err)
+	}
+
+	err = r.redisClient.Set(ctx, passengerKey, match.ID, 5*time.Minute)
+	if err != nil {
+		return fmt.Errorf("failed to store passenger match reference: %w", err)
+	}
+
 	return nil
 }
 
 // FindNearbyDrivers finds available drivers within the specified radius
-func (r *MatchRepo) FindNearbyDrivers(ctx context.Context, location *models.Location, radiusKm float64) ([]string, error) {
+func (r *MatchRepo) FindNearbyDrivers(ctx context.Context, location *models.Location, radiusKm float64) ([]*models.NearbyUser, error) {
 	results, err := r.redisClient.GeoRadius(
 		ctx,
-		AvailableDriversKey,
+		constants.KeyDriverGeo,
 		location.Longitude,
 		location.Latitude,
 		radiusKm,
@@ -359,12 +259,20 @@ func (r *MatchRepo) FindNearbyDrivers(ctx context.Context, location *models.Loca
 		return nil, fmt.Errorf("failed to find nearby drivers: %w", err)
 	}
 
-	driverIDs := make([]string, len(results))
-	for i, result := range results {
-		driverIDs[i] = result.Name
+	nearbyDrivers := make([]*models.NearbyUser, 0, len(results))
+	for _, result := range results {
+		nearbyDrivers = append(nearbyDrivers, &models.NearbyUser{
+			ID: result.Name,
+			Location: models.Location{
+				Latitude:  result.Latitude,
+				Longitude: result.Longitude,
+				Timestamp: time.Now(),
+			},
+			Distance: result.Dist,
+		})
 	}
 
-	return driverIDs, nil
+	return nearbyDrivers, nil
 }
 
 // ProcessLocationUpdate processes a location update for a driver
@@ -372,7 +280,7 @@ func (r *MatchRepo) ProcessLocationUpdate(ctx context.Context, driverID string, 
 	// Update driver's location in Redis
 	err := r.redisClient.GeoAdd(
 		ctx,
-		AvailableDriversKey,
+		constants.KeyDriverGeo,
 		location.Longitude,
 		location.Latitude,
 		driverID,
@@ -383,44 +291,11 @@ func (r *MatchRepo) ProcessLocationUpdate(ctx context.Context, driverID string, 
 	return nil
 }
 
-// FindMatchForPassenger finds a match for a passenger
-func (r *MatchRepo) FindMatchForPassenger(ctx context.Context, passengerID string, location *models.Location, radiusKm float64) (*models.Trip, error) {
-	// Find nearby drivers
-	driverIDs, err := r.FindNearbyDrivers(ctx, location, radiusKm)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find nearby drivers: %w", err)
-	}
-
-	// Create a new trip
-	trip := &models.Trip{
-		PassengerMSISDN: passengerID,
-		PickupLocation:  *location,
-		Status:          models.TripStatusRequested,
-		RequestedAt:     time.Now(),
-	}
-
-	// Assign the first available driver
-	if len(driverIDs) > 0 {
-		trip.DriverMSISDN = driverIDs[0]
-		trip.Status = models.TripStatusMatched
-		now := time.Now()
-		trip.MatchedAt = &now
-	}
-
-	// Save the trip to the database
-	err = r.CreateMatch(ctx, trip)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create trip: %w", err)
-	}
-
-	return trip, nil
-}
-
 // AddAvailablePassenger adds a passenger to the Redis geospatial index
 func (r *MatchRepo) AddAvailablePassenger(ctx context.Context, passengerID string, location *models.Location) error {
 	err := r.redisClient.GeoAdd(
 		ctx,
-		AvailablePassengersKey,
+		constants.KeyPassengerGeo,
 		location.Longitude,
 		location.Latitude,
 		passengerID,
@@ -433,7 +308,7 @@ func (r *MatchRepo) AddAvailablePassenger(ctx context.Context, passengerID strin
 
 // RemoveAvailablePassenger removes a passenger from the Redis geospatial index
 func (r *MatchRepo) RemoveAvailablePassenger(ctx context.Context, passengerID string) error {
-	err := r.redisClient.Delete(ctx, fmt.Sprintf("%s:%s", AvailablePassengersKey, passengerID))
+	err := r.redisClient.Delete(ctx, fmt.Sprintf("%s:%s", constants.KeyPassengerGeo, passengerID))
 	if err != nil {
 		return fmt.Errorf("failed to remove passenger from geo index: %w", err)
 	}
@@ -441,10 +316,10 @@ func (r *MatchRepo) RemoveAvailablePassenger(ctx context.Context, passengerID st
 }
 
 // FindNearbyPassengers finds available passengers within the specified radius
-func (r *MatchRepo) FindNearbyPassengers(ctx context.Context, location *models.Location, radiusKm float64) ([]string, error) {
+func (r *MatchRepo) FindNearbyPassengers(ctx context.Context, location *models.Location, radiusKm float64) ([]*models.NearbyUser, error) {
 	results, err := r.redisClient.GeoRadius(
 		ctx,
-		AvailablePassengersKey,
+		constants.KeyPassengerGeo,
 		location.Longitude,
 		location.Latitude,
 		radiusKm,
@@ -454,10 +329,106 @@ func (r *MatchRepo) FindNearbyPassengers(ctx context.Context, location *models.L
 		return nil, fmt.Errorf("failed to find nearby passengers: %w", err)
 	}
 
-	passengerIDs := make([]string, len(results))
-	for i, result := range results {
-		passengerIDs[i] = result.Name
+	nearbyPassengers := make([]*models.NearbyUser, 0, len(results))
+	for _, result := range results {
+		nearbyPassengers = append(nearbyPassengers, &models.NearbyUser{
+			ID: result.Name,
+			Location: models.Location{
+				Latitude:  result.Latitude,
+				Longitude: result.Longitude,
+				Timestamp: time.Now(),
+			},
+			Distance: result.Dist,
+		})
 	}
 
-	return passengerIDs, nil
+	return nearbyPassengers, nil
+}
+
+// ListMatchesByDriver retrieves all matches for a driver
+func (r *MatchRepo) ListMatchesByDriver(ctx context.Context, driverID string) ([]*models.Match, error) {
+	query := `
+        SELECT 
+            id, driver_id, passenger_id,
+            (driver_location[0])::float8 as driver_longitude,
+            (driver_location[1])::float8 as driver_latitude,
+            (passenger_location[0])::float8 as passenger_longitude,
+            (passenger_location[1])::float8 as passenger_latitude,
+            status, created_at, updated_at
+        FROM matches
+        WHERE driver_id = $1
+        ORDER BY created_at DESC
+    `
+
+	rows, err := r.db.QueryContext(ctx, query, driverID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list matches: %w", err)
+	}
+	defer rows.Close()
+
+	var matches []*models.Match
+	for rows.Next() {
+		var dto models.MatchDTO
+		err := rows.Scan(
+			&dto.ID, &dto.DriverID, &dto.PassengerID,
+			&dto.DriverLongitude, &dto.DriverLatitude,
+			&dto.PassengerLongitude, &dto.PassengerLatitude,
+			&dto.Status, &dto.CreatedAt, &dto.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan match: %w", err)
+		}
+
+		matches = append(matches, dto.ToMatch())
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating matches: %w", err)
+	}
+
+	return matches, nil
+}
+
+// ListMatchesByPassenger retrieves all matches for a passenger
+func (r *MatchRepo) ListMatchesByPassenger(ctx context.Context, passengerID string) ([]*models.Match, error) {
+	query := `
+        SELECT 
+            id, driver_id, passenger_id,
+            (driver_location[0])::float8 as driver_longitude,
+            (driver_location[1])::float8 as driver_latitude,
+            (passenger_location[0])::float8 as passenger_longitude,
+            (passenger_location[1])::float8 as passenger_latitude,
+            status, created_at, updated_at
+        FROM matches
+        WHERE passenger_id = $1
+        ORDER BY created_at DESC
+    `
+
+	rows, err := r.db.QueryContext(ctx, query, passengerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list matches: %w", err)
+	}
+	defer rows.Close()
+
+	var matches []*models.Match
+	for rows.Next() {
+		var dto models.MatchDTO
+		err := rows.Scan(
+			&dto.ID, &dto.DriverID, &dto.PassengerID,
+			&dto.DriverLongitude, &dto.DriverLatitude,
+			&dto.PassengerLongitude, &dto.PassengerLatitude,
+			&dto.Status, &dto.CreatedAt, &dto.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan match: %w", err)
+		}
+
+		matches = append(matches, dto.ToMatch())
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating matches: %w", err)
+	}
+
+	return matches, nil
 }

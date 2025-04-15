@@ -18,15 +18,9 @@ type BeaconResponse struct {
 
 // BeaconEvent represents a beacon status change event for NATS
 type BeaconEvent struct {
-	MSISDN    string      `json:"msisdn"`
-	IsActive  bool        `json:"is_active"`
-	Role      string      `json:"role"`
-	Location  GeoLocation `json:"location"`
-	Timestamp time.Time   `json:"timestamp"`
-}
-
-// GeoLocation represents a geographic location
-type GeoLocation struct {
-	Latitude  float64 `json:"latitude"`
-	Longitude float64 `json:"longitude"`
+	UserID    string    `json:"user_id"`
+	IsActive  bool      `json:"is_active"`
+	Role      string    `json:"role"`
+	Location  Location  `json:"location"`
+	Timestamp time.Time `json:"timestamp"`
 }

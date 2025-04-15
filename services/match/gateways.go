@@ -8,5 +8,5 @@ import (
 
 // MatchGW defines the match gateaways interface
 type MatchGW interface {
-	PublishBeaconEvent(ctx context.Context, userID string, beaconReq *models.BeaconRequest) error
+	PublishMatchEvent(ctx context.Context, matchProp models.MatchProposal) error
 }

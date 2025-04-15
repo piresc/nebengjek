@@ -11,7 +11,6 @@ The Nebengjek application consists of the following services:
 3. **Location Service** - Tracks and manages location data
 4. **Match Service** - Matches triprs with drivers
 5. **trips Service** - Manages trip requests and status
-6. **Trip Management Service** - Handles trip planning and history
 
 ## Infrastructure Services
 
@@ -69,7 +68,6 @@ docker-compose down -v
 | Location Service | 9998 |
 | Match Service | 10000 |
 | trips Service | 10002 |
-| Trip Management Service | 10004 |
 | PostgreSQL | 5432 |
 | Redis | 6379 |
 | NATS | 4222, 8222 |

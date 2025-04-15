@@ -1,17 +1,10 @@
 package models
 
-import (
-	"time"
-)
-
 // OTP represents a one-time password for user authentication
 type OTP struct {
-	ID         string    `json:"id" bson:"_id" db:"id"`
-	MSISDN     string    `json:"msisdn" bson:"msisdn" db:"msisdn"`
-	Code       string    `json:"code" bson:"code" db:"code"`
-	CreatedAt  time.Time `json:"created_at" bson:"created_at" db:"created_at"`
-	ExpiresAt  time.Time `json:"expires_at" bson:"expires_at" db:"expires_at"`
-	IsVerified bool      `json:"is_verified" bson:"is_verified" db:"is_verified"`
+	ID     string `json:"id" bson:"_id" db:"id"`
+	MSISDN string `json:"msisdn" bson:"msisdn" db:"msisdn"`
+	Code   string `json:"code" bson:"code" db:"code"`
 }
 
 // LoginRequest represents a request to login with MSISDN

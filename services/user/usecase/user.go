@@ -34,7 +34,6 @@ func (u *UserUC) RegisterUser(ctx context.Context, user *models.User) error {
 	user.CreatedAt = time.Now()
 	user.UpdatedAt = time.Now()
 	user.IsActive = true
-	user.Rating = 0
 
 	// Set role to passenger if not specified
 	if user.Role == "" {
@@ -85,9 +84,6 @@ func (u *UserUC) UpdateUserProfile(ctx context.Context, user *models.User) error
 	if existingUser.Role == "driver" && user.DriverInfo != nil {
 		existingUser.DriverInfo.VehicleType = user.DriverInfo.VehicleType
 		existingUser.DriverInfo.VehiclePlate = user.DriverInfo.VehiclePlate
-		existingUser.DriverInfo.VehicleModel = user.DriverInfo.VehicleModel
-		existingUser.DriverInfo.VehicleColor = user.DriverInfo.VehicleColor
-		existingUser.DriverInfo.LicenseNumber = user.DriverInfo.LicenseNumber
 	}
 
 	// Update user
@@ -142,10 +138,6 @@ func (u *UserUC) RegisterDriver(ctx context.Context, user *models.User) error {
 	// Set role to driver
 	user.Role = "driver"
 
-	// Set default driver values
-	user.DriverInfo.Verified = false
-	user.DriverInfo.IsAvailable = false
-
 	// Register user
 	return u.userRepo.CreateUser(ctx, user)
 }
@@ -180,18 +172,5 @@ func validateDriverData(driver *models.Driver) error {
 	if driver.VehiclePlate == "" {
 		return errors.New("vehicle plate is required")
 	}
-
-	if driver.VehicleModel == "" {
-		return errors.New("vehicle model is required")
-	}
-
-	if driver.VehicleColor == "" {
-		return errors.New("vehicle color is required")
-	}
-
-	if driver.LicenseNumber == "" {
-		return errors.New("license number is required")
-	}
-
 	return nil
 }

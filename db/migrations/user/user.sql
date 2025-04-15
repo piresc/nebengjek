@@ -17,16 +17,4 @@ CREATE TABLE IF NOT EXISTS drivers (
     user_id VARCHAR(36) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     vehicle_type VARCHAR(50) NOT NULL,
     vehicle_plate VARCHAR(20) NOT NULL,
-    vehicle_model VARCHAR(100) NOT NULL,
-    vehicle_color VARCHAR(50) NOT NULL,
-    license_number VARCHAR(50) NOT NULL,
-    verified BOOLEAN NOT NULL DEFAULT FALSE,
-    verified_at TIMESTAMP,
-    is_available BOOLEAN NOT NULL DEFAULT FALSE
 );
-
-
--- Add indexes for common queries
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone_number);
-CREATE INDEX IF NOT EXISTS idx_drivers_available ON drivers(is_available) WHERE is_available = TRUE;

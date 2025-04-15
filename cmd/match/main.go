@@ -7,6 +7,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/config"
 	"github.com/piresc/nebengjek/internal/pkg/database"
+	"github.com/piresc/nebengjek/internal/pkg/nats"
+	"github.com/piresc/nebengjek/services/match/gateway"
 	"github.com/piresc/nebengjek/services/match/handler"
 	"github.com/piresc/nebengjek/services/match/repository"
 	"github.com/piresc/nebengjek/services/match/usecase"
@@ -30,12 +32,18 @@ func main() {
 		log.Fatalf("Failed to connect to Redis: %v", err)
 	}
 	defer redisClient.Close()
+	// Initialize NATS
+	natsClient, err := nats.NewClient(configs.NATS.URL)
+	if err != nil {
+		log.Fatalf("Failed to connect to NATS: %v", err)
+	}
+	defer natsClient.Close()
 
 	// Initialize repositories
 	matchRepo := repository.NewMatchRepository(configs, postgresClient.GetDB(), redisClient)
-
+	matchGW := gateway.NewMatchGW(natsClient.GetConn())
 	// Initialize use case
-	matchUC := usecase.NewMatchUC(matchRepo)
+	matchUC := usecase.NewMatchUC(matchRepo, matchGW)
 
 	// Initialize Echo router and handler
 	e := echo.New()

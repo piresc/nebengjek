@@ -6,14 +6,17 @@ import (
 
 // MatchUC implements the match use case interface
 type MatchUC struct {
-	repo match.MatchRepo
+	matchRepo match.MatchRepo
+	matchGW   match.MatchGW
 }
 
-// NewMatchUseCase creates a new match use case
+// NewMatchUC creates a new match use case
 func NewMatchUC(
-	repo match.MatchRepo,
+	matchRepo match.MatchRepo,
+	matchGW match.MatchGW,
 ) *MatchUC {
 	return &MatchUC{
-		repo: repo,
+		matchRepo: matchRepo,
+		matchGW:   matchGW,
 	}
 }

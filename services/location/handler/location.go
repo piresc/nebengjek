@@ -129,7 +129,6 @@ func (h *LocationHandler) GetNearbyDrivers(c echo.Context) error {
 	location := &models.Location{
 		Latitude:  lat,
 		Longitude: lng,
-		Timestamp: c.Request().Context().Value("requestTime").(time.Time),
 	}
 
 	// Get nearby drivers

@@ -5,13 +5,13 @@ import (
 )
 
 // userGW handles user gateway operations
-type UserGW struct {
+type matchGW struct {
 	nc *nats.Conn
 }
 
-// NewNATSGateway creates a new NATS gateway instance
-func NewUserGW(nc *nats.Conn) *UserGW {
-	return &UserGW{
+// NewMatchGW creates a new NATS gateway instance
+func NewMatchGW(nc *nats.Conn) *matchGW {
+	return &matchGW{
 		nc: nc,
 	}
 }

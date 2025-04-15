@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/database"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/internal/pkg/nats"
@@ -16,11 +17,6 @@ import (
 // Topics for NATS messaging
 const (
 	LocationUpdatesTopic = "location_updates"
-)
-
-// Redis keys
-const (
-	DriverLocationKey = "driver:locations" // Geo set for driver locations
 )
 
 // LocationUpdateType defines the type of location update
@@ -177,7 +173,7 @@ func (s *LocationService) UpdateLocation(
 	if role == "driver" {
 		err = s.redisClient.GeoAdd(
 			ctx,
-			DriverLocationKey,
+			constants.DriverLocationKey,
 			location.Longitude,
 			location.Latitude,
 			userID,
@@ -216,7 +212,7 @@ func (s *LocationService) GetNearbyDriversFromRedis(
 	// Get nearby drivers from Redis
 	results, err := s.redisClient.GeoRadius(
 		ctx,
-		DriverLocationKey,
+		constants.DriverLocationKey,
 		location.Longitude,
 		location.Latitude,
 		radiusKm,

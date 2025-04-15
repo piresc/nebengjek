@@ -7,9 +7,10 @@ import (
 	"math"
 	"time"
 
+	"github.com/piresc/nebengjek/internal/pkg/constants"
+	"github.com/piresc/nebengjek/internal/pkg/database"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/internal/pkg/nats"
-	"github.com/piresc/nebengjek/services/location"
 	"github.com/piresc/nebengjek/services/rides"
 )
 
@@ -47,7 +48,7 @@ type RideUpdate struct {
 type RideService struct {
 	cfg          *models.Config
 	rideRepo     rides.RideRepo
-	locationRepo location.LocationRepo
+	redisClient  *database.RedisClient
 	natsProducer *nats.Producer
 }
 
@@ -56,6 +57,12 @@ func NewRideService(
 	cfg *models.Config,
 	rideRepo rides.RideRepo,
 ) (*RideService, error) {
+	// Initialize Redis client
+	redisClient, err := database.NewRedisClient(cfg.Redis)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize Redis client: %w", err)
+	}
+
 	// Initialize NATS producer
 	producer, err := nats.NewProducer(cfg.NATS.URL)
 	if err != nil {
@@ -65,6 +72,7 @@ func NewRideService(
 	return &RideService{
 		cfg:          cfg,
 		rideRepo:     rideRepo,
+		redisClient:  redisClient,
 		natsProducer: producer,
 	}, nil
 }
@@ -121,6 +129,14 @@ func (s *RideService) CalculateFare(ctx context.Context, trip *models.Trip) (*mo
 
 // PublishRideUpdate publishes a ride update to NATS
 func (s *RideService) PublishRideUpdate(ctx context.Context, update *RideUpdate) error {
+	// Store trip status in Redis for quick access
+	if update.Status != "" {
+		err := s.redisClient.Set(ctx, fmt.Sprintf(constants.KeyActiveTrip, update.TripID), update.Status, 24*time.Hour)
+		if err != nil {
+			log.Printf("Warning: failed to store trip status in Redis: %v", err)
+		}
+	}
+
 	return s.natsProducer.Publish(RideUpdatesTopic, update)
 }
 

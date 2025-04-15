@@ -1,4 +1,4 @@
-package handler
+package http
 
 import (
 	"net/http"
@@ -6,10 +6,23 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/internal/utils"
+	"github.com/piresc/nebengjek/services/user"
 )
 
+// AuthHandler handles authentication-related HTTP requests
+type AuthHandler struct {
+	userUC user.UserUC
+}
+
+// NewAuthHandler creates a new authentication handler
+func NewAuthHandler(userUC user.UserUC) *AuthHandler {
+	return &AuthHandler{
+		userUC: userUC,
+	}
+}
+
 // GenerateOTP handles OTP generation requests via SMS
-func (h *UserHandler) GenerateOTP(c echo.Context) error {
+func (h *AuthHandler) GenerateOTP(c echo.Context) error {
 	var request models.LoginRequest
 	if err := c.Bind(&request); err != nil {
 		return utils.BadRequestResponse(c, "Invalid request payload")
@@ -20,7 +33,7 @@ func (h *UserHandler) GenerateOTP(c echo.Context) error {
 		return utils.BadRequestResponse(c, "MSISDN is required")
 	}
 
-	// Generate and send OTP via Telkomsel's SMS API
+	// Generate and send OTP via SMS
 	if err := h.userUC.GenerateOTP(c.Request().Context(), request.MSISDN); err != nil {
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, err.Error())
 	}
@@ -29,7 +42,7 @@ func (h *UserHandler) GenerateOTP(c echo.Context) error {
 }
 
 // VerifyOTP handles OTP verification requests
-func (h *UserHandler) VerifyOTP(c echo.Context) error {
+func (h *AuthHandler) VerifyOTP(c echo.Context) error {
 	var request models.VerifyRequest
 	if err := c.Bind(&request); err != nil {
 		return utils.BadRequestResponse(c, "Invalid request payload")

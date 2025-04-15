@@ -1,43 +1,79 @@
 package handler
 
 import (
+	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
-	"github.com/piresc/nebengjek/internal/pkg/middleware"
+	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/services/user"
+	"github.com/piresc/nebengjek/services/user/handler/http"
+	"github.com/piresc/nebengjek/services/user/handler/nats"
+	"github.com/piresc/nebengjek/services/user/handler/websocket"
 )
 
-// UserHandler handles HTTP requests for user operations
-type UserHandler struct {
-	userUC user.UserUC
+// Handler coordinates all protocol handlers for the user service
+type Handler struct {
+	userHandler   *http.UserHandler
+	authHandler   *http.AuthHandler
+	beaconHandler *http.BeaconHandler
+	wsManager     *websocket.WebSocketManager
+	natsHandler   *nats.Handler
+	jwtConfig     models.JWTConfig
 }
 
-// NewUserHandler creates a new user handler
-func NewUserHandler(userUC user.UserUC) *UserHandler {
-	return &UserHandler{userUC: userUC}
+// NewHandler creates and initializes all handlers
+func NewHandler(userUC user.UserUC, natsURL string, jwtConfig models.JWTConfig) (*Handler, error) {
+	// Initialize WebSocket manager
+	wsManager := websocket.NewWebSocketManager(userUC, jwtConfig)
+
+	// Initialize NATS handler
+	natsHandler, err := nats.NewHandler(wsManager, natsURL)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Handler{
+		userHandler:   http.NewUserHandler(userUC),
+		authHandler:   http.NewAuthHandler(userUC),
+		beaconHandler: http.NewBeaconHandler(userUC),
+		wsManager:     wsManager,
+		natsHandler:   natsHandler,
+		jwtConfig:     jwtConfig,
+	}, nil
 }
 
-// RegisterRoutes registers the user API routes
-func (h *UserHandler) RegisterRoutes(e *echo.Echo) {
-	// Public routes (JWT authentication)
-	e.POST("/auth/login", h.GenerateOTP) // Generates OTP via SMS
-	e.POST("/auth/verify", h.VerifyOTP)  // Validates OTP and issues JWT
+// RegisterRoutes registers all protocol handlers and their routes
+func (h *Handler) RegisterRoutes(e *echo.Echo) {
+	// Auth routes (public)
+	authGroup := e.Group("/auth")
+	authGroup.POST("/otp/generate", h.authHandler.GenerateOTP)
+	authGroup.POST("/otp/verify", h.authHandler.VerifyOTP)
 
-	// Service-to-service routes (API key authentication)
-	serviceRoutes := e.Group("/internal")
-	serviceRoutes.Use(
-		middleware.ValidateAPIKey(
-			"match-service",
-			"billing-service",
-			"trip-service"))
-	serviceRoutes.GET("/users/:id", h.GetUser)
-	serviceRoutes.GET("/users", h.ListUsers)
-	serviceRoutes.POST("/drivers", h.RegisterDriver)
+	// Configure JWT middleware
+	config := echojwt.Config{
+		SigningKey: []byte(h.jwtConfig.Secret),
+	}
 
-	// User routes (JWT authentication)
-	e.GET("/users/:id", h.GetUser)
-	e.PUT("/users/:id", h.UpdateUser)
-	e.DELETE("/users/:id", h.DeactivateUser)
+	// Protected routes
+	protected := e.Group("", echojwt.WithConfig(config))
 
-	// Beacon routes (JWT authentication)
-	e.POST("/beacon", h.ToggleBeacon)
+	// User routes
+	userGroup := protected.Group("/users")
+	userGroup.POST("", h.userHandler.CreateUser)
+	userGroup.GET("/:id", h.userHandler.GetUser)
+	userGroup.PUT("/:id", h.userHandler.UpdateUser)
+	userGroup.DELETE("/:id", h.userHandler.DeactivateUser)
+	userGroup.GET("", h.userHandler.ListUsers)
+
+	// Driver routes
+	driverGroup := protected.Group("/drivers")
+	driverGroup.POST("/register", h.userHandler.RegisterDriver)
+
+	// Beacon routes
+	beaconGroup := protected.Group("/beacon")
+	beaconGroup.PUT("", h.beaconHandler.UpdateBeacon)
+	beaconGroup.GET("/:user_id", h.beaconHandler.GetBeaconStatus)
+
+	// WebSocket routes
+	wsGroup := protected.Group("/ws")
+	wsGroup.GET("", h.wsManager.HandleWebSocket)
 }

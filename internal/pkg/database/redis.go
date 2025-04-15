@@ -56,6 +56,11 @@ func (r *RedisClient) Delete(ctx context.Context, key string) error {
 	return r.client.Del(ctx, key).Err()
 }
 
+// Exists checks if a key exists
+func (r *RedisClient) Keys(ctx context.Context, key string) error {
+	return r.client.Keys(ctx, key).Err()
+}
+
 // GeoAdd adds geospatial data to a sorted set
 func (r *RedisClient) GeoAdd(ctx context.Context, key string, longitude, latitude float64, member string) error {
 	return r.client.GeoAdd(ctx, key, &redis.GeoLocation{
@@ -74,6 +79,26 @@ func (r *RedisClient) GeoRadius(ctx context.Context, key string, longitude, lati
 		WithDist:  true,
 		Sort:      "ASC",
 	}).Result()
+}
+
+// SAdd adds members to a set
+func (r *RedisClient) SAdd(ctx context.Context, key string, members ...interface{}) error {
+	return r.client.SAdd(ctx, key, members...).Err()
+}
+
+// SRem removes members from a set
+func (r *RedisClient) SRem(ctx context.Context, key string, members ...interface{}) error {
+	return r.client.SRem(ctx, key, members...).Err()
+}
+
+// ZRem removes members from a sorted set
+func (r *RedisClient) ZRem(ctx context.Context, key string, members ...interface{}) error {
+	return r.client.ZRem(ctx, key, members...).Err()
+}
+
+// HMSet sets multiple hash fields
+func (r *RedisClient) HMSet(ctx context.Context, key string, values map[string]interface{}) error {
+	return r.client.HMSet(ctx, key, values).Err()
 }
 
 // Close closes the Redis client

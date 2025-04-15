@@ -11,6 +11,45 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
+// GetUserByMSISDN retrieves a user by MSISDN
+func (r *UserRepo) GetUserByMSISDN(ctx context.Context, msisdn string) (*models.User, error) {
+	query := `
+		SELECT id, msisdn, fullname, role, created_at, updated_at, is_active
+		FROM users
+		WHERE msisdn = $1
+	`
+
+	var user models.User
+	err := r.db.QueryRowContext(ctx, query, msisdn).Scan(
+		&user.ID,
+		&user.MSISDN,
+		&user.FullName,
+		&user.Role,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+		&user.IsActive,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("user not found")
+		}
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	// Check if user is a driver
+	if user.Role == "driver" {
+		// Get driver info
+		driver, err := r.getDriverInfo(ctx, user.ID)
+		if err != nil {
+			return nil, err
+		}
+		user.DriverInfo = driver
+	}
+
+	return &user, nil
+}
+
 // CreateUser creates a new user in the database
 func (r *UserRepo) CreateUser(ctx context.Context, user *models.User) error {
 	// Generate UUID if not provided
@@ -33,9 +72,9 @@ func (r *UserRepo) CreateUser(ctx context.Context, user *models.User) error {
 	// Insert user
 	query := `
 		INSERT INTO users (id, msisdn, fullname, role, 
-			created_at, updated_at, is_active, rating
+			created_at, updated_at, is_active
 		) VALUES (:id, :msisdn, :fullname, :role, 
-			:created_at, :updated_at, :is_active, :rating)
+			:created_at, :updated_at, :is_active)
 	`
 	_, err = tx.NamedExecContext(ctx, query, user)
 	if err != nil {
@@ -46,47 +85,19 @@ func (r *UserRepo) CreateUser(ctx context.Context, user *models.User) error {
 	if user.Role == "driver" && user.DriverInfo != nil {
 		// Create a map for driver info with user_id
 		driverData := map[string]interface{}{
-			"user_id":        user.ID,
-			"vehicle_type":   user.DriverInfo.VehicleType,
-			"vehicle_plate":  user.DriverInfo.VehiclePlate,
-			"vehicle_model":  user.DriverInfo.VehicleModel,
-			"vehicle_color":  user.DriverInfo.VehicleColor,
-			"license_number": user.DriverInfo.LicenseNumber,
-			"verified":       user.DriverInfo.Verified,
-			"verified_at":    user.DriverInfo.VerifiedAt,
-			"is_available":   user.DriverInfo.IsAvailable,
+			"user_id":       user.ID,
+			"vehicle_type":  user.DriverInfo.VehicleType,
+			"vehicle_plate": user.DriverInfo.VehiclePlate,
 		}
 
 		query = `
 			INSERT INTO drivers (
-				user_id, vehicle_type, vehicle_plate, vehicle_model, vehicle_color,
-				license_number, verified, verified_at, is_available
-			) VALUES (:user_id, :vehicle_type, :vehicle_plate, :vehicle_model, :vehicle_color,
-				:license_number, :verified, :verified_at, :is_available)
+				user_id, vehicle_type, vehicle_plate
+			) VALUES (:user_id, :vehicle_type, :vehicle_plate)
 		`
 		_, err = tx.NamedExecContext(ctx, query, driverData)
 		if err != nil {
 			return fmt.Errorf("failed to insert driver info: %w", err)
-		}
-
-		// Driver documents functionality has been removed
-
-		// Insert driver location if available
-		if user.DriverInfo.CurrentLocation != nil {
-			locationData := map[string]interface{}{
-				"user_id":   user.ID,
-				"latitude":  user.DriverInfo.CurrentLocation.Latitude,
-				"longitude": user.DriverInfo.CurrentLocation.Longitude,
-				"timestamp": user.DriverInfo.CurrentLocation.Timestamp,
-			}
-
-			_, err = tx.NamedExecContext(ctx, `
-				INSERT INTO driver_locations (user_id, latitude, longitude, address, timestamp)
-				VALUES (:user_id, :latitude, :longitude, :address, :timestamp)
-			`, locationData)
-			if err != nil {
-				return fmt.Errorf("failed to insert driver location: %w", err)
-			}
 		}
 	}
 
@@ -155,25 +166,6 @@ func (r *UserRepo) getDriverInfo(ctx context.Context, userID string) (*models.Dr
 		}
 		return nil, fmt.Errorf("failed to get driver info: %w", err)
 	}
-
-	// Driver documents functionality has been removed
-
-	// Get driver location
-	var location models.Location
-	err = r.db.GetContext(ctx, &location, `
-		SELECT * FROM driver_locations
-		WHERE user_id = $1
-		ORDER BY timestamp DESC
-		LIMIT 1
-	`, userID)
-	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("failed to get driver location: %w", err)
-		}
-	} else {
-		driver.CurrentLocation = &location
-	}
-
 	return &driver, nil
 }
 
@@ -221,15 +213,9 @@ func (r *UserRepo) UpdateUser(ctx context.Context, user *models.User) error {
 
 		// Create a map for driver data
 		driverData := map[string]interface{}{
-			"user_id":        user.ID,
-			"vehicle_type":   user.DriverInfo.VehicleType,
-			"vehicle_plate":  user.DriverInfo.VehiclePlate,
-			"vehicle_model":  user.DriverInfo.VehicleModel,
-			"vehicle_color":  user.DriverInfo.VehicleColor,
-			"license_number": user.DriverInfo.LicenseNumber,
-			"verified":       user.DriverInfo.Verified,
-			"verified_at":    user.DriverInfo.VerifiedAt,
-			"is_available":   user.DriverInfo.IsAvailable,
+			"user_id":       user.ID,
+			"vehicle_type":  user.DriverInfo.VehicleType,
+			"vehicle_plate": user.DriverInfo.VehiclePlate,
 		}
 
 		if exists {
@@ -237,9 +223,7 @@ func (r *UserRepo) UpdateUser(ctx context.Context, user *models.User) error {
 			query := `
 				UPDATE drivers SET
 					vehicle_type = :vehicle_type, vehicle_plate = :vehicle_plate, 
-					vehicle_model = :vehicle_model, vehicle_color = :vehicle_color,
-					license_number = :license_number, verified = :verified, 
-					verified_at = :verified_at, is_available = :is_available
+					license_number = :license_number,
 				WHERE user_id = :user_id
 			`
 			_, err = tx.NamedExecContext(ctx, query, driverData)

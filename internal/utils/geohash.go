@@ -55,7 +55,6 @@ func LocationFromGeoPoint(point GeoPoint) models.Location {
 	return models.Location{
 		Latitude:  point.Latitude,
 		Longitude: point.Longitude,
-		Timestamp: models.Now(),
 	}
 }
 

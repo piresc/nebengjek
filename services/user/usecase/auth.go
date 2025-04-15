@@ -24,12 +24,9 @@ func (u *UserUC) GenerateOTP(ctx context.Context, msisdn string) error {
 
 	// Create OTP record
 	otp := &models.OTP{
-		ID:         uuid.New().String(),
-		MSISDN:     formattedMSISDN,
-		Code:       code,
-		CreatedAt:  time.Now(),
-		ExpiresAt:  time.Now().Add(5 * time.Minute), // OTP expires in 5 minutes
-		IsVerified: false,
+		ID:     uuid.New().String(),
+		MSISDN: formattedMSISDN,
+		Code:   code,
 	}
 
 	// Save OTP to database
@@ -57,16 +54,13 @@ func (u *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*models.Au
 	if err != nil {
 		return nil, fmt.Errorf("invalid OTP: %w", err)
 	}
-
-	// Check if OTP is expired
-	if time.Now().After(otp.ExpiresAt) {
-		return nil, fmt.Errorf("OTP expired")
+	if otp == nil {
+		return nil, fmt.Errorf("OTP not found or expired")
+	}
+	if otp.Code != code {
+		return nil, fmt.Errorf("invalid OTP code")
 	}
 
-	// Check if OTP is already verified
-	if otp.IsVerified {
-		return nil, fmt.Errorf("OTP already used")
-	}
 	// Get or create user
 	user, err := u.userRepo.GetUserByMSISDN(ctx, formattedMSISDN)
 	if err != nil {
@@ -78,7 +72,6 @@ func (u *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*models.Au
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 			IsActive:  true,
-			Rating:    0,
 		}
 
 		if err := u.userRepo.CreateUser(ctx, user); err != nil {
@@ -87,12 +80,13 @@ func (u *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*models.Au
 	}
 
 	// Generate JWT token
-	token, expiresAt, err := generateJWTToken(user)
+	token, expiresAt, err := u.generateJWTToken(user)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate token: %w", err)
 	}
+
 	// Mark OTP as verified
-	if err := u.userRepo.MarkOTPVerified(ctx, otp.ID); err != nil {
+	if err := u.userRepo.MarkOTPVerified(ctx, formattedMSISDN, code); err != nil {
 		return nil, fmt.Errorf("failed to mark OTP as verified: %w", err)
 	}
 
@@ -105,12 +99,10 @@ func (u *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*models.Au
 	}, nil
 }
 
-// Helper functions
-
 // generateJWTToken generates a JWT token for the given user
-func generateJWTToken(user *models.User) (string, int64, error) {
-	// Set token expiration time (24 hours)
-	expirationTime := time.Now().Add(24 * time.Hour)
+func (u *UserUC) generateJWTToken(user *models.User) (string, int64, error) {
+	// Set token expiration time
+	expirationTime := time.Now().Add(time.Duration(u.jwtCfg.Expiration) * time.Minute)
 	expiresAt := expirationTime.Unix()
 
 	// Create claims
@@ -119,13 +111,14 @@ func generateJWTToken(user *models.User) (string, int64, error) {
 		"msisdn":  user.MSISDN,
 		"role":    user.Role,
 		"exp":     expiresAt,
+		"iss":     u.jwtCfg.Issuer,
 	}
 
 	// Create token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	// TODO: Use a proper secret key from configuration
-	tokenString, err := token.SignedString([]byte("your-secret-key"))
+	// Sign token with configured secret
+	tokenString, err := token.SignedString([]byte(u.jwtCfg.Secret))
 	if err != nil {
 		return "", 0, err
 	}
