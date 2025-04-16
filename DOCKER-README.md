@@ -10,7 +10,7 @@ The Nebengjek application consists of the following services:
 2. **Billing Service** - Manages payment processing and invoicing
 3. **Location Service** - Tracks and manages location data
 4. **Match Service** - Matches triprs with drivers
-5. **trips Service** - Manages trip requests and status
+5. **ride Service** - Manages ride requests and status
 
 ## Infrastructure Services
 
@@ -67,7 +67,7 @@ docker-compose down -v
 | Billing Service | 9996 |
 | Location Service | 9998 |
 | Match Service | 10000 |
-| trips Service | 10002 |
+| rides Service | 10002 |
 | PostgreSQL | 5432 |
 | Redis | 6379 |
 | NATS | 4222, 8222 |

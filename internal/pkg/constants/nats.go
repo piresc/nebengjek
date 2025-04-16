@@ -7,26 +7,16 @@ const (
 	SubjectUserUpdated = "user.updated"
 
 	// Match Service
-	SubjectMatchFound           = "match.found"
-	SubjectMatchRequestAccepted = "match.request.accept"
-	SubjectMatchAccepted        = "match.accepted"
-	SubjectMatchRejected        = "match.rejected"
+	SubjectMatchFound    = "match.found"
+	SubjectMatchAccepted = "match.accepted"
+	SubjectMatchConfirm  = "match.confirmed"
+	SubjectMatchRejected = "match.rejected"
+
+	SubjectRideStarted   = "ride.started"
+	SubjectRideCompleted = "ride.completed"
 
 	// Location Service
 	SubjectLocationUpdate  = "location.update"
 	SubjectDriverLocation  = "driver.location"
 	SubjectDriverAvailable = "driver.availability"
-
-	// Trip Service
-	SubjectTripStarted   = "trip.started"
-	SubjectTripEnded     = "trip.ended"
-	SubjectTripCancelled = "trip.cancelled"
-	SubjectTripUpdate    = "trip.update"
-
-	// Payment Service
-	SubjectPaymentRequested = "payment.requested"
-	SubjectPaymentCompleted = "payment.completed"
-	SubjectPaymentFailed    = "payment.failed"
-	SubjectRefundRequested  = "refund.requested"
-	SubjectRefundCompleted  = "refund.completed"
 )

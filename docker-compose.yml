@@ -100,18 +100,17 @@ services:
     restart: always
     networks:
       - local
-    # trips Service
   
-  # trips Service
-  trip-service:
-    container_name: "nebengjek_trips"
+  # ride Service
+  rides-service:
+    container_name: "nebengjek_rides"
     build:
       context: .
-      dockerfile: ./cmd/trips/Dockerfile
+      dockerfile: ./cmd/rides/Dockerfile
     ports:
       - "9992:9992"
     env_file:
-      - ./cmd/trips/.env
+      - ./cmd/rides/.env
     environment:
       DB_HOST: postgres
       REDIS_HOST: redis

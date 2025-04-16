@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
@@ -47,7 +48,7 @@ func (m *WebSocketManager) handleMessage(client *WebSocketClient, msg []byte) er
 	switch wsMsg.Event {
 	case constants.EventBeaconUpdate:
 		return m.handleBeaconUpdate(client, wsMsg.Data)
-	case constants.EventMatchAccepted:
+	case constants.EventMatchAccept:
 		return m.handleMatchAccept(client, wsMsg.Data)
 	case constants.EventLocationUpdate:
 		return m.handleLocationUpdate(client.UserID, wsMsg.Data)
@@ -104,6 +105,17 @@ func (m *WebSocketManager) handleLocationUpdate(userID string, data json.RawMess
 
 	log.Printf("Location update from user %s: lat=%f, lng=%f",
 		userID, location.Latitude, location.Longitude)
+
+	// Set timestamp if not provided
+	if location.Timestamp.IsZero() {
+		location.Timestamp = time.Now()
+	}
+
+	// Forward location update to the user usecase
+	if err := m.userUC.UpdateUserLocation(context.Background(), userID, &location); err != nil {
+		log.Printf("Error updating location for user %s: %v", userID, err)
+		return m.sendErrorMessage(m.clients[userID].Conn, constants.ErrorInvalidLocation, err.Error())
+	}
 
 	return nil
 }

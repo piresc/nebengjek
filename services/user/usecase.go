@@ -10,14 +10,18 @@ import (
 type UserUC interface {
 	RegisterUser(ctx context.Context, user *models.User) error
 	GetUserByID(ctx context.Context, id string) (*models.User, error)
-	UpdateUserProfile(ctx context.Context, user *models.User) error
-	DeactivateUser(ctx context.Context, id string) error
-	ListUsers(ctx context.Context, offset, limit int) ([]*models.User, error)
+
+	// handle OTP
 	GenerateOTP(ctx context.Context, msisdn string) error
 	VerifyOTP(ctx context.Context, msisdn, otp string) (*models.AuthResponse, error)
+
+	// register driver
 	RegisterDriver(ctx context.Context, user *models.User) error
 
 	// handle match
 	UpdateBeaconStatus(ctx context.Context, beaconReq *models.BeaconRequest) error
 	ConfirmMatch(ctx context.Context, mp *models.MatchProposal) error
+
+	// handle location
+	UpdateUserLocation(ctx context.Context, userID string, location *models.Location) error
 }

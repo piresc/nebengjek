@@ -17,21 +17,10 @@ const (
 
 	// Match events
 	EventMatchFound    = "match_found"
-	EventMatchAccepted = "match_accepted"
+	EventMatchConfirm  = "match_confirm"
+	EventMatchAccept   = "match_accept"
 	EventMatchRejected = "match_rejected"
 	EventMatchExpired  = "match_expired"
-
-	// Trip events
-	EventTripStarted   = "trip_started"
-	EventTripLocation  = "trip_location"
-	EventTripArrived   = "trip_arrived"
-	EventTripCompleted = "trip_completed"
-	EventTripCancelled = "trip_cancelled"
-
-	// Payment events
-	EventPaymentRequest = "payment_request"
-	EventPaymentSuccess = "payment_success"
-	EventPaymentFailed  = "payment_failed"
 )
 
 // WebSocket error codes

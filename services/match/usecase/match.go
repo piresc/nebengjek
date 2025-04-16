@@ -166,14 +166,14 @@ func (uc *MatchUC) ConfirmMatchStatus(matchID string, mp models.MatchProposal) e
 	}
 
 	if mp.MatchStatus == models.MatchStatusAccepted {
-		// Publish match acceptance event
+		// Publish match confirm event
 		acceptEvent := models.MatchProposal{
 			ID:          matchID,
 			PassengerID: match.PassengerID,
 			DriverID:    match.DriverID,
 			MatchStatus: models.MatchStatusAccepted,
 		}
-		if err := uc.matchGW.PublishMatchAccept(ctx, acceptEvent); err != nil {
+		if err := uc.matchGW.PublishMatchConfirm(ctx, acceptEvent); err != nil {
 			return fmt.Errorf("failed to publish match acceptance: %w", err)
 		}
 

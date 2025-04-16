@@ -12,12 +12,11 @@ import (
 
 // Handler coordinates all protocol handlers for the user service
 type Handler struct {
-	userHandler   *http.UserHandler
-	authHandler   *http.AuthHandler
-	beaconHandler *http.BeaconHandler
-	wsManager     *websocket.WebSocketManager
-	natsHandler   *nats.Handler
-	jwtConfig     models.JWTConfig
+	userHandler *http.UserHandler
+	authHandler *http.AuthHandler
+	wsManager   *websocket.WebSocketManager
+	natsHandler *nats.Handler
+	jwtConfig   models.JWTConfig
 }
 
 // NewHandler creates and initializes all handlers
@@ -32,12 +31,11 @@ func NewHandler(userUC user.UserUC, natsURL string, jwtConfig models.JWTConfig) 
 	}
 
 	return &Handler{
-		userHandler:   http.NewUserHandler(userUC),
-		authHandler:   http.NewAuthHandler(userUC),
-		beaconHandler: http.NewBeaconHandler(userUC),
-		wsManager:     wsManager,
-		natsHandler:   natsHandler,
-		jwtConfig:     jwtConfig,
+		userHandler: http.NewUserHandler(userUC),
+		authHandler: http.NewAuthHandler(userUC),
+		wsManager:   wsManager,
+		natsHandler: natsHandler,
+		jwtConfig:   jwtConfig,
 	}, nil
 }
 
@@ -60,18 +58,10 @@ func (h *Handler) RegisterRoutes(e *echo.Echo) {
 	userGroup := protected.Group("/users")
 	userGroup.POST("", h.userHandler.CreateUser)
 	userGroup.GET("/:id", h.userHandler.GetUser)
-	userGroup.PUT("/:id", h.userHandler.UpdateUser)
-	userGroup.DELETE("/:id", h.userHandler.DeactivateUser)
-	userGroup.GET("", h.userHandler.ListUsers)
 
 	// Driver routes
 	driverGroup := protected.Group("/drivers")
 	driverGroup.POST("/register", h.userHandler.RegisterDriver)
-
-	// Beacon routes
-	beaconGroup := protected.Group("/beacon")
-	beaconGroup.PUT("", h.beaconHandler.UpdateBeacon)
-	beaconGroup.GET("/:user_id", h.beaconHandler.GetBeaconStatus)
 
 	// WebSocket routes
 	wsGroup := protected.Group("/ws")

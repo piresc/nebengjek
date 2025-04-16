@@ -20,17 +20,3 @@ CREATE INDEX idx_matches_passenger_id ON matches(passenger_id);
 -- Create a spatial index on location columns for faster geographical queries
 CREATE INDEX idx_matches_driver_location ON matches USING GIST (driver_location);
 CREATE INDEX idx_matches_passenger_location ON matches USING GIST (passenger_location);
-
--- Create a trigger to automatically update the updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
-
-CREATE TRIGGER update_matches_updated_at
-    BEFORE UPDATE ON matches
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();

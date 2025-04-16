@@ -25,7 +25,7 @@ func (h *MatchHandler) InitNATSConsumers() error {
 
 	// Initialize match acceptance consumer
 	_, err = nats.NewConsumer(
-		constants.SubjectMatchRequestAccepted,
+		constants.SubjectMatchAccepted,
 		"match-service",
 		h.cfg.NATS.URL,
 		h.handleMatchAccept,

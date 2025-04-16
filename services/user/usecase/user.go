@@ -54,68 +54,6 @@ func (u *UserUC) GetUserByID(ctx context.Context, id string) (*models.User, erro
 	return user, nil
 }
 
-// UpdateUserProfile updates a user's profile
-func (u *UserUC) UpdateUserProfile(ctx context.Context, user *models.User) error {
-	// Validate user data
-	if err := validateUserData(user); err != nil {
-		return err
-	}
-
-	// Get existing user
-	existingUser, err := u.userRepo.GetUserByID(ctx, user.ID)
-	if err != nil {
-		return err
-	}
-
-	// Update only allowed fields
-	existingUser.FullName = user.FullName
-	existingUser.UpdatedAt = time.Now()
-
-	// Update MSISDN if provided and valid
-	if user.MSISDN != "" && user.MSISDN != existingUser.MSISDN {
-		isValid, formattedMSISDN, err := utils.ValidateMSISDN(user.MSISDN)
-		if err != nil || !isValid {
-			return fmt.Errorf("invalid MSISDN format or not a Telkomsel number")
-		}
-		existingUser.MSISDN = formattedMSISDN
-	}
-
-	// Update driver info if user is a driver
-	if existingUser.Role == "driver" && user.DriverInfo != nil {
-		existingUser.DriverInfo.VehicleType = user.DriverInfo.VehicleType
-		existingUser.DriverInfo.VehiclePlate = user.DriverInfo.VehiclePlate
-	}
-
-	// Update user
-	return u.userRepo.UpdateUser(ctx, existingUser)
-}
-
-// DeactivateUser deactivates a user account
-func (u *UserUC) DeactivateUser(ctx context.Context, id string) error {
-	// Get existing user
-	user, err := u.userRepo.GetUserByID(ctx, id)
-	if err != nil {
-		return err
-	}
-
-	// Deactivate user
-	user.IsActive = false
-	user.UpdatedAt = time.Now()
-
-	// Update user
-	return u.userRepo.UpdateUser(ctx, user)
-}
-
-// ListUsers retrieves a list of users with pagination
-func (u *UserUC) ListUsers(ctx context.Context, offset, limit int) ([]*models.User, error) {
-	users, err := u.userRepo.ListUsers(ctx, offset, limit)
-	if err != nil {
-		return nil, err
-	}
-
-	return users, nil
-}
-
 // RegisterDriver registers a new driver
 func (u *UserUC) RegisterDriver(ctx context.Context, user *models.User) error {
 	// Validate user data
@@ -141,8 +79,6 @@ func (u *UserUC) RegisterDriver(ctx context.Context, user *models.User) error {
 	// Register user
 	return u.userRepo.CreateUser(ctx, user)
 }
-
-// Helper functions for validation
 
 func validateUserData(user *models.User) error {
 	if user == nil {

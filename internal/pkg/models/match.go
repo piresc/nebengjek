@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-// TripStatus represents the current status of a trip
+// MatchStatus represents the status of a match
 type MatchStatus string
 
 const (

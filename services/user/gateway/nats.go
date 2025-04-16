@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -25,5 +26,15 @@ func (g *UserGW) MatchAccept(mp *models.MatchProposal) error {
 		return err
 	}
 	fmt.Printf("Publishing match accept: %s\n", string(data))
-	return g.nc.Publish(constants.SubjectMatchRequestAccepted, data)
+	return g.nc.Publish(constants.SubjectMatchAccepted, data)
+}
+
+// PublishLocationUpdate publishes a location update event to NATS
+func (g *UserGW) PublishLocationUpdate(ctx context.Context, locationEvent interface{}) error {
+	data, err := json.Marshal(locationEvent)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Publishing location update: %s\n", string(data))
+	return g.nc.Publish(constants.SubjectLocationUpdate, data)
 }

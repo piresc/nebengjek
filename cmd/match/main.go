@@ -16,7 +16,7 @@ import (
 
 func main() {
 	appName := "match-service"
-	envPath := ".env"
+	envPath := "./cmd/match/.env"
 	configs := config.InitConfig(envPath)
 
 	// Initialize PostgreSQL database connection
@@ -41,6 +41,7 @@ func main() {
 
 	// Initialize repositories
 	matchRepo := repository.NewMatchRepository(configs, postgresClient.GetDB(), redisClient)
+	// Initialize gateways
 	matchGW := gateway.NewMatchGW(natsClient.GetConn())
 	// Initialize use case
 	matchUC := usecase.NewMatchUC(matchRepo, matchGW)
@@ -48,7 +49,6 @@ func main() {
 	// Initialize Echo router and handler
 	e := echo.New()
 	matchHandler := handler.NewMatchHandler(matchUC, configs)
-	matchHandler.RegisterRoutes(e)
 
 	// Initialize NATS consumers
 	if err := matchHandler.InitNATSConsumers(); err != nil {
