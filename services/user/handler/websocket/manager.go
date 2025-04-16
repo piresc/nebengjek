@@ -114,6 +114,7 @@ func (m *WebSocketManager) removeClient(userID string) {
 
 // sendMessage sends a message to a WebSocket client
 func (m *WebSocketManager) sendMessage(conn *websocket.Conn, event string, data interface{}) error {
+	log.Printf("Sending message to client: %s", event)
 	rawData, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("error marshaling message data: %v", err)
@@ -137,6 +138,7 @@ func (m *WebSocketManager) sendErrorMessage(conn *websocket.Conn, code string, m
 
 // NotifyClient sends a notification to a specific client
 func (m *WebSocketManager) NotifyClient(userID string, event string, data interface{}) {
+	log.Printf("Notifying client %s with event %s", userID, event)
 	m.RLock()
 	client, exists := m.clients[userID]
 	m.RUnlock()

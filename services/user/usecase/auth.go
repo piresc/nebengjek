@@ -66,7 +66,6 @@ func (u *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*models.Au
 	if err != nil {
 		// User doesn't exist, create a new one
 		user = &models.User{
-			ID:        uuid.New().String(),
 			MSISDN:    formattedMSISDN,
 			Role:      "passenger", // Default role is passenger
 			CreatedAt: time.Now(),
@@ -93,7 +92,7 @@ func (u *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*models.Au
 	// Return auth response
 	return &models.AuthResponse{
 		Token:     token,
-		UserID:    user.ID,
+		UserID:    user.ID.String(),
 		Role:      user.Role,
 		ExpiresAt: expiresAt,
 	}, nil

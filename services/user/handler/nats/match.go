@@ -3,6 +3,7 @@ package nats
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"github.com/nats-io/nats.go"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
@@ -13,6 +14,7 @@ import (
 func (h *Handler) InitMatchConsumers() error {
 	// Subscribe to match found events
 	matchSub, err := h.natsClient.Subscribe(constants.SubjectMatchFound, func(msg *nats.Msg) {
+		log.Printf("Received match event: %s\n", msg.Data)
 		if err := h.handleMatchEvent(msg.Data); err != nil {
 			fmt.Printf("Error handling match event: %v\n", err)
 		}
@@ -53,7 +55,7 @@ func (h *Handler) handleMatchEvent(msg []byte) error {
 	if err := json.Unmarshal(msg, &event); err != nil {
 		return fmt.Errorf("failed to unmarshal match event: %w", err)
 	}
-
+	log.Printf("Match event: %s\n", event)
 	// Notify both driver and passenger
 	h.wsManager.NotifyClient(event.DriverID, constants.SubjectMatchFound, event)
 	h.wsManager.NotifyClient(event.PassengerID, constants.SubjectMatchFound, event)

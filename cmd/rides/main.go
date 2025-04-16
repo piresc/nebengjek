@@ -17,7 +17,8 @@ import (
 
 func main() {
 	appName := "rides-service"
-	configs := config.InitConfig(appName)
+	envPath := ".env"
+	configs := config.InitConfig(envPath)
 
 	// Initialize database connection
 	postgresClient, err := database.NewPostgresClient(configs.Database)

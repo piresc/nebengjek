@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // MatchStatus represents the status of a match
 type MatchStatus string
@@ -11,18 +15,11 @@ const (
 	MatchStatusRejected MatchStatus = "REJECTED"
 )
 
-// NearbyUser represents a user with their current location and distance
-type NearbyUser struct {
-	ID       string   `json:"id"`
-	Location Location `json:"location"`
-	Distance float64  `json:"distance_km"`
-}
-
 // Match represents a ride-sharing match between a driver and a passenger
 type Match struct {
-	ID                string      `json:"match_id" db:"id"`
-	DriverID          string      `json:"driver_id" db:"driver_id"`
-	PassengerID       string      `json:"passenger_id" db:"passenger_id"`
+	ID                uuid.UUID   `json:"match_id" db:"id"`
+	DriverID          uuid.UUID   `json:"driver_id" db:"driver_id"`
+	PassengerID       uuid.UUID   `json:"passenger_id" db:"passenger_id"`
 	DriverLocation    Location    `json:"driver_location" db:"driver_location"`
 	PassengerLocation Location    `json:"passenger_location" db:"passenger_location"`
 	Status            MatchStatus `json:"status" db:"status"`
@@ -32,9 +29,9 @@ type Match struct {
 
 // MatchDTO is used for database operations to flatten the nested Location structs
 type MatchDTO struct {
-	ID                 string      `db:"id"`
-	DriverID           string      `db:"driver_id"`
-	PassengerID        string      `db:"passenger_id"`
+	ID                 uuid.UUID   `db:"id"`
+	DriverID           uuid.UUID   `db:"driver_id"`
+	PassengerID        uuid.UUID   `db:"passenger_id"`
 	DriverLongitude    float64     `db:"driver_longitude"`
 	DriverLatitude     float64     `db:"driver_latitude"`
 	PassengerLongitude float64     `db:"passenger_longitude"`
@@ -89,4 +86,11 @@ type MatchProposal struct {
 	UserLocation   Location    `json:"location"`
 	DriverLocation Location    `json:"driver_location"`
 	MatchStatus    MatchStatus `json:"match_status"`
+}
+
+// NearbyUser represents a user with their current location and distance
+type NearbyUser struct {
+	ID       string   `json:"id"`
+	Location Location `json:"location"`
+	Distance float64  `json:"distance_km"`
 }

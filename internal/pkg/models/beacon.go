@@ -1,6 +1,8 @@
 package models
 
-import "time"
+import (
+	"time"
+)
 
 // BeaconRequest represents a request to toggle user beacon (availability)
 type BeaconRequest struct {

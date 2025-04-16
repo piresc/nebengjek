@@ -76,10 +76,7 @@ func (m *WebSocketManager) handleBeaconUpdate(client *WebSocketClient, data json
 
 // handleMatchAccept processes match acceptance from drivers
 func (m *WebSocketManager) handleMatchAccept(client *WebSocketClient, data json.RawMessage) error {
-	// Verify that the client is a driver
-	if client.Role != "driver" {
-		return m.sendErrorMessage(client.Conn, constants.ErrorUnauthorized, "Only drivers can accept matches")
-	}
+	UserID := client.UserID
 
 	var matchProposalAccept models.MatchProposal
 	if err := json.Unmarshal(data, &matchProposalAccept); err != nil {
@@ -87,7 +84,7 @@ func (m *WebSocketManager) handleMatchAccept(client *WebSocketClient, data json.
 	}
 
 	// Update beacon status
-	err := m.userUC.ConfirmMatch(context.Background(), &matchProposalAccept)
+	err := m.userUC.ConfirmMatch(context.Background(), &matchProposalAccept, UserID)
 	if err != nil {
 		log.Printf("Error confirming match for driver %s: %v", client.UserID, err)
 		return m.sendErrorMessage(client.Conn, constants.ErrorMatchUpdateFailed, err.Error())

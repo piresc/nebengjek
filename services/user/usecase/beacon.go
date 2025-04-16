@@ -17,7 +17,7 @@ func (uc *UserUC) UpdateBeaconStatus(ctx context.Context, beaconReq *models.Beac
 
 	// Create and publish beacon event
 	beaconEvent := &models.BeaconEvent{
-		UserID:   user.ID,
+		UserID:   user.ID.String(),
 		IsActive: beaconReq.IsActive,
 		Role:     beaconReq.Role,
 		Location: models.Location{

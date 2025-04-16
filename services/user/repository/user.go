@@ -52,12 +52,7 @@ func (r *UserRepo) GetUserByMSISDN(ctx context.Context, msisdn string) (*models.
 
 // CreateUser creates a new user in the database
 func (r *UserRepo) CreateUser(ctx context.Context, user *models.User) error {
-	// Generate UUID if not provided
-	if user.ID == "" {
-		user.ID = uuid.New().String()
-	}
-
-	// Set timestamps
+	user.ID = uuid.New()
 	now := time.Now()
 	user.CreatedAt = now
 	user.UpdatedAt = now
@@ -81,31 +76,54 @@ func (r *UserRepo) CreateUser(ctx context.Context, user *models.User) error {
 		return fmt.Errorf("failed to insert user: %w", err)
 	}
 
-	// If user is a driver, insert driver info
-	if user.Role == "driver" && user.DriverInfo != nil {
-		// Create a map for driver info with user_id
-		driverData := map[string]interface{}{
-			"user_id":       user.ID,
-			"vehicle_type":  user.DriverInfo.VehicleType,
-			"vehicle_plate": user.DriverInfo.VehiclePlate,
-		}
+	// Commit transaction
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
 
-		query = `
+	return nil
+}
+
+func (r *UserRepo) UpdateToDriver(ctx context.Context, user *models.User) error {
+	// Begin transaction
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	user.UpdatedAt = time.Now()
+	defer tx.Rollback()
+	// Update user role to driver
+	query := `
+		UPDATE users
+		SET role = :role, updated_at = :updated_at
+		WHERE id = :id
+	`
+	_, err = tx.NamedExecContext(ctx, query, user)
+	if err != nil {
+		return fmt.Errorf("failed to update user role: %w", err)
+	}
+
+	// Create a map for driver info with user_id
+	driverData := map[string]interface{}{
+		"user_id":       user.ID,
+		"vehicle_type":  user.DriverInfo.VehicleType,
+		"vehicle_plate": user.DriverInfo.VehiclePlate,
+	}
+
+	query = `
 			INSERT INTO drivers (
 				user_id, vehicle_type, vehicle_plate
 			) VALUES (:user_id, :vehicle_type, :vehicle_plate)
 		`
-		_, err = tx.NamedExecContext(ctx, query, driverData)
-		if err != nil {
-			return fmt.Errorf("failed to insert driver info: %w", err)
-		}
+	_, err = tx.NamedExecContext(ctx, query, driverData)
+	if err != nil {
+		return fmt.Errorf("failed to insert driver info: %w", err)
 	}
 
 	// Commit transaction
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
-
 	return nil
 }
 
@@ -146,7 +164,7 @@ func (r *UserRepo) getUserByField(ctx context.Context, field, value string) (*mo
 }
 
 // getDriverInfo retrieves driver information for a user
-func (r *UserRepo) getDriverInfo(ctx context.Context, userID string) (*models.Driver, error) {
+func (r *UserRepo) getDriverInfo(ctx context.Context, userID uuid.UUID) (*models.Driver, error) {
 	query := `SELECT * FROM drivers WHERE user_id = $1`
 
 	var driver models.Driver

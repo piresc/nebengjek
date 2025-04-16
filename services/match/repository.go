@@ -3,6 +3,7 @@ package match
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
@@ -13,7 +14,7 @@ type MatchRepo interface {
 	GetMatch(ctx context.Context, matchID string) (*models.Match, error)
 	UpdateMatchStatus(ctx context.Context, matchID string, status models.MatchStatus) error
 	ListMatchesByDriver(ctx context.Context, driverID string) ([]*models.Match, error)
-	ListMatchesByPassenger(ctx context.Context, passengerID string) ([]*models.Match, error)
+	ListMatchesByPassenger(ctx context.Context, passengerID uuid.UUID) ([]*models.Match, error)
 
 	// Redis match proposal operations
 	StoreMatchProposal(ctx context.Context, match *models.Match) error

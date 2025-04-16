@@ -20,7 +20,7 @@ type UserUC interface {
 
 	// handle match
 	UpdateBeaconStatus(ctx context.Context, beaconReq *models.BeaconRequest) error
-	ConfirmMatch(ctx context.Context, mp *models.MatchProposal) error
+	ConfirmMatch(ctx context.Context, mp *models.MatchProposal, userID string) error
 
 	// handle location
 	UpdateUserLocation(ctx context.Context, userID string, location *models.Location) error

@@ -1,9 +1,9 @@
 CREATE TYPE match_status AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED');
 
 CREATE TABLE IF NOT EXISTS matches (
-    id VARCHAR(255) PRIMARY KEY,
-    driver_id VARCHAR(255) NOT NULL,
-    passenger_id VARCHAR(255) NOT NULL,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    driver_id UUID NOT NULL,
+    passenger_id UUID NOT NULL,
     driver_location point NOT NULL,
     passenger_location point NOT NULL,
     status match_status NOT NULL DEFAULT 'PENDING',

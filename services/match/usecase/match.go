@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/piresc/nebengjek/internal/pkg/converter"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
@@ -23,13 +23,11 @@ func (uc *MatchUC) handleActiveDriver(ctx context.Context, event models.BeaconEv
 		log.Printf("Failed to find nearby passengers: %v", err)
 		return err
 	}
-
 	// Create match proposals for each nearby passenger
 	for _, passenger := range nearbyPassengers {
 		match := &models.Match{
-			ID:                uuid.New().String(),
-			DriverID:          event.UserID,
-			PassengerID:       passenger.ID,
+			DriverID:          converter.StrToUUID(event.UserID),
+			PassengerID:       converter.StrToUUID(passenger.ID),
 			DriverLocation:    event.Location,
 			PassengerLocation: passenger.Location,
 			Status:            models.MatchStatusPending,
@@ -62,9 +60,8 @@ func (uc *MatchUC) handleActivePassenger(ctx context.Context, event models.Beaco
 	// Create match proposals for each nearby driver
 	for _, driver := range nearbyDrivers {
 		match := &models.Match{
-			ID:                uuid.New().String(),
-			DriverID:          driver.ID,
-			PassengerID:       event.UserID,
+			DriverID:          converter.StrToUUID(driver.ID),
+			PassengerID:       converter.StrToUUID(event.UserID),
 			DriverLocation:    driver.Location,
 			PassengerLocation: event.Location,
 			Status:            models.MatchStatusPending,
@@ -129,9 +126,9 @@ func (uc *MatchUC) CreateMatch(ctx context.Context, match *models.Match) error {
 
 	// Create match proposal
 	matchProposal := models.MatchProposal{
-		ID:             createdMatch.ID,
-		PassengerID:    createdMatch.PassengerID,
-		DriverID:       createdMatch.DriverID,
+		ID:             converter.UUIDToStr(createdMatch.ID),
+		PassengerID:    converter.UUIDToStr(createdMatch.PassengerID),
+		DriverID:       converter.UUIDToStr(createdMatch.DriverID),
 		UserLocation:   createdMatch.PassengerLocation,
 		DriverLocation: createdMatch.DriverLocation,
 		MatchStatus:    createdMatch.Status,
@@ -156,7 +153,7 @@ func (uc *MatchUC) ConfirmMatchStatus(matchID string, mp models.MatchProposal) e
 	}
 
 	// Validate that the user is part of this match
-	if mp.DriverID != match.DriverID && mp.PassengerID != match.PassengerID {
+	if mp.DriverID != converter.UUIDToStr(match.DriverID) && mp.PassengerID != converter.UUIDToStr(match.PassengerID) {
 		return fmt.Errorf("user is not part of this match")
 	}
 
@@ -169,8 +166,8 @@ func (uc *MatchUC) ConfirmMatchStatus(matchID string, mp models.MatchProposal) e
 		// Publish match confirm event
 		acceptEvent := models.MatchProposal{
 			ID:          matchID,
-			PassengerID: match.PassengerID,
-			DriverID:    match.DriverID,
+			PassengerID: converter.UUIDToStr(match.PassengerID),
+			DriverID:    converter.UUIDToStr(match.DriverID),
 			MatchStatus: models.MatchStatusAccepted,
 		}
 		if err := uc.matchGW.PublishMatchConfirm(ctx, acceptEvent); err != nil {
@@ -186,19 +183,19 @@ func (uc *MatchUC) ConfirmMatchStatus(matchID string, mp models.MatchProposal) e
 		// Notify other drivers that their matches were rejected
 		for _, otherMatch := range matches {
 			// Skip the accepted match
-			if otherMatch.ID == matchID {
+			if converter.UUIDToStr(otherMatch.ID) == matchID {
 				continue
 			}
 			// Only notify if the match is still pending
 			if otherMatch.Status == models.MatchStatusPending {
 				rejectEvent := models.MatchProposal{
-					ID:          otherMatch.ID,
-					PassengerID: otherMatch.PassengerID,
-					DriverID:    otherMatch.DriverID,
+					ID:          converter.UUIDToStr(otherMatch.ID),
+					PassengerID: converter.UUIDToStr(otherMatch.PassengerID),
+					DriverID:    converter.UUIDToStr(otherMatch.DriverID),
 					MatchStatus: models.MatchStatusRejected,
 				}
 				// Update match status to rejected
-				if err := uc.matchRepo.UpdateMatchStatus(ctx, otherMatch.ID, models.MatchStatusRejected); err != nil {
+				if err := uc.matchRepo.UpdateMatchStatus(ctx, converter.UUIDToStr(otherMatch.ID), models.MatchStatusRejected); err != nil {
 					log.Printf("Failed to update rejected match status: %v", err)
 					continue
 				}

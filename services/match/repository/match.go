@@ -37,10 +37,7 @@ func NewMatchRepository(
 
 // CreateMatch creates a new match (trip) in the database
 func (r *MatchRepo) CreateMatch(ctx context.Context, match *models.Match) (*models.Match, error) {
-	// Generate UUID if not provided
-	if match.ID == "" {
-		match.ID = uuid.New().String()
-	}
+	match.ID = uuid.New()
 
 	// Set timestamps
 	now := time.Now()
@@ -390,7 +387,7 @@ func (r *MatchRepo) ListMatchesByDriver(ctx context.Context, driverID string) ([
 }
 
 // ListMatchesByPassenger retrieves all matches for a passenger
-func (r *MatchRepo) ListMatchesByPassenger(ctx context.Context, passengerID string) ([]*models.Match, error) {
+func (r *MatchRepo) ListMatchesByPassenger(ctx context.Context, passengerID uuid.UUID) ([]*models.Match, error) {
 	query := `
         SELECT 
             id, driver_id, passenger_id,
