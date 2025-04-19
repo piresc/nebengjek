@@ -210,6 +210,15 @@ func (uc *MatchUC) ConfirmMatchStatus(matchID string, mp models.MatchProposal) e
 				}
 			}
 		}
+		err = uc.matchRepo.RemoveAvailableDriver(ctx, mp.DriverID)
+		if err != nil {
+			log.Printf("Failed to remove available driver: %v", err)
+		}
+		err = uc.matchRepo.RemoveAvailablePassenger(ctx, mp.PassengerID)
+		if err != nil {
+			log.Printf("Failed to remove available passenger: %v", err)
+		}
+
 	}
 
 	return nil

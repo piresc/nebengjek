@@ -305,10 +305,12 @@ func (r *MatchRepo) AddAvailablePassenger(ctx context.Context, passengerID strin
 
 // RemoveAvailablePassenger removes a passenger from the Redis geospatial index
 func (r *MatchRepo) RemoveAvailablePassenger(ctx context.Context, passengerID string) error {
-	err := r.redisClient.Delete(ctx, fmt.Sprintf("%s:%s", constants.KeyPassengerGeo, passengerID))
+	// Remove from passenger geo set
+	err := r.redisClient.ZRem(ctx, constants.KeyPassengerGeo, passengerID)
 	if err != nil {
 		return fmt.Errorf("failed to remove passenger from geo index: %w", err)
 	}
+
 	return nil
 }
 
