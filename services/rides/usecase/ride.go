@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	"github.com/google/uuid"
@@ -37,7 +38,7 @@ func (uc *rideUC) CreateRide(mp models.MatchProposal) error {
 	ride := &models.Ride{
 		DriverID:   uuid.MustParse(mp.DriverID),
 		CustomerID: uuid.MustParse(mp.PassengerID),
-		Status:     models.RideStatusPending,
+		Status:     models.RideStatusOngoing,
 		TotalCost:  0, // This will be calculated later
 	}
 
@@ -54,5 +55,41 @@ func (uc *rideUC) CreateRide(mp models.MatchProposal) error {
 	}
 
 	log.Printf("Successfully created ride with ID: %s", createdRide.RideID)
+	return nil
+}
+
+// ProcessBillingUpdate handles billing updates from location aggregates
+func (uc *rideUC) ProcessBillingUpdate(rideID string, entry *models.BillingLedger) error {
+	ctx := context.Background()
+
+	// Get current ride to verify it exists and is active
+	ride, err := uc.ridesRepo.GetRide(ctx, rideID)
+	if err != nil {
+		return fmt.Errorf("failed to get ride: %w", err)
+	}
+
+	if ride.Status != models.RideStatusOngoing {
+		return fmt.Errorf("cannot update billing for non-active ride")
+	}
+
+	// Parse ride ID to UUID
+	rideUUID, err := uuid.Parse(rideID)
+	if err != nil {
+		return fmt.Errorf("invalid ride ID format: %w", err)
+	}
+	entry.RideID = rideUUID
+
+	// Add billing entry
+	if err := uc.ridesRepo.AddBillingEntry(ctx, entry); err != nil {
+		return fmt.Errorf("failed to add billing entry: %w", err)
+	}
+
+	// Update total cost
+	if err := uc.ridesRepo.UpdateTotalCost(ctx, rideID, entry.Cost); err != nil {
+		log.Printf("Warning: Failed to update total cost for ride %s: %v", rideID, err)
+		return fmt.Errorf("failed to update total cost: %w", err)
+	}
+
+	log.Printf("Updated billing for ride %s: +%d IDR (%.2f km)", rideID, entry.Cost, entry.Distance)
 	return nil
 }

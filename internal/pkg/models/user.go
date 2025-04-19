@@ -30,6 +30,5 @@ type Driver struct {
 type Location struct {
 	Latitude  float64   `json:"latitude" bson:"latitude" db:"latitude"`
 	Longitude float64   `json:"longitude" bson:"longitude" db:"longitude"`
-	Address   string    `json:"address,omitempty" bson:"address,omitempty" db:"address"`
 	Timestamp time.Time `json:"timestamp" bson:"timestamp" db:"timestamp"`
 }

@@ -101,6 +101,16 @@ func (r *RedisClient) HMSet(ctx context.Context, key string, values map[string]i
 	return r.client.HMSet(ctx, key, values).Err()
 }
 
+// HGetAll gets all fields in a hash
+func (r *RedisClient) HGetAll(ctx context.Context, key string) (map[string]string, error) {
+	return r.client.HGetAll(ctx, key).Result()
+}
+
+// Expire sets an expiration on a key
+func (r *RedisClient) Expire(ctx context.Context, key string, expiration time.Duration) error {
+	return r.client.Expire(ctx, key, expiration).Err()
+}
+
 // Close closes the Redis client
 func (r *RedisClient) Close() error {
 	return r.client.Close()

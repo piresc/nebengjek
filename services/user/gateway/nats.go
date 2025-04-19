@@ -30,7 +30,7 @@ func (g *UserGW) MatchAccept(mp *models.MatchProposal) error {
 }
 
 // PublishLocationUpdate publishes a location update event to NATS
-func (g *UserGW) PublishLocationUpdate(ctx context.Context, locationEvent interface{}) error {
+func (g *UserGW) PublishLocationUpdate(ctx context.Context, locationEvent *models.LocationUpdate) error {
 	data, err := json.Marshal(locationEvent)
 	if err != nil {
 		return err

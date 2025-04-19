@@ -23,5 +23,5 @@ type UserUC interface {
 	ConfirmMatch(ctx context.Context, mp *models.MatchProposal, userID string) error
 
 	// handle location
-	UpdateUserLocation(ctx context.Context, userID string, location *models.Location) error
+	UpdateUserLocation(ctx context.Context, location *models.LocationUpdate) error
 }

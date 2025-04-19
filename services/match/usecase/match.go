@@ -165,10 +165,12 @@ func (uc *MatchUC) ConfirmMatchStatus(matchID string, mp models.MatchProposal) e
 	if mp.MatchStatus == models.MatchStatusAccepted {
 		// Publish match confirm event
 		acceptEvent := models.MatchProposal{
-			ID:          matchID,
-			PassengerID: converter.UUIDToStr(match.PassengerID),
-			DriverID:    converter.UUIDToStr(match.DriverID),
-			MatchStatus: models.MatchStatusAccepted,
+			ID:             matchID,
+			PassengerID:    converter.UUIDToStr(match.PassengerID),
+			DriverID:       converter.UUIDToStr(match.DriverID),
+			MatchStatus:    models.MatchStatusAccepted,
+			DriverLocation: match.DriverLocation,
+			UserLocation:   match.PassengerLocation,
 		}
 		if err := uc.matchGW.PublishMatchConfirm(ctx, acceptEvent); err != nil {
 			return fmt.Errorf("failed to publish match acceptance: %w", err)
@@ -189,10 +191,12 @@ func (uc *MatchUC) ConfirmMatchStatus(matchID string, mp models.MatchProposal) e
 			// Only notify if the match is still pending
 			if otherMatch.Status == models.MatchStatusPending {
 				rejectEvent := models.MatchProposal{
-					ID:          converter.UUIDToStr(otherMatch.ID),
-					PassengerID: converter.UUIDToStr(otherMatch.PassengerID),
-					DriverID:    converter.UUIDToStr(otherMatch.DriverID),
-					MatchStatus: models.MatchStatusRejected,
+					ID:             converter.UUIDToStr(otherMatch.ID),
+					PassengerID:    converter.UUIDToStr(otherMatch.PassengerID),
+					DriverID:       converter.UUIDToStr(otherMatch.DriverID),
+					MatchStatus:    models.MatchStatusRejected,
+					DriverLocation: otherMatch.DriverLocation,
+					UserLocation:   otherMatch.PassengerLocation,
 				}
 				// Update match status to rejected
 				if err := uc.matchRepo.UpdateMatchStatus(ctx, converter.UUIDToStr(otherMatch.ID), models.MatchStatusRejected); err != nil {

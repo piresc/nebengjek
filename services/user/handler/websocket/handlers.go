@@ -93,25 +93,27 @@ func (m *WebSocketManager) handleMatchAccept(client *WebSocketClient, data json.
 }
 
 // handleLocationUpdate processes location updates from clients
-func (m *WebSocketManager) handleLocationUpdate(userID string, data json.RawMessage) error {
-	var location models.Location
-	if err := json.Unmarshal(data, &location); err != nil {
-		log.Printf("Error parsing location update from user %s: %v", userID, err)
+func (m *WebSocketManager) handleLocationUpdate(DriverID string, data json.RawMessage) error {
+	var locationUpdate models.LocationUpdate
+	if err := json.Unmarshal(data, &locationUpdate); err != nil {
+		log.Printf("Error parsing location update from user %s: %v", DriverID, err)
 		return fmt.Errorf("invalid location format")
 	}
 
-	log.Printf("Location update from user %s: lat=%f, lng=%f",
-		userID, location.Latitude, location.Longitude)
+	log.Printf("Location update from user %s: lat=%f, lng=%f, tripID=%s",
+		DriverID, locationUpdate.Location.Latitude, locationUpdate.Location.Longitude, locationUpdate.RideID)
 
 	// Set timestamp if not provided
-	if location.Timestamp.IsZero() {
-		location.Timestamp = time.Now()
+	if locationUpdate.Location.Timestamp.IsZero() {
+		locationUpdate.Location.Timestamp = time.Now()
 	}
+	locationUpdate.DriverID = DriverID
+	locationUpdate.CreatedAt = time.Now()
 
 	// Forward location update to the user usecase
-	if err := m.userUC.UpdateUserLocation(context.Background(), userID, &location); err != nil {
-		log.Printf("Error updating location for user %s: %v", userID, err)
-		return m.sendErrorMessage(m.clients[userID].Conn, constants.ErrorInvalidLocation, err.Error())
+	if err := m.userUC.UpdateUserLocation(context.Background(), &locationUpdate); err != nil {
+		log.Printf("Error updating location for user %s: %v", DriverID, err)
+		return m.sendErrorMessage(m.clients[DriverID].Conn, constants.ErrorInvalidLocation, err.Error())
 	}
 
 	return nil

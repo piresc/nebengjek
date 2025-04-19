@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -68,4 +69,79 @@ func (r *RideRepo) CreateRide(ride *models.Ride) (*models.Ride, error) {
 
 	log.Printf("Created ride with ID: %s", ride.RideID)
 	return ride, nil
+}
+
+// AddBillingEntry adds a new entry to the billing ledger
+func (r *RideRepo) AddBillingEntry(ctx context.Context, entry *models.BillingLedger) error {
+	query := `
+		INSERT INTO billing_ledger (
+			entry_id, ride_id, distance, cost, created_at
+		) VALUES (
+			$1, $2, $3, $4, $5
+		)
+	`
+
+	if entry.EntryID == uuid.Nil {
+		entry.EntryID = uuid.New()
+	}
+
+	_, err := r.db.ExecContext(
+		ctx,
+		query,
+		entry.EntryID,
+		entry.RideID,
+		entry.Distance,
+		entry.Cost,
+		time.Now(),
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to insert billing entry: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateTotalCost updates the total cost of a ride
+func (r *RideRepo) UpdateTotalCost(ctx context.Context, rideID string, additionalCost int) error {
+	query := `
+		UPDATE rides 
+		SET total_cost = total_cost + $1,
+			updated_at = NOW()
+		WHERE ride_id = $2
+	`
+
+	result, err := r.db.ExecContext(ctx, query, additionalCost, rideID)
+	if err != nil {
+		return fmt.Errorf("failed to update ride total cost: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get affected rows: %w", err)
+	}
+
+	if rows == 0 {
+		return fmt.Errorf("ride not found: %s", rideID)
+	}
+
+	return nil
+}
+
+// GetRide gets a ride by ID
+func (r *RideRepo) GetRide(ctx context.Context, rideID string) (*models.Ride, error) {
+	var ride models.Ride
+
+	query := `
+		SELECT ride_id, driver_id, customer_id, status, total_cost, created_at, updated_at
+		FROM rides
+		WHERE ride_id = $1
+	`
+
+	err := r.db.GetContext(ctx, &ride, query, rideID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ride: %w", err)
+	}
+
+	return &ride, nil
 }

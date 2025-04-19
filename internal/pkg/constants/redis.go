@@ -19,10 +19,7 @@ const (
 	KeyPassengerMatch = "passenger:match:%s" // Format: passenger:match:{passenger_id}
 	KeyDriverMatch    = "driver:match:%s"    // Format: driver:match:{driver_id}
 
-	// Trip Service
-	KeyActiveTrip   = "trip:active:%s"   // Format: trip:active:{trip_id}
-	KeyTripHistory  = "trip:history:%s"  // Format: trip:history:{user_id}
-	KeyTripLocation = "trip:location:%s" // Format: trip:location:{trip_id}
+	KeyRideLocation = "rides:location:%s" // Format: trip:location:{trip_id}
 
 	// Rate Limiting
 	KeyRateLimit = "rate:limit:%s:%s" // Format: rate:limit:{resource}:{ip}

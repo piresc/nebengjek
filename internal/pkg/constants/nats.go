@@ -16,7 +16,8 @@ const (
 	SubjectRideCompleted = "ride.completed"
 
 	// Location Service
-	SubjectLocationUpdate  = "location.update"
-	SubjectDriverLocation  = "driver.location"
-	SubjectDriverAvailable = "driver.availability"
+	SubjectLocationUpdate    = "location.update"
+	SubjectLocationAggregate = "location.aggregate"
+	SubjectDriverLocation    = "driver.location"
+	SubjectDriverAvailable   = "driver.availability"
 )
