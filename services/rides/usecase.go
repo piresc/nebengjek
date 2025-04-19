@@ -8,4 +8,5 @@ import (
 type RideUC interface {
 	CreateRide(mp models.MatchProposal) error
 	ProcessBillingUpdate(rideID string, entry *models.BillingLedger) error
+	CompleteRide(rideID string, adjustmentFactor float64) (*models.Payment, error)
 }

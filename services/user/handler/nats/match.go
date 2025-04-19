@@ -55,7 +55,7 @@ func (h *Handler) handleMatchEvent(msg []byte) error {
 	if err := json.Unmarshal(msg, &event); err != nil {
 		return fmt.Errorf("failed to unmarshal match event: %w", err)
 	}
-	log.Printf("Match event: %s\n", event)
+
 	// Notify both driver and passenger
 	h.wsManager.NotifyClient(event.DriverID, constants.SubjectMatchFound, event)
 	h.wsManager.NotifyClient(event.PassengerID, constants.SubjectMatchFound, event)

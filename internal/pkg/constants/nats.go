@@ -12,7 +12,9 @@ const (
 	SubjectMatchConfirm  = "match.confirmed"
 	SubjectMatchRejected = "match.rejected"
 
+	// Ride events
 	SubjectRideStarted   = "ride.started"
+	SubjectRideArrived   = "ride.arrived"
 	SubjectRideCompleted = "ride.completed"
 
 	// Location Service

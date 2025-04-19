@@ -24,4 +24,6 @@ type UserUC interface {
 
 	// handle location
 	UpdateUserLocation(ctx context.Context, location *models.LocationUpdate) error
+
+	RideArrived(ctx context.Context, event *models.RideCompleteEvent) error
 }

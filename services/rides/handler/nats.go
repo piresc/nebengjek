@@ -35,6 +35,17 @@ func (h *ridesHandler) InitNATSConsumers() error {
 		return fmt.Errorf("failed to initialize location aggregate consumer: %w", err)
 	}
 
+	// Subscribe to ride arrival events
+	_, err = nats.NewConsumer(
+		constants.SubjectRideArrived,
+		"rides-service",
+		h.cfg.NATS.URL,
+		h.handleRideArrived,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize ride arrival consumer: %w", err)
+	}
+
 	return nil
 }
 
@@ -90,6 +101,25 @@ func (h *ridesHandler) handleLocationAggregate(msg []byte) error {
 			log.Printf("Failed to process billing update: %v", err)
 			return err
 		}
+	}
+
+	return nil
+}
+
+// handleRideArrived processes ride arrival events and completes the ride
+func (h *ridesHandler) handleRideArrived(msg []byte) error {
+	var event models.RideCompleteEvent
+	if err := json.Unmarshal(msg, &event); err != nil {
+		log.Printf("Failed to unmarshal ride arrival event: %v", err)
+		return err
+	}
+
+	log.Printf("Ride arrived event received: rideID=%s, adjustmentFactor=%.2f", event.RideID, event.AdjustmentFactor)
+
+	// Complete ride which will calculate payment and publish ride.completed
+	if _, err := h.ridesUC.CompleteRide(event.RideID, event.AdjustmentFactor); err != nil {
+		log.Printf("Error completing ride on arrival: %v", err)
+		return err
 	}
 
 	return nil

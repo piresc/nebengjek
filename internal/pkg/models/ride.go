@@ -35,6 +35,12 @@ type BillingLedger struct {
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 }
 
+// RideCompleteEvent represents an event to complete a ride with adjustment
+type RideCompleteEvent struct {
+	RideID           string  `json:"ride_id"`
+	AdjustmentFactor float64 `json:"adjustment_factor"`
+}
+
 // Payment represents a payment record
 type Payment struct {
 	PaymentID    uuid.UUID `json:"payment_id" db:"payment_id"`
@@ -43,4 +49,9 @@ type Payment struct {
 	AdminFee     int       `json:"admin_fee" db:"admin_fee"`
 	DriverPayout int       `json:"driver_payout" db:"driver_payout"`
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+}
+
+type RideComplete struct {
+	Ride    Ride    `json:"ride"`
+	Payment Payment `json:"payment"`
 }

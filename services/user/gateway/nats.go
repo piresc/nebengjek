@@ -38,3 +38,12 @@ func (g *UserGW) PublishLocationUpdate(ctx context.Context, locationEvent *model
 	fmt.Printf("Publishing location update: %s\n", string(data))
 	return g.nc.Publish(constants.SubjectLocationUpdate, data)
 }
+
+func (g *UserGW) PublishRideArrived(ctx context.Context, event *models.RideCompleteEvent) error {
+	data, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Publishing ride arrived event: %s\n", string(data))
+	return g.nc.Publish(constants.SubjectRideArrived, data)
+}

@@ -52,6 +52,8 @@ func (m *WebSocketManager) handleMessage(client *WebSocketClient, msg []byte) er
 		return m.handleMatchAccept(client, wsMsg.Data)
 	case constants.EventLocationUpdate:
 		return m.handleLocationUpdate(client.UserID, wsMsg.Data)
+	case constants.EventRideArrived:
+		return m.handleRideArrived(client, wsMsg.Data)
 	default:
 		return m.sendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Unknown event type")
 	}
@@ -115,6 +117,19 @@ func (m *WebSocketManager) handleLocationUpdate(DriverID string, data json.RawMe
 		log.Printf("Error updating location for user %s: %v", DriverID, err)
 		return m.sendErrorMessage(m.clients[DriverID].Conn, constants.ErrorInvalidLocation, err.Error())
 	}
+
+	return nil
+}
+
+// handleRideArrived processes ride arrival events from WebSocket clients
+func (m *WebSocketManager) handleRideArrived(client *WebSocketClient, data json.RawMessage) error {
+	var event models.RideCompleteEvent
+	if err := json.Unmarshal(data, &event); err != nil {
+		return m.sendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Invalid ride arrival format")
+	}
+
+	// Publish to NATS for rides-service to process completion
+	m.userUC.RideArrived(context.Background(), &event)
 
 	return nil
 }

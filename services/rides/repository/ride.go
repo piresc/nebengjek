@@ -145,3 +145,78 @@ func (r *RideRepo) GetRide(ctx context.Context, rideID string) (*models.Ride, er
 
 	return &ride, nil
 }
+
+// CompleteRide marks a ride as completed
+func (r *RideRepo) CompleteRide(ctx context.Context, ride *models.Ride) error {
+	query := `
+		UPDATE rides 
+		SET status = 'completed',
+			updated_at = NOW()
+		WHERE ride_id = $1
+	`
+
+	result, err := r.db.ExecContext(ctx, query, ride.RideID)
+	if err != nil {
+		return fmt.Errorf("failed to complete ride: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get affected rows: %w", err)
+	}
+
+	if rows == 0 {
+		return fmt.Errorf("ride not found: %s", ride.RideID)
+	}
+
+	return nil
+}
+
+// GetBillingLedgerSum gets the sum of all costs in the billing ledger for a ride
+func (r *RideRepo) GetBillingLedgerSum(ctx context.Context, rideID string) (int, error) {
+	query := `
+		SELECT SUM(cost) 
+		FROM billing_ledger 
+		WHERE ride_id = $1
+	`
+
+	var totalCost int
+	err := r.db.GetContext(ctx, &totalCost, query, rideID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get billing ledger sum: %w", err)
+	}
+
+	return totalCost, nil
+}
+
+// CreatePayment creates a payment record for a ride
+func (r *RideRepo) CreatePayment(ctx context.Context, payment *models.Payment) error {
+	query := `
+		INSERT INTO payments (
+			payment_id, ride_id, adjusted_cost, admin_fee, driver_payout, created_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6
+		)
+	`
+
+	if payment.PaymentID == uuid.Nil {
+		payment.PaymentID = uuid.New()
+	}
+
+	_, err := r.db.ExecContext(
+		ctx,
+		query,
+		payment.PaymentID,
+		payment.RideID,
+		payment.AdjustedCost,
+		payment.AdminFee,
+		payment.DriverPayout,
+		time.Now(),
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to create payment: %w", err)
+	}
+
+	return nil
+}

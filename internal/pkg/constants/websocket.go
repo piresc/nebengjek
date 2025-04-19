@@ -21,6 +21,10 @@ const (
 	EventMatchAccept   = "match_accept"
 	EventMatchRejected = "match_rejected"
 	EventMatchExpired  = "match_expired"
+
+	// Ride events
+	EventRideCompleted = "ride_completed"
+	EventRideArrived   = "ride_arrived"
 )
 
 // WebSocket error codes

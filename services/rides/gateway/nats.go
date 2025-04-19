@@ -35,11 +35,11 @@ func (g *rideGW) PublishRideStarted(ctx context.Context, ride *models.Ride) erro
 }
 
 // PublishRideCompleted publishes a ride completed event to NATS
-func (g *rideGW) PublishRideCompleted(ctx context.Context, ride *models.Ride) error {
+func (g *rideGW) PublishRideCompleted(ctx context.Context, rideComplete models.RideComplete) error {
 	fmt.Printf("Publishing ride completed event: rideID=%s, driverID=%s, customerID=%s\n",
-		ride.RideID, ride.DriverID, ride.CustomerID)
+		rideComplete.Ride.RideID, rideComplete.Ride.DriverID, rideComplete.Ride.CustomerID)
 
-	data, err := json.Marshal(ride)
+	data, err := json.Marshal(rideComplete)
 	if err != nil {
 		return err
 	}

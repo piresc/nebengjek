@@ -22,6 +22,17 @@ func (h *Handler) InitRideConsumers() error {
 	}
 	h.subs = append(h.subs, rideStartedSub)
 
+	// Subscribe to ride completed events
+	rideCompletedSub, err := h.natsClient.Subscribe(constants.SubjectRideCompleted, func(msg *nats.Msg) {
+		if err := h.handleRideCompletedEvent(msg.Data); err != nil {
+			fmt.Printf("Error handling ride completed event: %v\n", err)
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to ride completed events: %w", err)
+	}
+	h.subs = append(h.subs, rideCompletedSub)
+
 	return nil
 }
 
@@ -38,6 +49,23 @@ func (h *Handler) handleRideStartedEvent(msg []byte) error {
 	// Notify both driver and passenger about the ride start
 	h.wsManager.NotifyClient(ride.DriverID.String(), constants.SubjectRideStarted, ride)
 	h.wsManager.NotifyClient(ride.CustomerID.String(), constants.SubjectRideStarted, ride)
+
+	return nil
+}
+
+// handleRideCompletedEvent processes ride completed events
+func (h *Handler) handleRideCompletedEvent(msg []byte) error {
+	var rideComplete models.RideComplete
+	if err := json.Unmarshal(msg, &rideComplete); err != nil {
+		return fmt.Errorf("failed to unmarshal ride completed event: %w", err)
+	}
+
+	fmt.Printf("Received ride completed event: rideID=%s, driverID=%s, customerID=%s\n",
+		rideComplete.Ride.RideID, rideComplete.Ride.DriverID, rideComplete.Ride.CustomerID)
+
+	// Notify driver and passenger about the ride completion
+	h.wsManager.NotifyClient(rideComplete.Ride.DriverID.String(), constants.EventRideCompleted, rideComplete)
+	h.wsManager.NotifyClient(rideComplete.Ride.CustomerID.String(), constants.EventRideCompleted, rideComplete)
 
 	return nil
 }
