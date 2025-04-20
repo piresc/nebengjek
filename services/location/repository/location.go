@@ -57,30 +57,45 @@ func (r *locationRepo) StoreLocation(ctx context.Context, rideID string, locatio
 func (r *locationRepo) GetLastLocation(ctx context.Context, rideID string) (*models.Location, error) {
 	locationKey := fmt.Sprintf(constants.KeyRideLocation, rideID)
 
-	// Get location data from Redis hash
-	locationData, err := r.redisClient.HGetAll(ctx, locationKey)
+	// Get specific location fields from Redis hash using HMGET
+	fields := []string{
+		constants.FieldLatitude,
+		constants.FieldLongitude,
+		constants.FieldTimestamp,
+	}
+
+	values, err := r.redisClient.HMGet(ctx, locationKey, fields...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get location data: %w", err)
 	}
 
-	// If no data found, return error
-	if len(locationData) == 0 {
+	// Check if any values were returned
+	hasValue := false
+	for _, v := range values {
+		if v != "" {
+			hasValue = true
+			break
+		}
+	}
+
+	if !hasValue || len(values) != 3 {
 		return nil, fmt.Errorf("no location data found for ride %s", rideID)
 	}
 
-	// Parse latitude and longitude
-	lat, err := strconv.ParseFloat(locationData[constants.FieldLatitude], 64)
+	// Parse latitude
+	lat, err := strconv.ParseFloat(values[0], 64)
 	if err != nil {
 		return nil, fmt.Errorf("invalid latitude: %w", err)
 	}
 
-	lng, err := strconv.ParseFloat(locationData[constants.FieldLongitude], 64)
+	// Parse longitude
+	lng, err := strconv.ParseFloat(values[1], 64)
 	if err != nil {
 		return nil, fmt.Errorf("invalid longitude: %w", err)
 	}
 
 	// Parse timestamp
-	ts, err := strconv.ParseInt(locationData[constants.FieldTimestamp], 10, 64)
+	ts, err := strconv.ParseInt(values[2], 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("invalid timestamp: %w", err)
 	}

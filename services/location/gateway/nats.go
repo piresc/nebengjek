@@ -7,6 +7,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
+	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/services/location"
 )
 
@@ -22,7 +23,7 @@ func NewLocationGW(nc *nats.Conn) location.LocationGW {
 }
 
 // PublishLocationAggregate publishes a location aggregate event to NATS
-func (g *locationGW) PublishLocationAggregate(ctx context.Context, aggregate interface{}) error {
+func (g *locationGW) PublishLocationAggregate(ctx context.Context, aggregate models.LocationAggregate) error {
 	data, err := json.Marshal(aggregate)
 	if err != nil {
 		return fmt.Errorf("failed to marshal location aggregate: %w", err)

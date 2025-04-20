@@ -13,10 +13,10 @@ type UserUC struct {
 }
 
 // NewUserUC creates a new user usecase instance
-func NewUserUC(userRepo repository.UserRepo, natsGW gateway.UserGW, jwtConfig models.JWTConfig) *UserUC {
+func NewUserUC(userRepo repository.UserRepo, userGW gateway.UserGW, jwtConfig models.JWTConfig) *UserUC {
 	return &UserUC{
 		userRepo: userRepo,
-		UserGW:   natsGW,
+		UserGW:   userGW,
 		jwtCfg:   jwtConfig,
 	}
 }

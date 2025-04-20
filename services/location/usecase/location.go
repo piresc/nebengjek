@@ -69,7 +69,7 @@ func (uc *locationUC) StoreLocation(update models.LocationUpdate) error {
 
 	// Publish location aggregate
 	log.Printf("Publishing location aggregate: ride_id=%s, distance=%.2f km", update.RideID, distance)
-	aggregate := &models.LocationAggregate{
+	aggregate := models.LocationAggregate{
 		RideID:    update.RideID,
 		Distance:  distance,
 		Latitude:  update.Location.Latitude,
