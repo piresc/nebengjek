@@ -16,7 +16,7 @@ func (g *UserGW) PublishBeaconEvent(event *models.BeaconEvent) error {
 		return err
 	}
 	fmt.Printf("Publishing beacon event: %s\n", string(data))
-	return g.nc.Publish(constants.SubjectUserBeacon, data)
+	return g.natsClient.Publish(constants.SubjectUserBeacon, data)
 }
 
 // PublishMatchAccept publishes a match acceptance event to NATS
@@ -26,7 +26,7 @@ func (g *UserGW) MatchAccept(mp *models.MatchProposal) error {
 		return err
 	}
 	fmt.Printf("Publishing match accept: %s\n", string(data))
-	return g.nc.Publish(constants.SubjectMatchAccepted, data)
+	return g.natsClient.Publish(constants.SubjectMatchAccepted, data)
 }
 
 // PublishLocationUpdate publishes a location update event to NATS
@@ -36,7 +36,7 @@ func (g *UserGW) PublishLocationUpdate(ctx context.Context, locationEvent *model
 		return err
 	}
 	fmt.Printf("Publishing location update: %s\n", string(data))
-	return g.nc.Publish(constants.SubjectLocationUpdate, data)
+	return g.natsClient.Publish(constants.SubjectLocationUpdate, data)
 }
 
 func (g *UserGW) PublishRideArrived(ctx context.Context, event *models.RideCompleteEvent) error {
@@ -45,5 +45,5 @@ func (g *UserGW) PublishRideArrived(ctx context.Context, event *models.RideCompl
 		return err
 	}
 	fmt.Printf("Publishing ride arrived event: %s\n", string(data))
-	return g.nc.Publish(constants.SubjectRideArrived, data)
+	return g.natsClient.Publish(constants.SubjectRideArrived, data)
 }

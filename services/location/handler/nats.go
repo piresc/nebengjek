@@ -12,30 +12,26 @@ import (
 	"github.com/piresc/nebengjek/services/location"
 )
 
-type NatsHandler struct {
+type LocationHandler struct {
 	locationUC location.LocationUC
 	natsClient *natspkg.Client
 	subs       []*nats.Subscription
-	cfg        *models.Config
 }
 
-// NewNatsHandler creates a new location NATS handler
-func NewNatsHandler(locationUC location.LocationUC, cfg *models.Config) (*NatsHandler, error) {
-	client, err := natspkg.NewClient(cfg.NATS.URL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create NATS client: %w", err)
-	}
-
-	return &NatsHandler{
+// NewLocationHandler creates a new location NATS handler
+func NewLocationHandler(
+	locationUC location.LocationUC,
+	client *natspkg.Client,
+) *LocationHandler {
+	return &LocationHandler{
 		locationUC: locationUC,
 		natsClient: client,
-		cfg:        cfg,
 		subs:       make([]*nats.Subscription, 0),
-	}, nil
+	}
 }
 
 // InitNATSConsumers initializes all NATS consumers for the location service
-func (h *NatsHandler) InitNATSConsumers() error {
+func (h *LocationHandler) InitNATSConsumers() error {
 	// Initialize location update consumer
 	sub, err := h.natsClient.Subscribe(constants.SubjectLocationUpdate, func(msg *nats.Msg) {
 		if err := h.handleLocationUpdate(msg.Data); err != nil {
@@ -51,7 +47,7 @@ func (h *NatsHandler) InitNATSConsumers() error {
 }
 
 // handleLocationUpdate processes location update events
-func (h *NatsHandler) handleLocationUpdate(msg []byte) error {
+func (h *LocationHandler) handleLocationUpdate(msg []byte) error {
 	var update models.LocationUpdate
 	if err := json.Unmarshal(msg, &update); err != nil {
 		log.Printf("Failed to unmarshal location update: %v", err)
@@ -69,14 +65,4 @@ func (h *NatsHandler) handleLocationUpdate(msg []byte) error {
 	}
 
 	return nil
-}
-
-// Close unsubscribes from all NATS subscriptions
-func (h *NatsHandler) Close() {
-	for _, sub := range h.subs {
-		sub.Unsubscribe()
-	}
-	if h.natsClient != nil {
-		h.natsClient.Close()
-	}
 }

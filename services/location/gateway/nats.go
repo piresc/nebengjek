@@ -5,20 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/nats-io/nats.go"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/models"
+	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/location"
 )
 
 type locationGW struct {
-	nc *nats.Conn
+	natsClient *natspkg.Client
 }
 
 // NewLocationGW creates a new location gateway
-func NewLocationGW(nc *nats.Conn) location.LocationGW {
+func NewLocationGW(client *natspkg.Client) location.LocationGW {
 	return &locationGW{
-		nc: nc,
+		natsClient: client,
 	}
 }
 
@@ -29,5 +29,5 @@ func (g *locationGW) PublishLocationAggregate(ctx context.Context, aggregate mod
 		return fmt.Errorf("failed to marshal location aggregate: %w", err)
 	}
 
-	return g.nc.Publish(constants.SubjectLocationAggregate, data)
+	return g.natsClient.Publish(constants.SubjectLocationAggregate, data)
 }

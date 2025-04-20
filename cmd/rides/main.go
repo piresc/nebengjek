@@ -43,23 +43,22 @@ func main() {
 	// Initialize repositories
 	rideRepo := repository.NewRideRepository(configs, postgresClient.GetDB())
 	// Initialize NATS producer
-	ridesGW := gateway.NewRideGW(natsClient.GetConn())
+	ridesGW := gateway.NewRideGW(natsClient)
 	// Initialize use cases
 	rideUC, err := usecase.NewRideUC(configs, rideRepo, ridesGW)
 	if err != nil {
 		log.Fatalf("Failed to initialize ride use case: %v", err)
 	}
 
-	// Initialize Echo server
-	e := echo.New()
-
-	// Initialize handlers
-	rideHandler := handler.NewRideHandler(configs, rideUC)
+	rideHandler := handler.NewNatsHandler(rideUC, natsClient)
 
 	// Initialize NATS consumers
 	if err := rideHandler.InitNATSConsumers(); err != nil {
 		log.Fatalf("Failed to initialize NATS consumers: %v", err)
 	}
+
+	// Initialize Echo server
+	e := echo.New()
 
 	// Start server
 	serverAddr := fmt.Sprintf(":%d", configs.Server.Port)

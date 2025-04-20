@@ -37,20 +37,17 @@ func main() {
 	locationRepo := repository.NewLocationRepository(redisClient)
 
 	// Initialize gateway
-	locationGW := gateway.NewLocationGW(natsClient.GetConn())
+	locationGW := gateway.NewLocationGW(natsClient)
 
 	// Initialize usecase
 	locationUC := usecase.NewLocationUC(locationRepo, locationGW)
 
 	// Initialize NATS handler
-	natsHandler, err := handler.NewNatsHandler(locationUC, configs)
-	if err != nil {
-		log.Fatalf("Failed to create NATS handler: %v", err)
-	}
+	locationhandler := handler.NewLocationHandler(locationUC, natsClient)
 
 	// Initialize NATS consumers
-	if err := natsHandler.InitNATSConsumers(); err != nil {
-		log.Fatalf("Failed to initialize NATS consumers: %v", err)
+	if err := locationhandler.InitNATSConsumers(); err != nil {
+		log.Fatalf("Failed to initialize locationhandler consumers: %v", err)
 	}
 
 	// Initialize Echo router

@@ -20,7 +20,7 @@ type Handler struct {
 }
 
 // NewHandler creates and initializes all handlers
-func NewHandler(userUC user.UserUC, natsURL string, jwtConfig models.JWTConfig) (*Handler, error) {
+func NewUserHandler(userUC user.UserUC, natsURL string, jwtConfig models.JWTConfig) (*Handler, error) {
 	// Initialize WebSocket manager
 	wsManager := websocket.NewWebSocketManager(userUC, jwtConfig)
 

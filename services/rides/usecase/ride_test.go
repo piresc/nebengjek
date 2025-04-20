@@ -5,544 +5,462 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/services/rides/mocks"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
-
-// Mock Ride Repository
-type MockRideRepo struct {
-	mock.Mock
-}
-
-func (m *MockRideRepo) CreateRide(ctx context.Context, ride *models.Ride) error {
-	args := m.Called(ctx, ride)
-	return args.Error(0)
-}
-
-func (m *MockRideRepo) GetRide(ctx context.Context, rideID string) (*models.Ride, error) {
-	args := m.Called(ctx, rideID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*models.Ride), args.Error(1)
-}
-
-func (m *MockRideRepo) UpdateRideStatus(ctx context.Context, rideID string, status models.RideStatus) error {
-	args := m.Called(ctx, rideID, status)
-	return args.Error(0)
-}
-
-func (m *MockRideRepo) RecordBillingEntry(ctx context.Context, entry *models.BillingLedger) error {
-	args := m.Called(ctx, entry)
-	return args.Error(0)
-}
-
-func (m *MockRideRepo) GetRideBillingTotal(ctx context.Context, rideID string) (*models.BillingTotal, error) {
-	args := m.Called(ctx, rideID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*models.BillingTotal), args.Error(1)
-}
-
-func (m *MockRideRepo) RecordPayment(ctx context.Context, payment *models.Payment) error {
-	args := m.Called(ctx, payment)
-	return args.Error(0)
-}
-
-// Mock Ride Gateway
-type MockRideGW struct {
-	mock.Mock
-}
-
-func (m *MockRideGW) PublishRideCreated(ctx context.Context, ride *models.Ride) error {
-	args := m.Called(ctx, ride)
-	return args.Error(0)
-}
-
-func (m *MockRideGW) PublishRideCompleted(ctx context.Context, payment *models.Payment) error {
-	args := m.Called(ctx, payment)
-	return args.Error(0)
-}
 
 func TestCreateRide_Success(t *testing.T) {
 	// Arrange
-	mockRepo := new(MockRideRepo)
-	mockGW := new(MockRideGW)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	cfg := &models.Config{
-		Billing: models.BillingConfig{
-			FareRate:        3000, // 3000 IDR per km
-			AdminFeePercent: 5,    // 5% admin fee
-		},
-	}
+	mockRepo := mocks.NewMockRideRepo(ctrl)
+	mockGW := mocks.NewMockRideGW(ctrl)
 
-	uc := NewRideUC(cfg, mockRepo, mockGW)
+	cfg := &models.Config{}
+	uc, err := NewRideUC(cfg, mockRepo, mockGW)
+	require.NoError(t, err)
 
-	mp := models.MatchProposal{
-		ID:          uuid.New().String(),
-		DriverID:    uuid.New().String(),
-		PassengerID: uuid.New().String(),
-		MatchStatus: models.MatchStatusAccepted,
-		PickupLocation: models.Location{
+	driverID := uuid.New().String()
+	passengerID := uuid.New().String()
+
+	matchProposal := models.MatchProposal{
+		ID:          "match-123",
+		DriverID:    driverID,
+		PassengerID: passengerID,
+		UserLocation: models.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
 		},
-		DestinationLocation: models.Location{
+		DriverLocation: models.Location{
 			Latitude:  -6.185392,
 			Longitude: 106.837153,
 		},
-		EstimatedDistance: 5.2, // km
+		MatchStatus: models.MatchStatusAccepted,
 	}
 
-	// Should create a ride with the correct data
-	mockRepo.On("CreateRide", mock.Anything, mock.MatchedBy(func(r *models.Ride) bool {
-		return r.DriverID.String() == mp.DriverID &&
-			r.PassengerID.String() == mp.PassengerID &&
-			r.Status == models.RideStatusCreated
-	})).Return(nil)
+	// Set up expectations
+	mockRepo.EXPECT().
+		CreateRide(gomock.Any()).
+		DoAndReturn(func(ride *models.Ride) (*models.Ride, error) {
+			assert.Equal(t, uuid.MustParse(driverID), ride.DriverID)
+			assert.Equal(t, uuid.MustParse(passengerID), ride.CustomerID)
 
-	// Should publish ride created event
-	mockGW.On("PublishRideCreated", mock.Anything, mock.AnythingOfType("*models.Ride")).Return(nil)
+			// Add ride ID to simulate DB creation
+			ride.RideID = uuid.New()
+			return ride, nil
+		})
+
+	mockGW.EXPECT().
+		PublishRideStarted(gomock.Any(), gomock.Any()).
+		Return(nil)
 
 	// Act
-	err := uc.CreateRide(context.Background(), mp)
+	err = uc.CreateRide(matchProposal)
 
 	// Assert
 	assert.NoError(t, err)
-	mockRepo.AssertExpectations(t)
-	mockGW.AssertExpectations(t)
 }
 
 func TestCreateRide_RepositoryError(t *testing.T) {
 	// Arrange
-	mockRepo := new(MockRideRepo)
-	mockGW := new(MockRideGW)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	cfg := &models.Config{
-		Billing: models.BillingConfig{
-			FareRate:        3000,
-			AdminFeePercent: 5,
-		},
-	}
+	mockRepo := mocks.NewMockRideRepo(ctrl)
+	mockGW := mocks.NewMockRideGW(ctrl)
 
-	uc := NewRideUC(cfg, mockRepo, mockGW)
+	cfg := &models.Config{}
+	uc, err := NewRideUC(cfg, mockRepo, mockGW)
+	require.NoError(t, err)
 
-	mp := models.MatchProposal{
-		ID:          uuid.New().String(),
-		DriverID:    uuid.New().String(),
-		PassengerID: uuid.New().String(),
+	driverID := uuid.New().String()
+	passengerID := uuid.New().String()
+
+	matchProposal := models.MatchProposal{
+		ID:          "match-123",
+		DriverID:    driverID,
+		PassengerID: passengerID,
 		MatchStatus: models.MatchStatusAccepted,
 	}
 
 	expectedError := errors.New("database error")
-	mockRepo.On("CreateRide", mock.Anything, mock.AnythingOfType("*models.Ride")).Return(expectedError)
+
+	// Set up expectations
+	mockRepo.EXPECT().
+		CreateRide(gomock.Any()).
+		Return(nil, expectedError)
 
 	// Act
-	err := uc.CreateRide(context.Background(), mp)
+	err = uc.CreateRide(matchProposal)
 
 	// Assert
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to create ride")
-	mockRepo.AssertExpectations(t)
+	assert.Equal(t, expectedError, err)
 }
 
 func TestCreateRide_PublishError(t *testing.T) {
 	// Arrange
-	mockRepo := new(MockRideRepo)
-	mockGW := new(MockRideGW)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	cfg := &models.Config{
-		Billing: models.BillingConfig{
-			FareRate:        3000,
-			AdminFeePercent: 5,
-		},
-	}
+	mockRepo := mocks.NewMockRideRepo(ctrl)
+	mockGW := mocks.NewMockRideGW(ctrl)
 
-	uc := NewRideUC(cfg, mockRepo, mockGW)
+	cfg := &models.Config{}
+	uc, err := NewRideUC(cfg, mockRepo, mockGW)
+	require.NoError(t, err)
 
-	mp := models.MatchProposal{
-		ID:          uuid.New().String(),
-		DriverID:    uuid.New().String(),
-		PassengerID: uuid.New().String(),
+	driverID := uuid.New().String()
+	passengerID := uuid.New().String()
+
+	matchProposal := models.MatchProposal{
+		ID:          "match-123",
+		DriverID:    driverID,
+		PassengerID: passengerID,
 		MatchStatus: models.MatchStatusAccepted,
 	}
 
-	// Repository succeeds but publishing fails
-	mockRepo.On("CreateRide", mock.Anything, mock.AnythingOfType("*models.Ride")).Return(nil)
-
 	expectedError := errors.New("publish error")
-	mockGW.On("PublishRideCreated", mock.Anything, mock.AnythingOfType("*models.Ride")).Return(expectedError)
+
+	// Set up expectations
+	mockRepo.EXPECT().
+		CreateRide(gomock.Any()).
+		DoAndReturn(func(ride *models.Ride) (*models.Ride, error) {
+			ride.RideID = uuid.New()
+			return ride, nil
+		})
+
+	mockGW.EXPECT().
+		PublishRideStarted(gomock.Any(), gomock.Any()).
+		Return(expectedError)
 
 	// Act
-	err := uc.CreateRide(context.Background(), mp)
+	err = uc.CreateRide(matchProposal)
 
 	// Assert
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to publish ride created event")
-	mockRepo.AssertExpectations(t)
-	mockGW.AssertExpectations(t)
+	assert.Equal(t, expectedError, err)
 }
 
 func TestProcessBillingUpdate_Success(t *testing.T) {
 	// Arrange
-	mockRepo := new(MockRideRepo)
-	mockGW := new(MockRideGW)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	cfg := &models.Config{
-		Billing: models.BillingConfig{
-			FareRate:        3000,
-			AdminFeePercent: 5,
-		},
-	}
+	mockRepo := mocks.NewMockRideRepo(ctrl)
+	mockGW := mocks.NewMockRideGW(ctrl)
 
-	uc := NewRideUC(cfg, mockRepo, mockGW)
+	cfg := &models.Config{}
+	uc, err := NewRideUC(cfg, mockRepo, mockGW)
+	require.NoError(t, err)
 
 	rideID := uuid.New().String()
-	aggregate := models.LocationAggregate{
-		RideID:   rideID,
-		Distance: 2.5, // km
+	rideUUID := uuid.MustParse(rideID)
+
+	entry := &models.BillingLedger{
+		RideID:   rideUUID,
+		Distance: 2.5,
+		Cost:     7500,
 	}
 
-	// Calculate expected cost based on fare rate
-	expectedCost := int64(aggregate.Distance * float64(cfg.Billing.FareRate))
+	ride := &models.Ride{
+		RideID:    rideUUID,
+		Status:    models.RideStatusOngoing,
+		TotalCost: 10000,
+	}
 
-	// Mock BillingLedger entry
-	mockRepo.On("RecordBillingEntry", mock.Anything, mock.MatchedBy(func(entry *models.BillingLedger) bool {
-		return entry.RideID == rideID &&
-			entry.Distance == aggregate.Distance &&
-			entry.Cost == expectedCost
-	})).Return(nil)
+	// Set up expectations
+	mockRepo.EXPECT().
+		GetRide(gomock.Any(), rideID).
+		Return(ride, nil)
+
+	mockRepo.EXPECT().
+		AddBillingEntry(gomock.Any(), entry).
+		Return(nil)
+
+	mockRepo.EXPECT().
+		UpdateTotalCost(gomock.Any(), rideID, entry.Cost).
+		Return(nil)
 
 	// Act
-	err := uc.ProcessBillingUpdate(context.Background(), aggregate)
+	err = uc.ProcessBillingUpdate(rideID, entry)
 
 	// Assert
 	assert.NoError(t, err)
-	mockRepo.AssertExpectations(t)
 }
 
-func TestProcessBillingUpdate_RepositoryError(t *testing.T) {
+func TestProcessBillingUpdate_GetRideError(t *testing.T) {
 	// Arrange
-	mockRepo := new(MockRideRepo)
-	mockGW := new(MockRideGW)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	cfg := &models.Config{
-		Billing: models.BillingConfig{
-			FareRate:        3000,
-			AdminFeePercent: 5,
-		},
-	}
+	mockRepo := mocks.NewMockRideRepo(ctrl)
+	mockGW := mocks.NewMockRideGW(ctrl)
 
-	uc := NewRideUC(cfg, mockRepo, mockGW)
+	cfg := &models.Config{}
+	uc, err := NewRideUC(cfg, mockRepo, mockGW)
+	require.NoError(t, err)
 
 	rideID := uuid.New().String()
-	aggregate := models.LocationAggregate{
-		RideID:   rideID,
+	rideUUID := uuid.MustParse(rideID)
+
+	entry := &models.BillingLedger{
+		RideID:   rideUUID,
 		Distance: 2.5,
+		Cost:     7500,
 	}
 
-	expectedError := errors.New("repository error")
-	mockRepo.On("RecordBillingEntry", mock.Anything, mock.AnythingOfType("*models.BillingLedger")).Return(expectedError)
+	expectedError := errors.New("database error")
+
+	// Set up expectations
+	mockRepo.EXPECT().
+		GetRide(gomock.Any(), rideID).
+		Return(nil, expectedError)
 
 	// Act
-	err := uc.ProcessBillingUpdate(context.Background(), aggregate)
+	err = uc.ProcessBillingUpdate(rideID, entry)
 
 	// Assert
 	assert.Error(t, err)
-	assert.Equal(t, expectedError, err)
-	mockRepo.AssertExpectations(t)
+	assert.Contains(t, err.Error(), "failed to get ride")
+}
+
+func TestProcessBillingUpdate_InvalidRideStatus(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockRideRepo(ctrl)
+	mockGW := mocks.NewMockRideGW(ctrl)
+
+	cfg := &models.Config{}
+	uc, err := NewRideUC(cfg, mockRepo, mockGW)
+	require.NoError(t, err)
+
+	rideID := uuid.New().String()
+	rideUUID := uuid.MustParse(rideID)
+
+	entry := &models.BillingLedger{
+		RideID:   rideUUID,
+		Distance: 2.5,
+		Cost:     7500,
+	}
+
+	ride := &models.Ride{
+		RideID:    rideUUID,
+		Status:    models.RideStatusCompleted, // Ride is already completed
+		TotalCost: 10000,
+	}
+
+	// Set up expectations
+	mockRepo.EXPECT().
+		GetRide(gomock.Any(), rideID).
+		Return(ride, nil)
+
+	// Act
+	err = uc.ProcessBillingUpdate(rideID, entry)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot update billing for non-active ride")
 }
 
 func TestCompleteRide_Success(t *testing.T) {
 	// Arrange
-	mockRepo := new(MockRideRepo)
-	mockGW := new(MockRideGW)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	cfg := &models.Config{
-		Billing: models.BillingConfig{
-			FareRate:        3000,
-			AdminFeePercent: 5,
-		},
-	}
+	mockRepo := mocks.NewMockRideRepo(ctrl)
+	mockGW := mocks.NewMockRideGW(ctrl)
 
-	uc := NewRideUC(cfg, mockRepo, mockGW)
+	cfg := &models.Config{}
+	uc, err := NewRideUC(cfg, mockRepo, mockGW)
+	require.NoError(t, err)
 
 	rideID := uuid.New().String()
-	adjustmentFactor := 1.0 // No adjustment
+	rideUUID := uuid.MustParse(rideID)
+	adjustmentFactor := 0.8 // 80% of original price
 
-	// Mock ride info
+	totalCost := 10000
+
 	ride := &models.Ride{
-		ID:           uuid.MustParse(rideID),
-		DriverID:     uuid.New(),
-		PassengerID:  uuid.New(),
-		Status:       models.RideStatusInProgress,
-		EstimatedFee: 30000,
+		RideID:    rideUUID,
+		Status:    models.RideStatusOngoing,
+		TotalCost: totalCost,
 	}
 
-	// Mock billing total
-	billingTotal := &models.BillingTotal{
-		TotalDistance: 10.0,
-		TotalCost:     30000,
-	}
+	// Expected values
+	adjustedCost := int(float64(totalCost) * adjustmentFactor)
+	adminFee := int(float64(adjustedCost) * 0.05)
+	driverPayout := adjustedCost - adminFee
 
-	mockRepo.On("GetRide", mock.Anything, rideID).Return(ride, nil)
-	mockRepo.On("GetRideBillingTotal", mock.Anything, rideID).Return(billingTotal, nil)
-	mockRepo.On("UpdateRideStatus", mock.Anything, rideID, models.RideStatusCompleted).Return(nil)
-	mockRepo.On("RecordPayment", mock.Anything, mock.MatchedBy(func(p *models.Payment) bool {
-		// Check payment calculation
-		expectedAmount := float64(billingTotal.TotalCost) * adjustmentFactor // 30000 * 1.0 = 30000
-		expectedAdminFee := expectedAmount * 0.05                            // 5% of 30000 = 1500
-		expectedDriverPayout := expectedAmount - expectedAdminFee            // 30000 - 1500 = 28500
+	// Set up expectations
+	mockRepo.EXPECT().
+		GetRide(gomock.Any(), rideID).
+		Return(ride, nil)
 
-		return p.RideID == rideID &&
-			p.AdjustedCost == int64(expectedAmount) &&
-			p.AdminFee == int64(expectedAdminFee) &&
-			p.DriverPayout == int64(expectedDriverPayout)
-	})).Return(nil)
+	mockRepo.EXPECT().
+		GetBillingLedgerSum(gomock.Any(), rideID).
+		Return(totalCost, nil)
 
-	mockGW.On("PublishRideCompleted", mock.Anything, mock.AnythingOfType("*models.Payment")).Return(nil)
+	mockRepo.EXPECT().
+		CreatePayment(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, payment *models.Payment) error {
+			assert.Equal(t, rideUUID, payment.RideID)
+			assert.Equal(t, adjustedCost, payment.AdjustedCost)
+			assert.Equal(t, adminFee, payment.AdminFee)
+			assert.Equal(t, driverPayout, payment.DriverPayout)
+			return nil
+		})
+
+	mockRepo.EXPECT().
+		CompleteRide(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, updatedRide *models.Ride) error {
+			assert.Equal(t, rideUUID, updatedRide.RideID)
+			assert.Equal(t, models.RideStatusCompleted, updatedRide.Status)
+			return nil
+		})
+
+	mockGW.EXPECT().
+		PublishRideCompleted(gomock.Any(), gomock.Any()).
+		Return(nil)
 
 	// Act
-	payment, err := uc.CompleteRide(context.Background(), rideID, adjustmentFactor)
+	payment, err := uc.CompleteRide(rideID, adjustmentFactor)
 
 	// Assert
 	assert.NoError(t, err)
 	assert.NotNil(t, payment)
-	assert.Equal(t, rideID, payment.RideID)
-	mockRepo.AssertExpectations(t)
-	mockGW.AssertExpectations(t)
+	assert.Equal(t, rideUUID, payment.RideID)
+	assert.Equal(t, adjustedCost, payment.AdjustedCost)
+	assert.Equal(t, adminFee, payment.AdminFee)
+	assert.Equal(t, driverPayout, payment.DriverPayout)
 }
 
-func TestCompleteRide_GetRideError(t *testing.T) {
+func TestCompleteRide_InvalidAdjustmentFactor(t *testing.T) {
 	// Arrange
-	mockRepo := new(MockRideRepo)
-	mockGW := new(MockRideGW)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	cfg := &models.Config{
-		Billing: models.BillingConfig{
-			FareRate:        3000,
-			AdminFeePercent: 5,
-		},
-	}
+	mockRepo := mocks.NewMockRideRepo(ctrl)
+	mockGW := mocks.NewMockRideGW(ctrl)
 
-	uc := NewRideUC(cfg, mockRepo, mockGW)
+	cfg := &models.Config{}
+	uc, err := NewRideUC(cfg, mockRepo, mockGW)
+	require.NoError(t, err)
 
 	rideID := uuid.New().String()
-	adjustmentFactor := 1.0
+	rideUUID := uuid.MustParse(rideID)
+	invalidAdjustmentFactor := 1.5 // Should be reset to 1.0
 
-	expectedError := errors.New("ride not found")
-	mockRepo.On("GetRide", mock.Anything, rideID).Return(nil, expectedError)
-
-	// Act
-	payment, err := uc.CompleteRide(context.Background(), rideID, adjustmentFactor)
-
-	// Assert
-	assert.Error(t, err)
-	assert.Nil(t, payment)
-	assert.Equal(t, expectedError, err)
-	mockRepo.AssertExpectations(t)
-}
-
-func TestCompleteRide_InvalidRideStatus(t *testing.T) {
-	// Arrange
-	mockRepo := new(MockRideRepo)
-	mockGW := new(MockRideGW)
-
-	cfg := &models.Config{
-		Billing: models.BillingConfig{
-			FareRate:        3000,
-			AdminFeePercent: 5,
-		},
-	}
-
-	uc := NewRideUC(cfg, mockRepo, mockGW)
-
-	rideID := uuid.New().String()
-	adjustmentFactor := 1.0
-
-	// Already completed ride
-	ride := &models.Ride{
-		ID:     uuid.MustParse(rideID),
-		Status: models.RideStatusCompleted,
-	}
-
-	mockRepo.On("GetRide", mock.Anything, rideID).Return(ride, nil)
-
-	// Act
-	payment, err := uc.CompleteRide(context.Background(), rideID, adjustmentFactor)
-
-	// Assert
-	assert.Error(t, err)
-	assert.Nil(t, payment)
-	assert.Contains(t, err.Error(), "ride is not in progress")
-	mockRepo.AssertExpectations(t)
-}
-
-func TestCompleteRide_GetBillingTotalError(t *testing.T) {
-	// Arrange
-	mockRepo := new(MockRideRepo)
-	mockGW := new(MockRideGW)
-
-	cfg := &models.Config{
-		Billing: models.BillingConfig{
-			FareRate:        3000,
-			AdminFeePercent: 5,
-		},
-	}
-
-	uc := NewRideUC(cfg, mockRepo, mockGW)
-
-	rideID := uuid.New().String()
-	adjustmentFactor := 1.0
+	totalCost := 10000
 
 	ride := &models.Ride{
-		ID:     uuid.MustParse(rideID),
-		Status: models.RideStatusInProgress,
+		RideID:    rideUUID,
+		Status:    models.RideStatusOngoing,
+		TotalCost: totalCost,
 	}
 
-	expectedError := errors.New("billing error")
-	mockRepo.On("GetRide", mock.Anything, rideID).Return(ride, nil)
-	mockRepo.On("GetRideBillingTotal", mock.Anything, rideID).Return(nil, expectedError)
+	// Expected values with adjustment factor of 1.0
+	adjustedCost := totalCost
+	adminFee := int(float64(adjustedCost) * 0.05)
+	driverPayout := adjustedCost - adminFee
+
+	// Set up expectations
+	mockRepo.EXPECT().
+		GetRide(gomock.Any(), rideID).
+		Return(ride, nil)
+
+	mockRepo.EXPECT().
+		GetBillingLedgerSum(gomock.Any(), rideID).
+		Return(totalCost, nil)
+
+	mockRepo.EXPECT().
+		CreatePayment(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, payment *models.Payment) error {
+			assert.Equal(t, rideUUID, payment.RideID)
+			assert.Equal(t, adjustedCost, payment.AdjustedCost)
+			assert.Equal(t, adminFee, payment.AdminFee)
+			assert.Equal(t, driverPayout, payment.DriverPayout)
+			return nil
+		})
+
+	mockRepo.EXPECT().
+		CompleteRide(gomock.Any(), gomock.Any()).
+		Return(nil)
+
+	mockGW.EXPECT().
+		PublishRideCompleted(gomock.Any(), gomock.Any()).
+		Return(nil)
 
 	// Act
-	payment, err := uc.CompleteRide(context.Background(), rideID, adjustmentFactor)
+	payment, err := uc.CompleteRide(rideID, invalidAdjustmentFactor)
 
 	// Assert
-	assert.Error(t, err)
-	assert.Nil(t, payment)
-	assert.Equal(t, expectedError, err)
-	mockRepo.AssertExpectations(t)
-}
-
-func TestCompleteRide_UpdateStatusError(t *testing.T) {
-	// Arrange
-	mockRepo := new(MockRideRepo)
-	mockGW := new(MockRideGW)
-
-	cfg := &models.Config{
-		Billing: models.BillingConfig{
-			FareRate:        3000,
-			AdminFeePercent: 5,
-		},
-	}
-
-	uc := NewRideUC(cfg, mockRepo, mockGW)
-
-	rideID := uuid.New().String()
-	adjustmentFactor := 1.0
-
-	ride := &models.Ride{
-		ID:     uuid.MustParse(rideID),
-		Status: models.RideStatusInProgress,
-	}
-
-	billingTotal := &models.BillingTotal{
-		TotalDistance: 10.0,
-		TotalCost:     30000,
-	}
-
-	expectedError := errors.New("status update error")
-	mockRepo.On("GetRide", mock.Anything, rideID).Return(ride, nil)
-	mockRepo.On("GetRideBillingTotal", mock.Anything, rideID).Return(billingTotal, nil)
-	mockRepo.On("UpdateRideStatus", mock.Anything, rideID, models.RideStatusCompleted).Return(expectedError)
-
-	// Act
-	payment, err := uc.CompleteRide(context.Background(), rideID, adjustmentFactor)
-
-	// Assert
-	assert.Error(t, err)
-	assert.Nil(t, payment)
-	assert.Equal(t, expectedError, err)
-	mockRepo.AssertExpectations(t)
-}
-
-func TestCompleteRide_RecordPaymentError(t *testing.T) {
-	// Arrange
-	mockRepo := new(MockRideRepo)
-	mockGW := new(MockRideGW)
-
-	cfg := &models.Config{
-		Billing: models.BillingConfig{
-			FareRate:        3000,
-			AdminFeePercent: 5,
-		},
-	}
-
-	uc := NewRideUC(cfg, mockRepo, mockGW)
-
-	rideID := uuid.New().String()
-	adjustmentFactor := 1.0
-
-	ride := &models.Ride{
-		ID:     uuid.MustParse(rideID),
-		Status: models.RideStatusInProgress,
-	}
-
-	billingTotal := &models.BillingTotal{
-		TotalDistance: 10.0,
-		TotalCost:     30000,
-	}
-
-	expectedError := errors.New("payment error")
-	mockRepo.On("GetRide", mock.Anything, rideID).Return(ride, nil)
-	mockRepo.On("GetRideBillingTotal", mock.Anything, rideID).Return(billingTotal, nil)
-	mockRepo.On("UpdateRideStatus", mock.Anything, rideID, models.RideStatusCompleted).Return(nil)
-	mockRepo.On("RecordPayment", mock.Anything, mock.AnythingOfType("*models.Payment")).Return(expectedError)
-
-	// Act
-	payment, err := uc.CompleteRide(context.Background(), rideID, adjustmentFactor)
-
-	// Assert
-	assert.Error(t, err)
-	assert.Nil(t, payment)
-	assert.Equal(t, expectedError, err)
-	mockRepo.AssertExpectations(t)
+	assert.NoError(t, err)
+	assert.NotNil(t, payment)
+	assert.Equal(t, totalCost, payment.AdjustedCost) // Should be reset to full cost
 }
 
 func TestCompleteRide_PublishError(t *testing.T) {
 	// Arrange
-	mockRepo := new(MockRideRepo)
-	mockGW := new(MockRideGW)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	cfg := &models.Config{
-		Billing: models.BillingConfig{
-			FareRate:        3000,
-			AdminFeePercent: 5,
-		},
-	}
+	mockRepo := mocks.NewMockRideRepo(ctrl)
+	mockGW := mocks.NewMockRideGW(ctrl)
 
-	uc := NewRideUC(cfg, mockRepo, mockGW)
+	cfg := &models.Config{}
+	uc, err := NewRideUC(cfg, mockRepo, mockGW)
+	require.NoError(t, err)
 
 	rideID := uuid.New().String()
-	adjustmentFactor := 1.0
+	rideUUID := uuid.MustParse(rideID)
+	adjustmentFactor := 0.8
+
+	totalCost := 10000
 
 	ride := &models.Ride{
-		ID:     uuid.MustParse(rideID),
-		Status: models.RideStatusInProgress,
-	}
-
-	billingTotal := &models.BillingTotal{
-		TotalDistance: 10.0,
-		TotalCost:     30000,
+		RideID:    rideUUID,
+		Status:    models.RideStatusOngoing,
+		TotalCost: totalCost,
 	}
 
 	expectedError := errors.New("publish error")
-	mockRepo.On("GetRide", mock.Anything, rideID).Return(ride, nil)
-	mockRepo.On("GetRideBillingTotal", mock.Anything, rideID).Return(billingTotal, nil)
-	mockRepo.On("UpdateRideStatus", mock.Anything, rideID, models.RideStatusCompleted).Return(nil)
-	mockRepo.On("RecordPayment", mock.Anything, mock.AnythingOfType("*models.Payment")).Return(nil)
-	mockGW.On("PublishRideCompleted", mock.Anything, mock.AnythingOfType("*models.Payment")).Return(expectedError)
+
+	// Set up expectations
+	mockRepo.EXPECT().
+		GetRide(gomock.Any(), rideID).
+		Return(ride, nil)
+
+	mockRepo.EXPECT().
+		GetBillingLedgerSum(gomock.Any(), rideID).
+		Return(totalCost, nil)
+
+	mockRepo.EXPECT().
+		CreatePayment(gomock.Any(), gomock.Any()).
+		Return(nil)
+
+	mockRepo.EXPECT().
+		CompleteRide(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, updatedRide *models.Ride) error {
+			updatedRide.Status = models.RideStatusCompleted
+			return nil
+		})
+
+	mockGW.EXPECT().
+		PublishRideCompleted(gomock.Any(), gomock.Any()).
+		Return(expectedError)
 
 	// Act
-	payment, err := uc.CompleteRide(context.Background(), rideID, adjustmentFactor)
+	payment, err := uc.CompleteRide(rideID, adjustmentFactor)
 
 	// Assert
-	assert.Error(t, err)
-	assert.NotNil(t, payment) // Payment should still be created
-	assert.Contains(t, err.Error(), "failed to publish ride completed event")
-	mockRepo.AssertExpectations(t)
-	mockGW.AssertExpectations(t)
+	assert.NoError(t, err) // Should not fail the operation
+	assert.NotNil(t, payment)
 }

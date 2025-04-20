@@ -17,7 +17,7 @@ func (g *matchGW) PublishMatchFound(ctx context.Context, matchProp models.MatchP
 	if err != nil {
 		return err
 	}
-	return g.nc.Publish(constants.SubjectMatchFound, data)
+	return g.natsClient.Publish(constants.SubjectMatchFound, data)
 }
 
 // PublishMatchAccept publishes a beacon event to NATS
@@ -28,7 +28,7 @@ func (g *matchGW) PublishMatchConfirm(ctx context.Context, matchProp models.Matc
 	if err != nil {
 		return err
 	}
-	return g.nc.Publish(constants.SubjectMatchConfirm, data)
+	return g.natsClient.Publish(constants.SubjectMatchConfirm, data)
 }
 
 // PublishMatchRejected publishes a beacon event to NATS
@@ -39,5 +39,5 @@ func (g *matchGW) PublishMatchRejected(ctx context.Context, matchProp models.Mat
 	if err != nil {
 		return err
 	}
-	return g.nc.Publish(constants.SubjectMatchRejected, data)
+	return g.natsClient.Publish(constants.SubjectMatchRejected, data)
 }
