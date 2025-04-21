@@ -1,13 +1,12 @@
 package middleware
 
 import (
-	"errors"
 	"fmt"
 	"strings"
-	"time"
 
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	jwtpkg "github.com/piresc/nebengjek/internal/pkg/jwt"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/internal/utils"
 )
@@ -31,97 +30,34 @@ func JWTAuthMiddleware(config models.JWTConfig) echo.MiddlewareFunc {
 			// Extract the token
 			tokenString := parts[1]
 
-			// Parse and validate the token
-			claims := &Claims{}
-			token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-				// Validate the signing method
-				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-				}
-				return []byte(config.Secret), nil
-			})
-
-			// Handle token parsing errors
+			// Validate the token using our JWT package
+			claims, err := jwtpkg.ValidateToken(tokenString, config.Secret)
 			if err != nil {
-				var validationError *jwt.ValidationError
-				if errors.As(err, &validationError) {
-					if validationError.Errors&jwt.ValidationErrorExpired != 0 {
-						return utils.UnauthorizedResponse(c, "Token has expired")
-					}
-				}
 				return utils.UnauthorizedResponse(c, "Invalid token")
 			}
 
-			// Check if the token is valid
-			if !token.Valid {
-				return utils.UnauthorizedResponse(c, "Invalid token")
+			// Extract user ID and role from claims
+			userIDStr, ok := (*claims)["user_id"]
+			if !ok {
+				return utils.UnauthorizedResponse(c, "Invalid token: missing user_id claim")
+			}
+
+			role, ok := (*claims)["role"]
+			if !ok {
+				return utils.UnauthorizedResponse(c, "Invalid token: missing role claim")
+			}
+
+			// Parse the UUID
+			userID, err := uuid.Parse(fmt.Sprintf("%v", userIDStr))
+			if err != nil {
+				return utils.UnauthorizedResponse(c, "Invalid token: user_id is not a valid UUID")
 			}
 
 			// Set the user ID and role in the context
-			c.Set("user_id", claims.UserID)
-			c.Set("user_role", claims.Role)
+			c.Set("user_id", userID)
+			c.Set("user_role", role)
 
 			return next(c)
 		}
 	}
-}
-
-// Claims represents the JWT claims
-type Claims struct {
-	jwt.RegisteredClaims
-	UserID string `json:"user_id"`
-	Role   string `json:"role"`
-}
-
-// GenerateToken generates a new JWT token
-func GenerateToken(userID, role string, config models.JWTConfig) (string, error) {
-	// Set expiration time
-	expiration := time.Now().Add(time.Duration(config.Expiration) * time.Minute)
-
-	// Create claims
-	claims := &Claims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expiration),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    config.Issuer,
-		},
-		UserID: userID,
-		Role:   role,
-	}
-
-	// Create token
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	// Sign token with secret
-	tokenString, err := token.SignedString([]byte(config.Secret))
-	if err != nil {
-		return "", fmt.Errorf("failed to sign token: %w", err)
-	}
-
-	return tokenString, nil
-}
-
-// ValidateToken validates a JWT token and returns the claims
-func ValidateToken(tokenString string, config models.JWTConfig) (*Claims, error) {
-	// Parse and validate the token
-	claims := &Claims{}
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-		// Validate the signing method
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return []byte(config.Secret), nil
-	})
-
-	// Handle token parsing errors
-	if err != nil {
-		return nil, err
-	}
-
-	// Check if the token is valid
-	if !token.Valid {
-		return nil, errors.New("invalid token")
-	}
-
-	return claims, nil
 }

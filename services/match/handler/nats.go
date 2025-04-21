@@ -9,33 +9,27 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
+	"github.com/piresc/nebengjek/services/match"
 )
 
 // NatsHandler handles NATS subscriptions for the match service
-type NatsHandler struct {
-	matchUC    MatchUsecase
+type MatchHandler struct {
+	matchUC    match.MatchUC
 	natsClient *natspkg.Client
 	subs       []*nats.Subscription
-	cfg        *models.Config
 }
 
 // NewNatsHandler creates a new match NATS handler
-func NewNatsHandler(matchUC MatchUsecase, cfg *models.Config) (*NatsHandler, error) {
-	client, err := natspkg.NewClient(cfg.NATS.URL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create NATS client: %w", err)
-	}
-
-	return &NatsHandler{
+func NewMatchHandler(matchUC match.MatchUC, client *natspkg.Client) *MatchHandler {
+	return &MatchHandler{
 		matchUC:    matchUC,
 		natsClient: client,
-		cfg:        cfg,
 		subs:       make([]*nats.Subscription, 0),
-	}, nil
+	}
 }
 
 // InitNATSConsumers initializes all NATS consumers for the match service
-func (h *NatsHandler) InitNATSConsumers() error {
+func (h *MatchHandler) InitNATSConsumers() error {
 	// Initialize beacon events consumer
 	sub, err := h.natsClient.Subscribe(constants.SubjectUserBeacon, func(msg *nats.Msg) {
 		if err := h.handleBeaconEvent(msg.Data); err != nil {
@@ -62,7 +56,7 @@ func (h *NatsHandler) InitNATSConsumers() error {
 }
 
 // handleBeaconEvent processes beacon events from the user service
-func (h *NatsHandler) handleBeaconEvent(msg []byte) error {
+func (h *MatchHandler) handleBeaconEvent(msg []byte) error {
 	var event models.BeaconEvent
 	if err := json.Unmarshal(msg, &event); err != nil {
 		log.Printf("Failed to unmarshal beacon event: %v", err)
@@ -77,7 +71,7 @@ func (h *NatsHandler) handleBeaconEvent(msg []byte) error {
 }
 
 // handleMatchAccept processes match acceptance events
-func (h *NatsHandler) handleMatchAccept(msg []byte) error {
+func (h *MatchHandler) handleMatchAccept(msg []byte) error {
 	var matchAccept models.MatchProposal
 	if err := json.Unmarshal(msg, &matchAccept); err != nil {
 		log.Printf("Failed to unmarshal match accept event: %v", err)
@@ -95,14 +89,4 @@ func (h *NatsHandler) handleMatchAccept(msg []byte) error {
 	}
 
 	return nil
-}
-
-// Close unsubscribes from all NATS subscriptions
-func (h *NatsHandler) Close() {
-	for _, sub := range h.subs {
-		sub.Unsubscribe()
-	}
-	if h.natsClient != nil {
-		h.natsClient.Close()
-	}
 }

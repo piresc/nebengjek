@@ -79,15 +79,6 @@ func (u *UserUC) RegisterDriver(ctx context.Context, userDriver *models.User) er
 	return u.userRepo.UpdateToDriver(ctx, userDriver)
 }
 
-// RideArrived publishes a ride arrival event to NATS
-func (u *UserUC) RideArrived(ctx context.Context, event *models.RideCompleteEvent) error {
-	err := u.UserGW.PublishRideArrived(ctx, event)
-	if err != nil {
-		return fmt.Errorf("failed to publish ride arrived event: %w", err)
-	}
-	return nil
-}
-
 func validateUserData(user *models.User) error {
 	if user == nil {
 		return errors.New("user cannot be nil")

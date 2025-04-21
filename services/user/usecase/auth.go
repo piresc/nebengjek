@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/google/uuid"
+	jwtpkg "github.com/piresc/nebengjek/internal/pkg/jwt"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/internal/utils"
 )
@@ -78,8 +78,8 @@ func (u *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*models.Au
 		}
 	}
 
-	// Generate JWT token
-	token, expiresAt, err := u.generateJWTToken(user)
+	// Generate JWT token using the package
+	token, expiresAt, err := jwtpkg.GenerateToken(user.ID, user.MSISDN, user.Role, u.cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate token: %w", err)
 	}
@@ -96,31 +96,4 @@ func (u *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*models.Au
 		Role:      user.Role,
 		ExpiresAt: expiresAt,
 	}, nil
-}
-
-// generateJWTToken generates a JWT token for the given user
-func (u *UserUC) generateJWTToken(user *models.User) (string, int64, error) {
-	// Set token expiration time
-	expirationTime := time.Now().Add(time.Duration(u.cfg.JWT.Expiration) * time.Minute)
-	expiresAt := expirationTime.Unix()
-
-	// Create claims
-	claims := jwt.MapClaims{
-		"user_id": user.ID,
-		"msisdn":  user.MSISDN,
-		"role":    user.Role,
-		"exp":     expiresAt,
-		"iss":     u.cfg.JWT.Issuer,
-	}
-
-	// Create token
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	// Sign token with configured secret
-	tokenString, err := token.SignedString([]byte(u.cfg.JWT.Secret))
-	if err != nil {
-		return "", 0, err
-	}
-
-	return tokenString, expiresAt, nil
 }

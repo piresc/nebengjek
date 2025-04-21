@@ -43,7 +43,7 @@ func TestPublishBeaconEvent_Success(t *testing.T) {
 		Location: models.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
-			Timestamp: models.GetCurrentTime(),
+			Timestamp: time.Now(),
 		},
 	}
 
@@ -57,7 +57,8 @@ func TestPublishBeaconEvent_Success(t *testing.T) {
 
 	// Create gateway and publish message
 	userGW := NewUserGW(nc)
-	err = userGW.PublishBeaconEvent(beaconEvent)
+	ctx := context.Background()
+	err = userGW.PublishBeaconEvent(ctx, beaconEvent)
 	require.NoError(t, err)
 
 	// Wait for the message and verify contents
@@ -147,7 +148,7 @@ func TestPublishLocationUpdate_Success(t *testing.T) {
 		Location: models.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
-			Timestamp: models.GetCurrentTime(),
+			Timestamp: time.Now(),
 		},
 		CreatedAt: time.Now(),
 	}
@@ -190,18 +191,8 @@ func TestPublishRideArrived_Success(t *testing.T) {
 
 	// Create test data
 	rideCompleteEvent := &models.RideCompleteEvent{
-		RideID:      uuid.New().String(),
-		DriverID:    uuid.New().String(),
-		PassengerID: uuid.New().String(),
-		PickupTime:  time.Now(),
-		DropoffTime: time.Now().Add(20 * time.Minute),
-		TotalAmount: 35000,
-		TotalKM:     5.3,
-		ArrivalPoint: models.Location{
-			Latitude:  -6.185392,
-			Longitude: 106.837153,
-			Timestamp: models.GetCurrentTime(),
-		},
+		RideID:           uuid.New().String(),
+		AdjustmentFactor: 1.2,
 	}
 
 	// Channel to receive the message
@@ -225,12 +216,7 @@ func TestPublishRideArrived_Success(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, rideCompleteEvent.RideID, receivedEvent.RideID)
-		assert.Equal(t, rideCompleteEvent.DriverID, receivedEvent.DriverID)
-		assert.Equal(t, rideCompleteEvent.PassengerID, receivedEvent.PassengerID)
-		assert.Equal(t, rideCompleteEvent.TotalAmount, receivedEvent.TotalAmount)
-		assert.Equal(t, rideCompleteEvent.TotalKM, receivedEvent.TotalKM)
-		assert.Equal(t, rideCompleteEvent.ArrivalPoint.Latitude, receivedEvent.ArrivalPoint.Latitude)
-		assert.Equal(t, rideCompleteEvent.ArrivalPoint.Longitude, receivedEvent.ArrivalPoint.Longitude)
+		assert.Equal(t, rideCompleteEvent.AdjustmentFactor, receivedEvent.AdjustmentFactor)
 	case <-time.After(2 * time.Second):
 		t.Fatal("Did not receive published message")
 	}
