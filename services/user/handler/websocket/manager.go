@@ -21,16 +21,16 @@ type WebSocketManager struct {
 	sync.RWMutex
 	clients  map[string]*WebSocketClient
 	userUC   user.UserUC
-	jwtCfg   models.JWTConfig
+	cfg      models.Config
 	upgrader websocket.Upgrader
 }
 
 // NewWebSocketManager creates a new WebSocket manager
-func NewWebSocketManager(userUC user.UserUC, jwtConfig models.JWTConfig) *WebSocketManager {
+func NewWebSocketManager(userUC user.UserUC, cfg models.Config) *WebSocketManager {
 	return &WebSocketManager{
 		clients: make(map[string]*WebSocketClient),
 		userUC:  userUC,
-		jwtCfg:  jwtConfig,
+		cfg:     cfg,
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool { return true },
 		},
@@ -84,7 +84,7 @@ func (m *WebSocketManager) validateToken(tokenString string) (*CustomClaims, err
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return []byte(m.jwtCfg.Secret), nil
+		return []byte(m.cfg.JWT.Secret), nil
 	})
 
 	if err != nil {

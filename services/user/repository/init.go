@@ -14,7 +14,11 @@ type UserRepo struct {
 }
 
 // NewUserRepo creates a new user repository instance
-func NewUserRepo(cfg *models.Config, db *sqlx.DB, redisClient *database.RedisClient) *UserRepo {
+func NewUserRepo(
+	cfg *models.Config,
+	db *sqlx.DB,
+	redisClient *database.RedisClient,
+) *UserRepo {
 	return &UserRepo{
 		cfg:         cfg,
 		db:          db,

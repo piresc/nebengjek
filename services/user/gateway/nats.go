@@ -10,7 +10,7 @@ import (
 )
 
 // PublishBeaconEvent publishes a beacon event to NATS
-func (g *UserGW) PublishBeaconEvent(event *models.BeaconEvent) error {
+func (g *UserGW) PublishBeaconEvent(ctx context.Context, event *models.BeaconEvent) error {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return err

@@ -10,6 +10,7 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/user/gateway"
 	"github.com/piresc/nebengjek/services/user/handler"
+	"github.com/piresc/nebengjek/services/user/handler/websocket"
 	"github.com/piresc/nebengjek/services/user/repository"
 	"github.com/piresc/nebengjek/services/user/usecase"
 )
@@ -42,11 +43,14 @@ func main() {
 
 	// Initialize repository, service, and handler
 	userRepo := repository.NewUserRepo(configs, postgresClient.GetDB(), redisClient)
-	userGW := gateway.NewUserGW(natsClient.GetConn())
-	userUC := usecase.NewUserUC(*userRepo, *userGW, configs.JWT)
+	userGW := gateway.NewUserGW(natsClient)
+	userUC := usecase.NewUserUC(userRepo, userGW, configs)
+
+	// Initialize WebSocket manager
+	wsManager := websocket.NewWebSocketManager(userUC, jwtConfig)
 
 	// Initialize handlers
-	userHandler, err := handler.NewHandler(userUC, configs.NATS.URL, configs.JWT)
+	userHandler, err := handler.NewUserHandler(userUC, configs.NATS.URL, configs.JWT)
 	if err != nil {
 		log.Fatalf("Failed to create handler: %v", err)
 	}

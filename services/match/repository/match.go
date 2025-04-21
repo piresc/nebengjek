@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,7 +26,6 @@ func NewMatchRepository(
 	db *sqlx.DB,
 	redisClient *database.RedisClient,
 ) *MatchRepo {
-	log.Println("Initializing match repository")
 	return &MatchRepo{
 		cfg:         cfg,
 		db:          db,

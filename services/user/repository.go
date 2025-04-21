@@ -12,11 +12,9 @@ type UserRepo interface {
 	CreateUser(ctx context.Context, user *models.User) error
 	GetUserByID(ctx context.Context, id string) (*models.User, error)
 	GetUserByMSISDN(ctx context.Context, msisdn string) (*models.User, error)
-	UpdateUser(ctx context.Context, user *models.User) error
-	ListUsers(ctx context.Context, offset, limit int) ([]*models.User, error)
-
+	UpdateToDriver(ctx context.Context, user *models.User) error
 	// OTP management
 	CreateOTP(ctx context.Context, otp *models.OTP) error
 	GetOTP(ctx context.Context, msisdn, code string) (*models.OTP, error)
-	MarkOTPVerified(ctx context.Context, id string) error
+	MarkOTPVerified(ctx context.Context, msisdn string, code string) error
 }

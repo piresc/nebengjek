@@ -20,7 +20,6 @@ func NewRideRepository(
 	cfg *models.Config,
 	db *sqlx.DB,
 ) *RideRepo {
-	log.Println("Initializing ride repository")
 	return &RideRepo{
 		cfg: cfg,
 		db:  db,

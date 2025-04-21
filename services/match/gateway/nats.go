@@ -7,7 +7,21 @@ import (
 
 	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/models"
+	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
+	"github.com/piresc/nebengjek/services/match"
 )
+
+// matchGW handles match gateway operations
+type matchGW struct {
+	natsClient *natspkg.Client
+}
+
+// NewMatchGW creates a new NATS gateway instance
+func NewMatchGW(client *natspkg.Client) match.MatchGW {
+	return &matchGW{
+		natsClient: client,
+	}
+}
 
 // PublishMatchFound publishes a beacon event to NATS
 func (g *matchGW) PublishMatchFound(ctx context.Context, matchProp models.MatchProposal) error {

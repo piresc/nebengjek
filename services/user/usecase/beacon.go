@@ -27,5 +27,5 @@ func (uc *UserUC) UpdateBeaconStatus(ctx context.Context, beaconReq *models.Beac
 		Timestamp: time.Now(),
 	}
 
-	return uc.UserGW.PublishBeaconEvent(beaconEvent)
+	return uc.UserGW.PublishBeaconEvent(ctx, beaconEvent)
 }

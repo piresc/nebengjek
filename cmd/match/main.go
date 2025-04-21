@@ -42,18 +42,19 @@ func main() {
 	// Initialize repositories
 	matchRepo := repository.NewMatchRepository(configs, postgresClient.GetDB(), redisClient)
 	// Initialize gateways
-	matchGW := gateway.NewMatchGW(natsClient.GetConn())
+	matchGW := gateway.NewMatchGW(natsClient)
 	// Initialize use case
 	matchUC := usecase.NewMatchUC(matchRepo, matchGW)
 
 	// Initialize Echo router and handler
-	e := echo.New()
-	matchHandler := handler.NewMatchHandler(matchUC, configs)
+	matchHandler := handler.NewMatchHandler(matchUC, natsClient)
 
 	// Initialize NATS consumers
 	if err := matchHandler.InitNATSConsumers(); err != nil {
 		log.Fatalf("Failed to initialize NATS consumers: %v", err)
 	}
+	// Initialize Echo server
+	e := echo.New()
 
 	// Start server
 	log.Printf("Starting %s on port %d", appName, configs.Server.Port)

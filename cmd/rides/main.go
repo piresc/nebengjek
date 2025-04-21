@@ -50,7 +50,7 @@ func main() {
 		log.Fatalf("Failed to initialize ride use case: %v", err)
 	}
 
-	rideHandler := handler.NewNatsHandler(rideUC, natsClient)
+	rideHandler := handler.NewRidesHandler(rideUC, natsClient)
 
 	// Initialize NATS consumers
 	if err := rideHandler.InitNATSConsumers(); err != nil {
