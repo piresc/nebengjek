@@ -17,7 +17,7 @@ import (
 
 func main() {
 	appName := "rides-service"
-	envPath := ".env"
+	envPath := "./cmd/rides/.env"
 	configs := config.InitConfig(envPath)
 
 	// Initialize database connection

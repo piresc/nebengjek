@@ -11,7 +11,7 @@ import (
 )
 
 // InitMatchConsumers initializes NATS consumers for match-related events
-func (h *Handler) InitMatchConsumers() error {
+func (h *NatsHandler) initMatchConsumers() error {
 	// Subscribe to match found events
 	matchSub, err := h.natsClient.Subscribe(constants.SubjectMatchFound, func(msg *nats.Msg) {
 		log.Printf("Received match event: %s\n", msg.Data)
@@ -50,7 +50,7 @@ func (h *Handler) InitMatchConsumers() error {
 }
 
 // handleMatchEvent processes match events
-func (h *Handler) handleMatchEvent(msg []byte) error {
+func (h *NatsHandler) handleMatchEvent(msg []byte) error {
 	var event models.MatchProposal
 	if err := json.Unmarshal(msg, &event); err != nil {
 		return fmt.Errorf("failed to unmarshal match event: %w", err)
@@ -63,7 +63,7 @@ func (h *Handler) handleMatchEvent(msg []byte) error {
 }
 
 // handleMatchAcceptedEvent processes match accepted events
-func (h *Handler) handleMatchConfirmEvent(msg []byte) error {
+func (h *NatsHandler) handleMatchConfirmEvent(msg []byte) error {
 	var event models.MatchProposal
 	if err := json.Unmarshal(msg, &event); err != nil {
 		return fmt.Errorf("failed to unmarshal match accepted event: %w", err)
@@ -76,7 +76,7 @@ func (h *Handler) handleMatchConfirmEvent(msg []byte) error {
 }
 
 // handleMatchRejectedEvent processes match rejected events
-func (h *Handler) handleMatchRejectedEvent(msg []byte) error {
+func (h *NatsHandler) handleMatchRejectedEvent(msg []byte) error {
 	var event models.MatchProposal
 	if err := json.Unmarshal(msg, &event); err != nil {
 		return fmt.Errorf("failed to unmarshal match rejected event: %w", err)

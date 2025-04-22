@@ -2,152 +2,85 @@ package websocket
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
-	"net/http"
-	"strings"
-	"sync"
 
-	"github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/models"
+	pkgws "github.com/piresc/nebengjek/internal/pkg/websocket"
 	"github.com/piresc/nebengjek/services/user"
 )
 
-// WebSocketManager manages WebSocket connections and client state
+// WebSocketManager extends the base WebSocket manager for user-specific functionality
 type WebSocketManager struct {
-	sync.RWMutex
-	clients  map[string]*WebSocketClient
-	userUC   user.UserUC
-	cfg      models.Config
-	upgrader websocket.Upgrader
+	userUC  user.UserUC
+	manager *pkgws.Manager
 }
 
-// NewWebSocketManager creates a new WebSocket manager
-func NewWebSocketManager(userUC user.UserUC, cfg models.Config) *WebSocketManager {
+// NewWebSocketManager creates a new WebSocket manager for the user service
+func NewWebSocketManager(
+	userUC user.UserUC,
+	manager *pkgws.Manager,
+) *WebSocketManager {
 	return &WebSocketManager{
-		clients: make(map[string]*WebSocketClient),
+		manager: manager,
 		userUC:  userUC,
-		cfg:     cfg,
-		upgrader: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool { return true },
-		},
 	}
 }
 
 // HandleWebSocket handles new WebSocket connections
 func (m *WebSocketManager) HandleWebSocket(c echo.Context) error {
-	client, err := m.authenticateClient(c)
-	if err != nil {
-		return err
-	}
-
-	ws, err := m.upgrader.Upgrade(c.Response(), c.Request(), nil)
-	if err != nil {
-		return err
-	}
-	defer ws.Close()
-
-	return m.handleClientConnection(client, ws)
+	return m.manager.HandleConnection(c, m.handleClientConnection)
 }
 
-// authenticateClient authenticates the WebSocket client using JWT
-func (m *WebSocketManager) authenticateClient(c echo.Context) (*WebSocketClient, error) {
-	authHeader := c.Request().Header.Get("Authorization")
-	if authHeader == "" {
-		return nil, echo.NewHTTPError(http.StatusUnauthorized, "Authorization header is required")
-	}
+// handleClientConnection manages the client's WebSocket connection
+func (m *WebSocketManager) handleClientConnection(client *models.WebSocketClient, ws *websocket.Conn) error {
+	client.Conn = ws
+	m.manager.AddClient(client)
+	defer m.manager.RemoveClient(client.UserID)
 
-	parts := strings.Split(authHeader, " ")
-	if len(parts) != 2 || parts[0] != "Bearer" {
-		return nil, echo.NewHTTPError(http.StatusUnauthorized, "Invalid authorization format")
-	}
-
-	claims, err := m.validateToken(parts[1])
-	if err != nil {
-		log.Printf("Token validation failed: %v", err)
-		return nil, echo.NewHTTPError(http.StatusUnauthorized, "Invalid token")
-	}
-
-	return &WebSocketClient{
-		UserID: claims.UserID,
-		Role:   claims.Role,
-	}, nil
+	return m.messageLoop(client)
 }
 
-// validateToken validates the JWT token and returns the claims
-func (m *WebSocketManager) validateToken(tokenString string) (*CustomClaims, error) {
-	claims := &CustomClaims{}
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+// messageLoop handles incoming WebSocket messages
+func (m *WebSocketManager) messageLoop(client *models.WebSocketClient) error {
+	for {
+		_, msg, err := client.Conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("WebSocket error: %v", err)
+			}
+			return err
 		}
-		return []byte(m.cfg.JWT.Secret), nil
-	})
 
-	if err != nil {
-		return nil, err
+		if err := m.handleMessage(client, msg); err != nil {
+			log.Printf("Error handling message: %v", err)
+		}
 	}
-
-	if !token.Valid {
-		return nil, fmt.Errorf("invalid token")
-	}
-
-	return claims, nil
 }
 
-// addClient safely adds a client to the manager
-func (m *WebSocketManager) addClient(client *WebSocketClient) {
-	m.Lock()
-	defer m.Unlock()
-	m.clients[client.UserID] = client
-}
-
-// removeClient safely removes a client from the manager
-func (m *WebSocketManager) removeClient(userID string) {
-	m.Lock()
-	defer m.Unlock()
-	delete(m.clients, userID)
-}
-
-// sendMessage sends a message to a WebSocket client
-func (m *WebSocketManager) sendMessage(conn *websocket.Conn, event string, data interface{}) error {
-	log.Printf("Sending message to client: %s", event)
-	rawData, err := json.Marshal(data)
-	if err != nil {
-		return fmt.Errorf("error marshaling message data: %v", err)
-	}
-
-	response := WSMessage{
-		Event: event,
-		Data:  rawData,
-	}
-
-	return conn.WriteJSON(response)
-}
-
-// sendErrorMessage sends an error message to a WebSocket client
-func (m *WebSocketManager) sendErrorMessage(conn *websocket.Conn, code string, message string) error {
-	return m.sendMessage(conn, constants.EventError, WSErrorMessage{
-		Code:    code,
-		Message: message,
-	})
-}
-
-// NotifyClient sends a notification to a specific client
 func (m *WebSocketManager) NotifyClient(userID string, event string, data interface{}) {
-	log.Printf("Notifying client %s with event %s", userID, event)
-	m.RLock()
-	client, exists := m.clients[userID]
-	m.RUnlock()
+	m.manager.NotifyClient(userID, event, data)
+}
 
-	if !exists {
-		return
+// handleMessage processes incoming WebSocket messages
+func (m *WebSocketManager) handleMessage(client *models.WebSocketClient, msg []byte) error {
+	var wsMsg models.WSMessage
+	if err := json.Unmarshal(msg, &wsMsg); err != nil {
+		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Invalid message format")
 	}
 
-	if err := m.sendMessage(client.Conn, event, data); err != nil {
-		log.Printf("Error sending message to client %s: %v", userID, err)
+	switch wsMsg.Event {
+	case constants.EventBeaconUpdate:
+		return m.handleBeaconUpdate(client, wsMsg.Data)
+	case constants.EventMatchAccept:
+		return m.handleMatchAccept(client, wsMsg.Data)
+	case constants.EventLocationUpdate:
+		return m.handleLocationUpdate(client.UserID, wsMsg.Data)
+	case constants.EventRideArrived:
+		return m.handleRideArrived(client, wsMsg.Data)
+	default:
+		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Unknown event type")
 	}
 }

@@ -15,7 +15,9 @@ type UserHandler struct {
 }
 
 // NewUserHandler creates a new user handler
-func NewUserHandler(userUC user.UserUC) *UserHandler {
+func NewUserHandler(
+	userUC user.UserUC,
+) *UserHandler {
 	return &UserHandler{
 		userUC: userUC,
 	}

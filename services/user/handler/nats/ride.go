@@ -10,7 +10,7 @@ import (
 )
 
 // InitRideConsumers initializes NATS consumers for ride-related events
-func (h *Handler) InitRideConsumers() error {
+func (h *NatsHandler) initRideConsumers() error {
 	// Subscribe to ride started events
 	rideStartedSub, err := h.natsClient.Subscribe(constants.SubjectRideStarted, func(msg *nats.Msg) {
 		if err := h.handleRideStartedEvent(msg.Data); err != nil {
@@ -37,7 +37,7 @@ func (h *Handler) InitRideConsumers() error {
 }
 
 // handleRideStartedEvent processes ride started events
-func (h *Handler) handleRideStartedEvent(msg []byte) error {
+func (h *NatsHandler) handleRideStartedEvent(msg []byte) error {
 	var ride models.Ride
 	if err := json.Unmarshal(msg, &ride); err != nil {
 		return fmt.Errorf("failed to unmarshal ride started event: %w", err)
@@ -54,7 +54,7 @@ func (h *Handler) handleRideStartedEvent(msg []byte) error {
 }
 
 // handleRideCompletedEvent processes ride completed events
-func (h *Handler) handleRideCompletedEvent(msg []byte) error {
+func (h *NatsHandler) handleRideCompletedEvent(msg []byte) error {
 	var rideComplete models.RideComplete
 	if err := json.Unmarshal(msg, &rideComplete); err != nil {
 		return fmt.Errorf("failed to unmarshal ride completed event: %w", err)

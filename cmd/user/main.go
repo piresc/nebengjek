@@ -7,10 +7,13 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/config"
 	"github.com/piresc/nebengjek/internal/pkg/database"
-	"github.com/piresc/nebengjek/internal/pkg/nats"
+	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
+	wspkg "github.com/piresc/nebengjek/internal/pkg/websocket"
 	"github.com/piresc/nebengjek/services/user/gateway"
 	"github.com/piresc/nebengjek/services/user/handler"
-	"github.com/piresc/nebengjek/services/user/handler/websocket"
+	httpHandler "github.com/piresc/nebengjek/services/user/handler/http"
+	natsHandler "github.com/piresc/nebengjek/services/user/handler/nats"
+	wsHandler "github.com/piresc/nebengjek/services/user/handler/websocket"
 	"github.com/piresc/nebengjek/services/user/repository"
 	"github.com/piresc/nebengjek/services/user/usecase"
 )
@@ -35,29 +38,43 @@ func main() {
 	defer redisClient.Close()
 
 	// Initialize NATS
-	natsClient, err := nats.NewClient(configs.NATS.URL)
+	natsClient, err := natspkg.NewClient(configs.NATS.URL)
 	if err != nil {
 		log.Fatalf("Failed to connect to NATS: %v", err)
 	}
 	defer natsClient.Close()
 
-	// Initialize repository, service, and handler
+	// Initialize repository
 	userRepo := repository.NewUserRepo(configs, postgresClient.GetDB(), redisClient)
+
+	// Initialize Gateway
 	userGW := gateway.NewUserGW(natsClient)
+
+	// Initialize UseCase
 	userUC := usecase.NewUserUC(userRepo, userGW, configs)
 
-	// Initialize WebSocket manager
-	wsManager := websocket.NewWebSocketManager(userUC, jwtConfig)
+	// Handlers for HTTP
+	userHandler := httpHandler.NewUserHandler(userUC)
+	authHandler := httpHandler.NewAuthHandler(userUC)
+
+	// Handlers for WebSocket
+	manager := wspkg.NewManager(configs.JWT)
+	wsManager := wsHandler.NewWebSocketManager(userUC, manager)
+
+	// Handlers for NATS
+	natsHandler := natsHandler.NewNatsHandler(wsManager, natsClient)
+
+	// Initialize NATS consumers
+	if err := natsHandler.InitConsumers(); err != nil {
+		log.Fatalf("Failed to initialize NATS consumers: %v", err)
+	}
 
 	// Initialize handlers
-	userHandler, err := handler.NewUserHandler(userUC, configs.NATS.URL, configs.JWT)
-	if err != nil {
-		log.Fatalf("Failed to create handler: %v", err)
-	}
+	Handler := handler.NewHandler(userHandler, authHandler, wsManager, natsHandler, configs)
 
 	// Initialize Echo router
 	e := echo.New()
-	userHandler.RegisterRoutes(e)
+	Handler.RegisterRoutes(e)
 
 	// Start server
 	log.Printf("Starting %s on port %d", appName, configs.Server.Port)

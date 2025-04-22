@@ -4,7 +4,6 @@ import (
 	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/models"
-	"github.com/piresc/nebengjek/services/user"
 	"github.com/piresc/nebengjek/services/user/handler/http"
 	"github.com/piresc/nebengjek/services/user/handler/nats"
 	"github.com/piresc/nebengjek/services/user/handler/websocket"
@@ -15,28 +14,33 @@ type Handler struct {
 	userHandler *http.UserHandler
 	authHandler *http.AuthHandler
 	wsManager   *websocket.WebSocketManager
-	natsHandler *nats.Handler
-	jwtConfig   models.JWTConfig
+	natsHandler *nats.NatsHandler
+	cfg         *models.Config
 }
 
 // NewHandler creates and initializes all handlers
-func NewUserHandler(userUC user.UserUC, natsURL string, jwtConfig models.JWTConfig) (*Handler, error) {
-	// Initialize WebSocket manager
-	wsManager := websocket.NewWebSocketManager(userUC, jwtConfig)
-
-	// Initialize NATS handler
-	natsHandler, err := nats.NewHandler(wsManager, natsURL)
-	if err != nil {
-		return nil, err
-	}
+func NewHandler(
+	userHandler *http.UserHandler,
+	authHandler *http.AuthHandler,
+	wsManager *websocket.WebSocketManager,
+	natsHandler *nats.NatsHandler,
+	cfg *models.Config,
+) *Handler {
 
 	return &Handler{
-		userHandler: http.NewUserHandler(userUC),
-		authHandler: http.NewAuthHandler(userUC),
+		userHandler: userHandler,
+		authHandler: authHandler,
 		wsManager:   wsManager,
 		natsHandler: natsHandler,
-		jwtConfig:   jwtConfig,
-	}, nil
+		cfg:         cfg,
+	}
+}
+
+// GetJWTMiddleware returns the configured JWT middleware
+func (h *Handler) GetJWTMiddleware() echo.MiddlewareFunc {
+	return echojwt.WithConfig(echojwt.Config{
+		SigningKey: []byte(h.cfg.JWT.Secret),
+	})
 }
 
 // RegisterRoutes registers all protocol handlers and their routes
@@ -46,13 +50,8 @@ func (h *Handler) RegisterRoutes(e *echo.Echo) {
 	authGroup.POST("/otp/generate", h.authHandler.GenerateOTP)
 	authGroup.POST("/otp/verify", h.authHandler.VerifyOTP)
 
-	// Configure JWT middleware
-	config := echojwt.Config{
-		SigningKey: []byte(h.jwtConfig.Secret),
-	}
-
-	// Protected routes
-	protected := e.Group("", echojwt.WithConfig(config))
+	// Protected routes with JWT middleware
+	protected := e.Group("", h.GetJWTMiddleware())
 
 	// User routes
 	userGroup := protected.Group("/users")
