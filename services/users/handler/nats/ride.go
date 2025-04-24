@@ -43,12 +43,12 @@ func (h *NatsHandler) handleRideStartedEvent(msg []byte) error {
 		return fmt.Errorf("failed to unmarshal ride started event: %w", err)
 	}
 
-	fmt.Printf("Received ride started event: rideID=%s, driverID=%s, PassengerID=%s\n",
-		ride.RideID, ride.DriverID, ride.PassengerID)
+	fmt.Printf("Received ride started event: rideID=%s, driverID=%s, CustomerID=%s\n",
+		ride.RideID, ride.DriverID, ride.CustomerID)
 
 	// Notify both driver and passenger about the ride start
 	h.wsManager.NotifyClient(ride.DriverID.String(), constants.SubjectRideStarted, ride)
-	h.wsManager.NotifyClient(ride.PassengerID.String(), constants.SubjectRideStarted, ride)
+	h.wsManager.NotifyClient(ride.CustomerID.String(), constants.SubjectRideStarted, ride)
 
 	return nil
 }
@@ -60,12 +60,12 @@ func (h *NatsHandler) handleRideCompletedEvent(msg []byte) error {
 		return fmt.Errorf("failed to unmarshal ride completed event: %w", err)
 	}
 
-	fmt.Printf("Received ride completed event: rideID=%s, driverID=%s, PassengerID=%s\n",
-		rideComplete.Ride.RideID, rideComplete.Ride.DriverID, rideComplete.Ride.PassengerID)
+	fmt.Printf("Received ride completed event: rideID=%s, driverID=%s, CustomerID=%s\n",
+		rideComplete.Ride.RideID, rideComplete.Ride.DriverID, rideComplete.Ride.CustomerID)
 
 	// Notify driver and passenger about the ride completion
 	h.wsManager.NotifyClient(rideComplete.Ride.DriverID.String(), constants.EventRideCompleted, rideComplete)
-	h.wsManager.NotifyClient(rideComplete.Ride.PassengerID.String(), constants.EventRideCompleted, rideComplete)
+	h.wsManager.NotifyClient(rideComplete.Ride.CustomerID.String(), constants.EventRideCompleted, rideComplete)
 
 	return nil
 }

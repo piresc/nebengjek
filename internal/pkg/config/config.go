@@ -18,43 +18,43 @@ func loadConfigFromEnv() *models.Config {
 
 	// App config
 	configs.App.Name = GetEnv("APP_NAME", "")
-	configs.App.Environment = GetEnv("APP_ENV", "development")
+	configs.App.Environment = GetEnv("APP_ENV", "")
 	configs.App.Debug = GetEnvAsBool("APP_DEBUG", true)
-	configs.App.Version = GetEnv("APP_VERSION", "1.0.0")
+	configs.App.Version = GetEnv("APP_VERSION", "")
 
 	// Server config
-	configs.Server.Host = GetEnv("SERVER_HOST", "0.0.0.0")
-	configs.Server.Port = GetEnvAsInt("SERVER_PORT", 9990)
-	configs.Server.GRPCPort = GetEnvAsInt("SERVER_GRPC_PORT", 9090)
-	configs.Server.ReadTimeout = GetEnvAsInt("SERVER_READ_TIMEOUT", 60)
-	configs.Server.WriteTimeout = GetEnvAsInt("SERVER_WRITE_TIMEOUT", 60)
-	configs.Server.ShutdownTimeout = GetEnvAsInt("SERVER_SHUTDOWN_TIMEOUT", 30)
+	configs.Server.Host = GetEnv("SERVER_HOST", "")
+	configs.Server.Port = GetEnvAsInt("SERVER_PORT", 0)
+	configs.Server.GRPCPort = GetEnvAsInt("SERVER_GRPC_PORT", 0)
+	configs.Server.ReadTimeout = GetEnvAsInt("SERVER_READ_TIMEOUT", 0)
+	configs.Server.WriteTimeout = GetEnvAsInt("SERVER_WRITE_TIMEOUT", 0)
+	configs.Server.ShutdownTimeout = GetEnvAsInt("SERVER_SHUTDOWN_TIMEOUT", 0)
 
 	// Database config
-	configs.Database.Driver = GetEnv("DB_DRIVER", "postgres")
-	configs.Database.Host = GetEnv("DB_HOST", "localhost")
-	configs.Database.Port = GetEnvAsInt("DB_PORT", 5432)
-	configs.Database.Username = GetEnv("DB_USERNAME", "nebengjek-username")
-	configs.Database.Password = GetEnv("DB_PASSWORD", "nebengjek-password")
-	configs.Database.Database = GetEnv("DB_DATABASE", "nebengjek")
-	configs.Database.SSLMode = GetEnv("DB_SSL_MODE", "disable")
-	configs.Database.MaxConns = GetEnvAsInt("DB_MAX_CONNS", 100)
-	configs.Database.IdleConns = GetEnvAsInt("DB_IDLE_CONNS", 10)
+	configs.Database.Driver = GetEnv("DB_DRIVER", "")
+	configs.Database.Host = GetEnv("DB_HOST", "")
+	configs.Database.Port = GetEnvAsInt("DB_PORT", 0)
+	configs.Database.Username = GetEnv("DB_USERNAME", "")
+	configs.Database.Password = GetEnv("DB_PASSWORD", "")
+	configs.Database.Database = GetEnv("DB_DATABASE", "")
+	configs.Database.SSLMode = GetEnv("DB_SSL_MODE", "")
+	configs.Database.MaxConns = GetEnvAsInt("DB_MAX_CONNS", 0)
+	configs.Database.IdleConns = GetEnvAsInt("DB_IDLE_CONNS", 0)
 
 	// Redis config
-	configs.Redis.Host = GetEnv("REDIS_HOST", "localhost")
-	configs.Redis.Port = GetEnvAsInt("REDIS_PORT", 6379)
-	configs.Redis.Password = GetEnv("REDIS_PASSWORD", "redispassword")
+	configs.Redis.Host = GetEnv("REDIS_HOST", "")
+	configs.Redis.Port = GetEnvAsInt("REDIS_PORT", 0)
+	configs.Redis.Password = GetEnv("REDIS_PASSWORD", "")
 	configs.Redis.DB = GetEnvAsInt("REDIS_DB", 0)
-	configs.Redis.PoolSize = GetEnvAsInt("REDIS_POOL_SIZE", 10)
+	configs.Redis.PoolSize = GetEnvAsInt("REDIS_POOL_SIZE", 0)
 
 	// NATS config
-	configs.NATS.URL = GetEnv("NATS_URL", "nats://localhost:4222")
+	configs.NATS.URL = GetEnv("NATS_URL", "")
 
 	// JWT config
-	configs.JWT.Secret = GetEnv("JWT_SECRET", "your-secret-key-here")
-	configs.JWT.Expiration = GetEnvAsInt("JWT_EXPIRATION", 60)
-	configs.JWT.Issuer = GetEnv("JWT_ISSUER", "nebengjek")
+	configs.JWT.Secret = GetEnv("JWT_SECRET", "")
+	configs.JWT.Expiration = GetEnvAsInt("JWT_EXPIRATION", 0)
+	configs.JWT.Issuer = GetEnv("JWT_ISSUER", "")
 
 	return configs
 }

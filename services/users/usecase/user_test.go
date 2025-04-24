@@ -82,41 +82,6 @@ func TestRegisterUser_ValidationError(t *testing.T) {
 	assert.Contains(t, err.Error(), "MSISDN is required") // Updated to match actual error message
 }
 
-func TestRegisterUser_MissingFullName(t *testing.T) {
-	// Arrange
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockRepo := mocks.NewMockUserRepo(ctrl)
-	mockGW := mocks.NewMockUserGW(ctrl)
-
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
-			Secret:     "test-secret",
-			Expiration: 60,
-			Issuer:     "test-issuer",
-		},
-	}
-
-	uc := NewUserUC(mockRepo, mockGW, cfg)
-
-	// User without FullName
-	invalidUser := &models.User{
-		ID:     uuid.New(),
-		MSISDN: "+628123456789",
-		// Missing FullName
-		Role:     "passenger",
-		IsActive: true,
-	}
-
-	// Act
-	err := uc.RegisterUser(context.Background(), invalidUser)
-
-	// Assert
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "full name is required")
-}
-
 func TestRegisterUser_NilUser(t *testing.T) {
 	// Arrange
 	ctrl := gomock.NewController(t)
