@@ -24,7 +24,7 @@ COPY . .
 # Build the application with optimizations
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/go-build-cache \
-    go build -ldflags="-s -w" -o match-service ./cmd/match/main.go
+    go build -ldflags="-s -w" -o users-service ./cmd/users/main.go
 
 # Use a smaller image for the final stage
 FROM alpine:latest
@@ -35,10 +35,10 @@ RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app
 
 # Copy the binary from builder
-COPY --from=builder /app/match-service .
+COPY --from=builder /app/users-service .
 
 # Create logs directory
 RUN mkdir -p /app/logs
 
 # Set the entrypoint
-ENTRYPOINT ["/app/match-service"]
+ENTRYPOINT ["/app/users-service"]

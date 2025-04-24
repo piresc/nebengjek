@@ -87,10 +87,6 @@ func validateUserData(user *models.User) error {
 	if user.MSISDN == "" {
 		return errors.New("MSISDN is required")
 	}
-
-	if user.FullName == "" {
-		return errors.New("full name is required")
-	}
 	return nil
 }
 

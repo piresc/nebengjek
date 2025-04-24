@@ -154,7 +154,7 @@ func findMatches(matchUsecase usecase.MatchUsecase, natsProducer *nats.Producer)
                 // Publish match found event
                 matchEvent := MatchFoundEvent{
                     MatchID:    match.ID,
-                    CustomerID: customer.ID,
+                    PassengerID: customer.ID,
                     Drivers:    drivers,
                     Timestamp:  time.Now(),
                 }
@@ -183,7 +183,7 @@ func (r *matchRepository) AddAvailableDriver(driverID string, location GeoLocati
     return err
 }
 
-func (r *matchRepository) FindNearbyDrivers(customerID string, location GeoLocation, radiusKm float64) ([]Driver, error) {
+func (r *matchRepository) FindNearbyDrivers(PassengerID string, location GeoLocation, radiusKm float64) ([]Driver, error) {
     // Find drivers within radius using GEORADIUS
     geoOptions := &redis.GeoRadiusQuery{
         Radius:      radiusKm,
@@ -248,7 +248,7 @@ func (h *MatchHandler) ConfirmMatch(c echo.Context) error {
         // Publish match confirmed event
         matchEvent := MatchConfirmedEvent{
             MatchID:    matchID,
-            CustomerID: match.CustomerID,
+            PassengerID: match.PassengerID,
             DriverID:   driverID,
             Timestamp:  time.Now(),
         }
@@ -279,7 +279,7 @@ func SetupNATSConsumers(tripUsecase usecase.TripUsecase, natsProducer *nats.Prod
         }
         
         // Create new trip
-        trip, err := tripUsecase.CreateTrip(event.MatchID, event.CustomerID, event.DriverID)
+        trip, err := tripUsecase.CreateTrip(event.MatchID, event.PassengerID, event.DriverID)
         if err != nil {
             return err
         }
@@ -288,7 +288,7 @@ func SetupNATSConsumers(tripUsecase usecase.TripUsecase, natsProducer *nats.Prod
         tripEvent := triptartEvent{
             TripID:     trip.ID,
             MatchID:    event.MatchID,
-            CustomerID: event.CustomerID,
+            PassengerID: event.PassengerID,
             DriverID:   event.DriverID,
             StartTime:  time.Now(),
         }
@@ -493,7 +493,7 @@ func (h *TripHandler) EndTrip(c echo.Context) error {
         return c.JSON(http.StatusInternalServerError, ErrorResponse{Message: err.Error()})
     }
     
-    if trip.DriverID != userID && trip.CustomerID != userID {
+    if trip.DriverID != userID && trip.PassengerID != userID {
         return c.JSON(http.StatusForbidden, ErrorResponse{Message: "Not authorized"})
     }
     
@@ -512,7 +512,7 @@ func (h *TripHandler) EndTrip(c echo.Context) error {
     // Publish trip end event
     tripEndEvent := TripEndEvent{
         TripID:           tripID,
-        CustomerID:       trip.CustomerID,
+        PassengerID:       trip.PassengerID,
         DriverID:         trip.DriverID,
         FinalCost:        finalCost,
         AdjustmentFactor: adjustmentFactor,
@@ -552,7 +552,7 @@ func SetupNATSConsumers(paymentUsecase usecase.PaymentUsecase, natsAddress strin
         // Create payment record
         payment := Payment{
             TripID:       event.TripID,
-            CustomerID:   event.CustomerID,
+            PassengerID:   event.PassengerID,
             DriverID:     event.DriverID,
             TotalAmount:  event.FinalCost,
             AdminFee:     adminFee,

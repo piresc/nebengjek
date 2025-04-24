@@ -9,18 +9,18 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	pkgws "github.com/piresc/nebengjek/internal/pkg/websocket"
-	"github.com/piresc/nebengjek/services/user"
+	"github.com/piresc/nebengjek/services/users"
 )
 
 // WebSocketManager extends the base WebSocket manager for user-specific functionality
 type WebSocketManager struct {
-	userUC  user.UserUC
+	userUC  users.UserUC
 	manager *pkgws.Manager
 }
 
 // NewWebSocketManager creates a new WebSocket manager for the user service
 func NewWebSocketManager(
-	userUC user.UserUC,
+	userUC users.UserUC,
 	manager *pkgws.Manager,
 ) *WebSocketManager {
 	return &WebSocketManager{

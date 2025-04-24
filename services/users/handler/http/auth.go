@@ -6,16 +6,16 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/internal/utils"
-	"github.com/piresc/nebengjek/services/user"
+	"github.com/piresc/nebengjek/services/users"
 )
 
 // AuthHandler handles authentication-related HTTP requests
 type AuthHandler struct {
-	userUC user.UserUC
+	userUC users.UserUC
 }
 
 // NewAuthHandler creates a new authentication handler
-func NewAuthHandler(userUC user.UserUC) *AuthHandler {
+func NewAuthHandler(userUC users.UserUC) *AuthHandler {
 	return &AuthHandler{
 		userUC: userUC,
 	}

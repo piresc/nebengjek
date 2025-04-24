@@ -2,7 +2,7 @@ package gateway
 
 import (
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
-	"github.com/piresc/nebengjek/services/user"
+	"github.com/piresc/nebengjek/services/users"
 )
 
 // UserGW handles user gateway operations
@@ -11,7 +11,7 @@ type UserGW struct {
 }
 
 // NewUserGW creates a new NATS gateway instance
-func NewUserGW(client *natspkg.Client) user.UserGW {
+func NewUserGW(client *natspkg.Client) users.UserGW {
 	return &UserGW{
 		natsClient: client,
 	}

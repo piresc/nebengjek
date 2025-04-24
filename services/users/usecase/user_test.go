@@ -8,7 +8,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/piresc/nebengjek/internal/pkg/models"
-	"github.com/piresc/nebengjek/services/user/mocks"
+	"github.com/piresc/nebengjek/services/users/mocks"
 	"github.com/stretchr/testify/assert"
 )
 

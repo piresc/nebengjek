@@ -5,7 +5,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
-	"github.com/piresc/nebengjek/services/user/handler/websocket"
+	"github.com/piresc/nebengjek/services/users/handler/websocket"
 )
 
 // Handler handles NATS events for the user service

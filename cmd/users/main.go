@@ -9,19 +9,18 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/database"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	wspkg "github.com/piresc/nebengjek/internal/pkg/websocket"
-	"github.com/piresc/nebengjek/services/user/gateway"
-	"github.com/piresc/nebengjek/services/user/handler"
-	httpHandler "github.com/piresc/nebengjek/services/user/handler/http"
-	natsHandler "github.com/piresc/nebengjek/services/user/handler/nats"
-	wsHandler "github.com/piresc/nebengjek/services/user/handler/websocket"
-	"github.com/piresc/nebengjek/services/user/repository"
-	"github.com/piresc/nebengjek/services/user/usecase"
+	"github.com/piresc/nebengjek/services/users/gateway"
+	"github.com/piresc/nebengjek/services/users/handler"
+	httpHandler "github.com/piresc/nebengjek/services/users/handler/http"
+	natsHandler "github.com/piresc/nebengjek/services/users/handler/nats"
+	wsHandler "github.com/piresc/nebengjek/services/users/handler/websocket"
+	"github.com/piresc/nebengjek/services/users/repository"
+	"github.com/piresc/nebengjek/services/users/usecase"
 )
 
 func main() {
-	appName := "user-service"
-	envPath := "./cmd/user/.env"
-	configs := config.InitConfig(envPath)
+	appName := "users-service"
+	configs := config.InitConfig()
 
 	// Initialize PostgreSQL database connection
 	postgresClient, err := database.NewPostgresClient(configs.Database)

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # API Gateway with Nginx
   api-gateway:
@@ -13,7 +11,7 @@ services:
       - ./infrastructure/ssl:/etc/nginx/ssl:ro
       - ./infrastructure/jwt:/etc/nginx/jwt:ro
     depends_on:
-      - user-service
+      - users-service
       - location-service
       - match-service
       - rides-service
@@ -21,11 +19,6 @@ services:
       - frontend
       - backend
     restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "5"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/health"]
       interval: 30s
@@ -33,29 +26,16 @@ services:
       retries: 3
       start_period: 30s
 
-  # User Service
-  user-service:
+  # Users Service
+  users-service:
     build:
       context: .
-      dockerfile: ./cmd/user/Dockerfile
-    container_name: nebengjek-user-service
+      dockerfile: ./cmd/users/Dockerfile
+    container_name: nebengjek-users-service
     ports:
-      - "9995:9995"  # HTTP API
-      - "9997:9997"  # WebSocket
-    environment:
-      - DB_HOST=postgres
-      - DB_USER=postgres
-      - DB_PASSWORD=${DB_PASSWORD:-postgres}
-      - DB_NAME=nebengjek_user
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - NATS_URL=nats://nats:4222
-      - JWT_SECRET=${JWT_SECRET:-nebengjek_secret_key}
-      - JWT_EXPIRY=24h
-      - API_KEY=${API_KEY:-nebengjek_api_key}
-      - LOG_LEVEL=info
-      - PORT=9995
-      - WS_PORT=9997
+      - "9990:9990"
+    env_file:
+      - ./cmd/users/.env
     volumes:
       - ./logs:/app/logs
     depends_on:
@@ -65,13 +45,8 @@ services:
     networks:
       - backend
     restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "5"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9995/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9990/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -84,18 +59,9 @@ services:
       dockerfile: ./cmd/location/Dockerfile
     container_name: nebengjek-location-service
     ports:
-      - "9998:9998"
-    environment:
-      - DB_HOST=postgres
-      - DB_USER=postgres
-      - DB_PASSWORD=${DB_PASSWORD:-postgres}
-      - DB_NAME=nebengjek_location
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - NATS_URL=nats://nats:4222
-      - API_KEY=${API_KEY:-nebengjek_api_key}
-      - LOG_LEVEL=info
-      - PORT=9998
+      - "9994:9994"
+    env_file:
+      - ./cmd/location/.env
     volumes:
       - ./logs:/app/logs
     depends_on:
@@ -105,13 +71,8 @@ services:
     networks:
       - backend
     restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "5"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9998/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9994/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -124,20 +85,9 @@ services:
       dockerfile: ./cmd/match/Dockerfile
     container_name: nebengjek-match-service
     ports:
-      - "10000:10000"
-    environment:
-      - DB_HOST=postgres
-      - DB_USER=postgres
-      - DB_PASSWORD=${DB_PASSWORD:-postgres}
-      - DB_NAME=nebengjek_match
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - NATS_URL=nats://nats:4222
-      - API_KEY=${API_KEY:-nebengjek_api_key}
-      - LOG_LEVEL=info
-      - PORT=10000
-      - MATCH_RADIUS=5000  # Match radius in meters
-      - MATCH_TIMEOUT=30   # Match timeout in seconds
+      - "9993:9993"
+    env_file:
+      - ./cmd/match/.env
     volumes:
       - ./logs:/app/logs
     depends_on:
@@ -147,13 +97,8 @@ services:
     networks:
       - backend
     restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "5"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:10000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9993/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -166,33 +111,20 @@ services:
       dockerfile: ./cmd/rides/Dockerfile
     container_name: nebengjek-rides-service
     ports:
-      - "10002:10002"
-    environment:
-      - DB_HOST=postgres
-      - DB_USER=postgres
-      - DB_PASSWORD=${DB_PASSWORD:-postgres}
-      - DB_NAME=nebengjek_rides
-      - NATS_URL=nats://nats:4222
-      - API_KEY=${API_KEY:-nebengjek_api_key}
-      - LOG_LEVEL=info
-      - PORT=10002
-      - FARE_RATE=3000       # Rate in IDR per km
-      - ADMIN_FEE_PERCENT=5  # Admin fee percentage
+      - "9992:9992"
+    env_file:
+      - ./cmd/rides/.env
     volumes:
       - ./logs:/app/logs
     depends_on:
       - postgres
+      - redis
       - nats
     networks:
       - backend
     restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "5"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:10002/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9992/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -200,14 +132,15 @@ services:
 
   # PostgreSQL - Main Database
   postgres:
-    image: postgis/postgis:15-3.3
+    image: postgres:14-alpine
     container_name: nebengjek-postgres
+    command: postgres -c 'max_connections=500'
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
-      - POSTGRES_USER=postgres
-      - POSTGRES_DB=postgres
+     POSTGRES_DB: nebengjek
+     POSTGRES_USER: nebengjek-username
+     POSTGRES_PASSWORD: nebengjek-password
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/migrations:/docker-entrypoint-initdb.d
@@ -215,41 +148,11 @@ services:
       - backend
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U nebengjek-username -d nebengjek"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
-    command: 
-      - "postgres"
-      - "-c"
-      - "max_connections=200"
-      - "-c"
-      - "shared_buffers=256MB"
-      - "-c"
-      - "effective_cache_size=1GB"
-      - "-c"
-      - "work_mem=16MB"
-      - "-c"
-      - "maintenance_work_mem=128MB"
-      - "-c"
-      - "random_page_cost=1.1"
-      - "-c"
-      - "temp_file_limit=10GB"
-      - "-c"
-      - "log_min_duration_statement=200ms"
-      - "-c"
-      - "idle_in_transaction_session_timeout=10s"
-      - "-c"
-      - "lock_timeout=1s"
-      - "-c"
-      - "statement_timeout=60s"
-      - "-c"
-      - "shared_preload_libraries=pg_stat_statements"
-      - "-c"
-      - "pg_stat_statements.max=10000"
-      - "-c"
-      - "pg_stat_statements.track=all"
 
   # Redis - For caching and geo-spatial indexing
   redis:
@@ -257,91 +160,47 @@ services:
     container_name: nebengjek-redis
     ports:
       - "6379:6379"
+    command: ["redis-server", "--requirepass", "redispassword"]
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=redispassword
+      - REDIS_DB=0
+      - REDIS_POOL_SIZE=10
     volumes:
-      - ./infrastructure/redis.conf:/usr/local/etc/redis/redis.conf:ro
       - redis_data:/data
     networks:
       - backend
     restart: unless-stopped
-    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "redispassword", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
 
-  # NATS - Message broker for service communications
+  # NATS message broker
   nats:
-    image: nats:2.9-alpine
+    image: nats:latest
     container_name: nebengjek-nats
     ports:
-      - "4222:4222"  # Client connections
-      - "8222:8222"  # HTTP monitoring
-    volumes:
-      - ./infrastructure/nats-config.conf:/etc/nats/nats-config.conf:ro
-      - nats_data:/data
-    networks:
-      - backend
-    restart: unless-stopped
-    command: ["-c", "/etc/nats/nats-config.conf"]
+      - "4222:4222"
+      - "8222:8222"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8222/varz"]
-      interval: 10s
+      test: ["CMD", "curl", "-f", "http://localhost:8222/healthz"]
+      interval: 5s
       timeout: 5s
       retries: 5
-      start_period: 30s
-
-  # Prometheus - Monitoring
-  prometheus:
-    image: prom/prometheus:v2.42.0
-    container_name: nebengjek-prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./infrastructure/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
     networks:
-      - monitoring
       - backend
-    restart: unless-stopped
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-      - '--web.console.templates=/usr/share/prometheus/consoles'
-
-  # Grafana - Visualization for monitoring
-  grafana:
-    image: grafana/grafana:9.4.7
-    container_name: nebengjek-grafana
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
-      - GF_USERS_ALLOW_SIGN_UP=false
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning
-      - ./infrastructure/grafana/dashboards:/var/lib/grafana/dashboards
-    networks:
-      - monitoring
-    restart: unless-stopped
-    depends_on:
-      - prometheus
 
 volumes:
   postgres_data:
   redis_data:
   nats_data:
-  prometheus_data:
-  grafana_data:
 
 networks:
   frontend:
     driver: bridge
   backend:
-    driver: bridge
-  monitoring:
     driver: bridge

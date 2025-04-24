@@ -4,9 +4,9 @@ import (
 	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/models"
-	"github.com/piresc/nebengjek/services/user/handler/http"
-	"github.com/piresc/nebengjek/services/user/handler/nats"
-	"github.com/piresc/nebengjek/services/user/handler/websocket"
+	"github.com/piresc/nebengjek/services/users/handler/http"
+	"github.com/piresc/nebengjek/services/users/handler/nats"
+	"github.com/piresc/nebengjek/services/users/handler/websocket"
 )
 
 // Handler coordinates all protocol handlers for the user service

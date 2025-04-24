@@ -16,8 +16,7 @@ import (
 
 func main() {
 	appName := "location-service"
-	envPath := "./cmd/location/.env"
-	configs := config.InitConfig(envPath)
+	configs := config.InitConfig()
 
 	// Initialize Redis client
 	redisClient, err := database.NewRedisClient(configs.Redis)

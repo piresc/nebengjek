@@ -6,17 +6,17 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/internal/utils"
-	"github.com/piresc/nebengjek/services/user"
+	"github.com/piresc/nebengjek/services/users"
 )
 
 // UserHandler handles HTTP requests for user operations
 type UserHandler struct {
-	userUC user.UserUC
+	userUC users.UserUC
 }
 
 // NewUserHandler creates a new user handler
 func NewUserHandler(
-	userUC user.UserUC,
+	userUC users.UserUC,
 ) *UserHandler {
 	return &UserHandler{
 		userUC: userUC,

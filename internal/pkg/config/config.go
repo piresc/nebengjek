@@ -5,17 +5,10 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/joho/godotenv"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
-func InitConfig(envPath string) *models.Config {
-	// Load .env file if it exists
-	err := godotenv.Load(envPath)
-	if err != nil {
-		log.Println("Warning: .env file not found, using environment variables")
-	}
-
+func InitConfig() *models.Config {
 	// Create config from environment variables
 	return loadConfigFromEnv()
 }
@@ -31,7 +24,7 @@ func loadConfigFromEnv() *models.Config {
 
 	// Server config
 	configs.Server.Host = GetEnv("SERVER_HOST", "0.0.0.0")
-	configs.Server.Port = GetEnvAsInt("SERVER_PORT", 8080)
+	configs.Server.Port = GetEnvAsInt("SERVER_PORT", 9990)
 	configs.Server.GRPCPort = GetEnvAsInt("SERVER_GRPC_PORT", 9090)
 	configs.Server.ReadTimeout = GetEnvAsInt("SERVER_READ_TIMEOUT", 60)
 	configs.Server.WriteTimeout = GetEnvAsInt("SERVER_WRITE_TIMEOUT", 60)
@@ -41,8 +34,8 @@ func loadConfigFromEnv() *models.Config {
 	configs.Database.Driver = GetEnv("DB_DRIVER", "postgres")
 	configs.Database.Host = GetEnv("DB_HOST", "localhost")
 	configs.Database.Port = GetEnvAsInt("DB_PORT", 5432)
-	configs.Database.Username = GetEnv("DB_USERNAME", "postgres")
-	configs.Database.Password = GetEnv("DB_PASSWORD", "postgres")
+	configs.Database.Username = GetEnv("DB_USERNAME", "nebengjek-username")
+	configs.Database.Password = GetEnv("DB_PASSWORD", "nebengjek-password")
 	configs.Database.Database = GetEnv("DB_DATABASE", "nebengjek")
 	configs.Database.SSLMode = GetEnv("DB_SSL_MODE", "disable")
 	configs.Database.MaxConns = GetEnvAsInt("DB_MAX_CONNS", 100)
@@ -51,7 +44,7 @@ func loadConfigFromEnv() *models.Config {
 	// Redis config
 	configs.Redis.Host = GetEnv("REDIS_HOST", "localhost")
 	configs.Redis.Port = GetEnvAsInt("REDIS_PORT", 6379)
-	configs.Redis.Password = GetEnv("REDIS_PASSWORD", "")
+	configs.Redis.Password = GetEnv("REDIS_PASSWORD", "redispassword")
 	configs.Redis.DB = GetEnvAsInt("REDIS_DB", 0)
 	configs.Redis.PoolSize = GetEnvAsInt("REDIS_POOL_SIZE", 10)
 
