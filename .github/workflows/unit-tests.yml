@@ -6,6 +6,11 @@ on:
   push:
     branches: [ master ]
 
+# Add permissions needed to comment on PRs
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   test:
     name: Run Unit Tests
@@ -32,6 +37,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch all history to enable comparison with master
 
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -42,8 +49,8 @@ jobs:
       - name: Install dependencies
         run: go mod download
           
-      # Create a temporary test file to modify the hardcoded NATS URLs
-      - name: Create test wrapper
+      # Create a test wrapper that modifies the NATS URLs and handles embedded test server conflicts
+      - name: Create test wrapper for PR branch
         run: |
           cat > test_wrapper.sh << 'EOF'
           #!/bin/bash
@@ -54,7 +61,13 @@ jobs:
             sed -i 's|var testNatsURL = "nats://127.0.0.1:8369"|var testNatsURL = "nats://localhost:4222"|g' "$file"
           done
 
-          # Run the tests
+          # Temporarily disable embedded NATS servers in TestMain functions to use external NATS container
+          find . -name "*_test.go" -type f -exec grep -l "nats-server/test" {} \; | while read file; do
+            sed -i 's|testNatsServer := natsserver.RunServer(&opts)|// Disabled embedded NATS server to avoid port conflicts in CI\n\t// testNatsServer := natsserver.RunServer(&opts)|g' "$file"
+            sed -i 's|testNatsServer.Shutdown()|// testNatsServer.Shutdown()|g' "$file"
+          done
+
+          # Run the tests with coverage
           go test ./... -race -coverprofile=coverage.txt -covermode=atomic
           EOF
           
@@ -62,9 +75,136 @@ jobs:
 
       - name: Run tests with coverage
         run: ./test_wrapper.sh
-        
-      - name: Upload coverage report
-        uses: codecov/codecov-action@v3
+
+      # Get current branch coverage
+      - name: Generate coverage report for current branch
+        run: |
+          go tool cover -func=coverage.txt > coverage_report.txt
+          total_coverage=$(grep -E "^total:" coverage_report.txt | awk '{print $3}')
+          echo "CURRENT_BRANCH_COVERAGE=$total_coverage" >> $GITHUB_ENV
+          echo "Current branch coverage: $total_coverage"
+          
+          # Save PR branch files for later comparison
+          mkdir -p /tmp/pr_branch
+          cp coverage.txt coverage_report.txt /tmp/pr_branch/
+      
+      # Only run the following steps for PR events
+      - name: Checkout master branch for coverage comparison
+        if: github.event_name == 'pull_request'
+        run: |
+          # Save current branch name to return to it later
+          echo "PR_BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
+          
+          # Clean the workspace completely before checking out master
+          git clean -fdx
+          git reset --hard
+          
+          # Fetch and checkout master
+          git fetch origin master
+          git checkout origin/master
+
+      - name: Run tests on master branch
+        if: github.event_name == 'pull_request'
+        run: |
+          # Re-install dependencies in clean workspace
+          go mod download
+          
+          # Use the same test wrapper to fix NATS URLs and TestMain conflicts
+          ./test_wrapper.sh
+          
+          # Generate coverage report for master
+          go tool cover -func=coverage.txt > master_coverage_report.txt
+          master_total_coverage=$(grep -E "^total:" master_coverage_report.txt | awk '{print $3}')
+          echo "MASTER_BRANCH_COVERAGE=$master_total_coverage" >> $GITHUB_ENV
+          echo "Master branch coverage: $master_total_coverage"
+          
+          # Save master files for later comparison
+          mkdir -p /tmp/master_branch
+          cp coverage.txt master_coverage_report.txt /tmp/master_branch/
+          
+          # Return to PR branch for remaining steps
+          git clean -fdx
+          git reset --hard
+          git checkout $PR_BRANCH
+
+      # Restore PR branch coverage files
+      - name: Restore PR branch coverage files
+        if: github.event_name == 'pull_request'
+        run: |
+          cp /tmp/pr_branch/coverage.txt ./coverage.txt
+          cp /tmp/pr_branch/coverage_report.txt ./coverage_report.txt
+
+      # Generate a comment for PR with both branch coverages
+      - name: Generate coverage comment for PR
+        if: github.event_name == 'pull_request'
+        run: |
+          # Calculate coverage difference
+          pr_coverage=${CURRENT_BRANCH_COVERAGE%\%}
+          master_coverage=${MASTER_BRANCH_COVERAGE%\%}
+          
+          # Use bc for floating point calculation
+          coverage_diff=$(echo "$pr_coverage - $master_coverage" | bc)
+          
+          # Add plus sign for positive differences
+          if (( $(echo "$coverage_diff > 0" | bc -l) )); then
+            coverage_diff="+$coverage_diff"
+          fi
+          
+          # Generate the PR comment with current branch and master coverage
+          cat > coverage_comment.md << EOF
+          ## Code Coverage Report
+
+          | Branch | Coverage | Difference |
+          | ------ | -------- | ---------- |
+          | PR Branch | $CURRENT_BRANCH_COVERAGE | - |
+          | Master | $MASTER_BRANCH_COVERAGE | $coverage_diff% |
+
+          <details>
+          <summary>Detailed coverage report</summary>
+
+          \`\`\`
+          $(cat coverage_report.txt)
+          \`\`\`
+
+          </details>
+          EOF
+
+      # Post comment to PR
+      - name: Post coverage comment to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
         with:
-          file: ./coverage.txt
-          fail_ci_if_error: false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const comment = fs.readFileSync('coverage_comment.md', 'utf8');
+            const issue_number = context.issue.number;
+            
+            // Check if we already posted a coverage comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue_number
+            });
+            
+            const botComment = comments.find(comment => {
+              return comment.user.type === 'Bot' && comment.body.includes('Code Coverage Report');
+            });
+            
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue_number,
+                body: comment
+              });
+            }
