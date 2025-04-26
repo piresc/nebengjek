@@ -86,7 +86,7 @@ jobs:
           
           # Save PR branch files for later comparison
           mkdir -p /tmp/pr_branch
-          cp coverage.txt coverage_report.txt /tmp/pr_branch/
+          cp coverage.txt coverage_report.txt test_wrapper.sh /tmp/pr_branch/
       
       # Only run the following steps for PR events
       - name: Checkout master branch for coverage comparison
@@ -109,7 +109,11 @@ jobs:
           # Re-install dependencies in clean workspace
           go mod download
           
-          # Use the same test wrapper to fix NATS URLs and TestMain conflicts
+          # Copy the test wrapper script back from the saved location
+          cp /tmp/pr_branch/test_wrapper.sh .
+          chmod +x test_wrapper.sh
+          
+          # Use the test wrapper to fix NATS URLs and TestMain conflicts
           ./test_wrapper.sh
           
           # Generate coverage report for master
