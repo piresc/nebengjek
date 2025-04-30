@@ -1,9 +1,7 @@
 services:
   # Users Service
   users-service:
-    build:
-      context: .
-      dockerfile: ./cmd/users/Dockerfile
+    image: piresc16/nebengjek-users:${VERSION:-latest}
     container_name: nebengjek-users-service
     ports:
       - "9990:9990"
@@ -12,9 +10,12 @@ services:
     volumes:
       - ./logs:/app/logs
     depends_on:
-      - postgres
-      - redis
-      - nats
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
     networks:
       - backend
     restart: unless-stopped
@@ -27,9 +28,7 @@ services:
 
   # Location Service
   location-service:
-    build:
-      context: .
-      dockerfile: ./cmd/location/Dockerfile
+    image: piresc16/nebengjek-location:${VERSION:-latest}
     container_name: nebengjek-location-service
     ports:
       - "9994:9994"
@@ -38,9 +37,12 @@ services:
     volumes:
       - ./logs:/app/logs
     depends_on:
-      - postgres
-      - redis
-      - nats
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
     networks:
       - backend
     restart: unless-stopped
@@ -53,9 +55,7 @@ services:
 
   # Match Service
   match-service:
-    build:
-      context: .
-      dockerfile: ./cmd/match/Dockerfile
+    image: piresc16/nebengjek-match:${VERSION:-latest}
     container_name: nebengjek-match-service
     ports:
       - "9993:9993"
@@ -64,9 +64,12 @@ services:
     volumes:
       - ./logs:/app/logs
     depends_on:
-      - postgres
-      - redis
-      - nats
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
     networks:
       - backend
     restart: unless-stopped
@@ -79,9 +82,7 @@ services:
 
   # Rides Service
   rides-service:
-    build:
-      context: .
-      dockerfile: ./cmd/rides/Dockerfile
+    image: piresc16/nebengjek-rides:${VERSION:-latest}
     container_name: nebengjek-rides-service
     ports:
       - "9992:9992"
@@ -90,9 +91,12 @@ services:
     volumes:
       - ./logs:/app/logs
     depends_on:
-      - postgres
-      - redis
-      - nats
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
     networks:
       - backend
     restart: unless-stopped
