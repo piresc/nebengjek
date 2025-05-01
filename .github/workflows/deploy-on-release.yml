@@ -113,6 +113,10 @@ jobs:
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
         
+      - name: Set build timestamp
+        id: build_timestamp
+        run: echo "BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+        
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
@@ -125,6 +129,10 @@ jobs:
           context: .
           file: ./cmd/users/Dockerfile
           push: true
+          build-args: |
+            VERSION=${{ steps.get_version.outputs.VERSION }}
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ steps.build_timestamp.outputs.BUILD_TIME }}
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/nebengjek-users:latest
             ${{ secrets.DOCKER_USERNAME }}/nebengjek-users:${{ steps.get_version.outputs.VERSION }}
@@ -135,6 +143,10 @@ jobs:
           context: .
           file: ./cmd/location/Dockerfile
           push: true
+          build-args: |
+            VERSION=${{ steps.get_version.outputs.VERSION }}
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ steps.build_timestamp.outputs.BUILD_TIME }}
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/nebengjek-location:latest
             ${{ secrets.DOCKER_USERNAME }}/nebengjek-location:${{ steps.get_version.outputs.VERSION }}
@@ -145,6 +157,10 @@ jobs:
           context: .
           file: ./cmd/match/Dockerfile
           push: true
+          build-args: |
+            VERSION=${{ steps.get_version.outputs.VERSION }}
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ steps.build_timestamp.outputs.BUILD_TIME }}
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/nebengjek-match:latest
             ${{ secrets.DOCKER_USERNAME }}/nebengjek-match:${{ steps.get_version.outputs.VERSION }}
@@ -155,6 +171,10 @@ jobs:
           context: .
           file: ./cmd/rides/Dockerfile
           push: true
+          build-args: |
+            VERSION=${{ steps.get_version.outputs.VERSION }}
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ steps.build_timestamp.outputs.BUILD_TIME }}
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/nebengjek-rides:latest
             ${{ secrets.DOCKER_USERNAME }}/nebengjek-rides:${{ steps.get_version.outputs.VERSION }}
@@ -171,12 +191,19 @@ jobs:
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
         
+      - name: Set build timestamp
+        id: build_timestamp
+        run: echo "BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+        
       - name: Deploy to EC2
         env:
           PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           HOST: ${{ secrets.EC2_HOST }}
           USER: ${{ secrets.EC2_USERNAME }}
           VERSION: ${{ steps.get_version.outputs.VERSION }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          GIT_COMMIT: ${{ github.sha }}
+          BUILD_TIME: ${{ steps.build_timestamp.outputs.BUILD_TIME }}
         run: |
           # Setup SSH key
           echo "$PRIVATE_KEY" > github-ec2.pem 
@@ -191,14 +218,18 @@ jobs:
           # Copy docker-compose file
           scp -o StrictHostKeyChecking=no -i github-ec2.pem docker-compose.yml ${USER}@${HOST}:~/nebengjek/
           
-          # Deploy services using docker-compose
+          # Deploy services using docker-compose with build info
           ssh -o StrictHostKeyChecking=no -i github-ec2.pem ${USER}@${HOST} "cd ~/nebengjek && \
             echo 'Pulling latest Docker images...' && \
-            docker-compose pull && \
+            DOCKER_USERNAME=${DOCKER_USERNAME} VERSION=${VERSION} docker-compose pull && \
             echo 'Stopping existing services...' && \
             docker-compose down && \
             echo 'Starting services with new version...' && \
-            VERSION=${VERSION} docker-compose up -d && \
+            DOCKER_USERNAME=${DOCKER_USERNAME} \
+            VERSION=${VERSION} \
+            GIT_COMMIT=${GIT_COMMIT} \
+            BUILD_TIME=${BUILD_TIME} \
+            docker-compose up -d && \
             echo 'Deployment completed successfully!'"
           
       - name: Verify Deployment

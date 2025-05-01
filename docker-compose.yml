@@ -1,10 +1,14 @@
 services:
   # Users Service
   users-service:
-    image: ${DOCKER_USERNAME:-piresc16}/nebengjek-users:${VERSION:-latest}
+    image: ${DOCKER_USERNAME:-piresc16}/nebengjek-users:latest
     container_name: nebengjek-users-service
     ports:
       - "9990:9990"
+    environment:
+      - VERSION=${VERSION:-latest}
+      - GIT_COMMIT=${GIT_COMMIT:-unknown}
+      - BUILD_TIME=${BUILD_TIME:-unknown}
     env_file:
       - ./cmd/users/.env
     volumes:
@@ -28,10 +32,14 @@ services:
 
   # Location Service
   location-service:
-    image: ${DOCKER_USERNAME:-piresc16}/nebengjek-location:${VERSION:-latest}
+    image: ${DOCKER_USERNAME:-piresc16}/nebengjek-location:latest
     container_name: nebengjek-location-service
     ports:
       - "9994:9994"
+    environment:
+      - VERSION=${VERSION:-latest}
+      - GIT_COMMIT=${GIT_COMMIT:-unknown}
+      - BUILD_TIME=${BUILD_TIME:-unknown}
     env_file:
       - ./cmd/location/.env
     volumes:
@@ -55,10 +63,14 @@ services:
 
   # Match Service
   match-service:
-    image: ${DOCKER_USERNAME:-piresc16}/nebengjek-match:${VERSION:-latest}
+    image: ${DOCKER_USERNAME:-piresc16}/nebengjek-match:latest
     container_name: nebengjek-match-service
     ports:
       - "9993:9993"
+    environment:
+      - VERSION=${VERSION:-latest}
+      - GIT_COMMIT=${GIT_COMMIT:-unknown}
+      - BUILD_TIME=${BUILD_TIME:-unknown}
     env_file:
       - ./cmd/match/.env
     volumes:
@@ -82,10 +94,14 @@ services:
 
   # Rides Service
   rides-service:
-    image: ${DOCKER_USERNAME:-piresc16}/nebengjek-rides:${VERSION:-latest}
+    image: ${DOCKER_USERNAME:-piresc16}/nebengjek-rides:latest
     container_name: nebengjek-rides-service
     ports:
       - "9992:9992"
+    environment:
+      - VERSION=${VERSION:-latest}
+      - GIT_COMMIT=${GIT_COMMIT:-unknown}
+      - BUILD_TIME=${BUILD_TIME:-unknown}
     env_file:
       - ./cmd/rides/.env
     volumes:
