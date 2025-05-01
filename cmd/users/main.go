@@ -7,6 +7,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/config"
 	"github.com/piresc/nebengjek/internal/pkg/database"
+	"github.com/piresc/nebengjek/internal/pkg/health"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	wspkg "github.com/piresc/nebengjek/internal/pkg/websocket"
 	"github.com/piresc/nebengjek/services/users/gateway"
@@ -73,6 +74,11 @@ func main() {
 
 	// Initialize Echo router
 	e := echo.New()
+	
+	// Register health endpoints
+	health.RegisterHealthEndpoints(e, appName)
+	
+	// Register service routes
 	Handler.RegisterRoutes(e)
 
 	// Start server

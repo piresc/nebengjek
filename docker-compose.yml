@@ -1,7 +1,7 @@
 services:
   # Users Service
   users-service:
-    image: piresc16/nebengjek-users:${VERSION:-latest}
+    image: ${DOCKER_USERNAME:-piresc16}/nebengjek-users:${VERSION:-latest}
     container_name: nebengjek-users-service
     ports:
       - "9990:9990"
@@ -20,7 +20,7 @@ services:
       - backend
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9990/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9990/ping"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -28,7 +28,7 @@ services:
 
   # Location Service
   location-service:
-    image: piresc16/nebengjek-location:${VERSION:-latest}
+    image: ${DOCKER_USERNAME:-piresc16}/nebengjek-location:${VERSION:-latest}
     container_name: nebengjek-location-service
     ports:
       - "9994:9994"
@@ -47,7 +47,7 @@ services:
       - backend
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9994/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9994/ping"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -55,7 +55,7 @@ services:
 
   # Match Service
   match-service:
-    image: piresc16/nebengjek-match:${VERSION:-latest}
+    image: ${DOCKER_USERNAME:-piresc16}/nebengjek-match:${VERSION:-latest}
     container_name: nebengjek-match-service
     ports:
       - "9993:9993"
@@ -74,7 +74,7 @@ services:
       - backend
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9993/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9993/ping"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -82,7 +82,7 @@ services:
 
   # Rides Service
   rides-service:
-    image: piresc16/nebengjek-rides:${VERSION:-latest}
+    image: ${DOCKER_USERNAME:-piresc16}/nebengjek-rides:${VERSION:-latest}
     container_name: nebengjek-rides-service
     ports:
       - "9992:9992"
@@ -101,7 +101,7 @@ services:
       - backend
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9992/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9992/ping"]
       interval: 30s
       timeout: 10s
       retries: 3

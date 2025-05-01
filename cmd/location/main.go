@@ -7,6 +7,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/config"
 	"github.com/piresc/nebengjek/internal/pkg/database"
+	"github.com/piresc/nebengjek/internal/pkg/health"
 	"github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/location/gateway"
 	"github.com/piresc/nebengjek/services/location/handler"
@@ -51,6 +52,9 @@ func main() {
 
 	// Initialize Echo router
 	e := echo.New()
+	
+	// Register health endpoints
+	health.RegisterHealthEndpoints(e, appName)
 
 	// Start server
 	log.Printf("Starting %s on port %d", appName, configs.Server.Port)

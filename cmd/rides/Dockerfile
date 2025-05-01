@@ -9,6 +9,11 @@ ENV CGO_ENABLED=0 \
     GOARCH=amd64 \
     GOCACHE=/go-build-cache
 
+# Set version argument with default
+ARG VERSION=development
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
+
 WORKDIR /app
 
 # Copy go mod and sum files
@@ -24,7 +29,11 @@ COPY . .
 # Build the application with optimizations
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/go-build-cache \
-    go build -ldflags="-s -w" -o rides-service ./cmd/rides/main.go
+    go build -ldflags="-s -w \
+    -X main.Version=${VERSION} \
+    -X main.GitCommit=${GIT_COMMIT} \
+    -X main.BuildTime=${BUILD_TIME}" \
+    -o rides-service ./cmd/rides/main.go
 
 # Use a smaller image for the final stage
 FROM alpine:latest
@@ -39,6 +48,11 @@ COPY --from=builder /app/rides-service .
 
 # Create logs directory
 RUN mkdir -p /app/logs
+
+# Set build info environment variables
+ENV VERSION=${VERSION} \
+    GIT_COMMIT=${GIT_COMMIT} \
+    BUILD_TIME=${BUILD_TIME}
 
 # Set the entrypoint
 ENTRYPOINT ["/app/rides-service"]

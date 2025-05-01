@@ -5,9 +5,28 @@ on:
     types: [published]
 
 jobs:
-  build-and-test:
-    name: Build and Test
+  unit-tests:
+    name: Run Unit Tests
     runs-on: ubuntu-latest
+    
+    services:
+      # Setup Redis service container for location and match service tests
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          
+      # Setup NATS service container for messaging tests
+      nats:
+        image: nats:2.9.15
+        ports:
+          - 4222:4222
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -20,7 +39,50 @@ jobs:
 
       - name: Install dependencies
         run: go mod download
+          
+      # Create a test wrapper that modifies the NATS URLs and handles embedded test server conflicts
+      - name: Create test wrapper
+        run: |
+          cat > test_wrapper.sh << 'EOF'
+          #!/bin/bash
+          set -e
 
+          # Replace hardcoded NATS URLs in test files
+          find . -name "*_test.go" -type f -exec grep -l "testNatsURL" {} \; | while read file; do
+            sed -i 's|var testNatsURL = "nats://127.0.0.1:8369"|var testNatsURL = "nats://localhost:4222"|g' "$file"
+          done
+
+          # Temporarily disable embedded NATS servers in TestMain functions to use external NATS container
+          find . -name "*_test.go" -type f -exec grep -l "nats-server/test" {} \; | while read file; do
+            sed -i 's|testNatsServer := natsserver.RunServer(&opts)|// Disabled embedded NATS server to avoid port conflicts in CI\n\t// testNatsServer := natsserver.RunServer(&opts)|g' "$file"
+            sed -i 's|testNatsServer.Shutdown()|// testNatsServer.Shutdown()|g' "$file"
+          done
+
+          # Run the tests with coverage
+          go test ./... -race -coverprofile=coverage.txt -covermode=atomic
+          EOF
+          
+          chmod +x test_wrapper.sh
+
+      - name: Run tests
+        run: ./test_wrapper.sh
+        
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Install dependencies
+        run: go mod download
 
       - name: Build services
         run: |

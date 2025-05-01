@@ -7,6 +7,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/config"
 	"github.com/piresc/nebengjek/internal/pkg/database"
+	"github.com/piresc/nebengjek/internal/pkg/health"
 	"github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/match/gateway"
 	"github.com/piresc/nebengjek/services/match/handler"
@@ -31,6 +32,7 @@ func main() {
 		log.Fatalf("Failed to connect to Redis: %v", err)
 	}
 	defer redisClient.Close()
+
 	// Initialize NATS
 	natsClient, err := nats.NewClient(configs.NATS.URL)
 	if err != nil {
@@ -38,11 +40,13 @@ func main() {
 	}
 	defer natsClient.Close()
 
-	// Initialize repositories
+	// Initialize repository
 	matchRepo := repository.NewMatchRepository(configs, postgresClient.GetDB(), redisClient)
-	// Initialize gateways
+
+	// Initialize gateway
 	matchGW := gateway.NewMatchGW(natsClient)
-	// Initialize use case
+
+	// Initialize usecase
 	matchUC := usecase.NewMatchUC(matchRepo, matchGW)
 
 	// Initialize Echo router and handler
@@ -52,8 +56,12 @@ func main() {
 	if err := matchHandler.InitNATSConsumers(); err != nil {
 		log.Fatalf("Failed to initialize NATS consumers: %v", err)
 	}
+
 	// Initialize Echo server
 	e := echo.New()
+
+	// Register health endpoints
+	health.RegisterHealthEndpoints(e, appName)
 
 	// Start server
 	log.Printf("Starting %s on port %d", appName, configs.Server.Port)
