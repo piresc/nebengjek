@@ -46,6 +46,12 @@ func (r *RedisClient) Set(ctx context.Context, key string, value interface{}, ex
 	return r.Client.Set(ctx, key, value, expiration).Err()
 }
 
+// SetNX sets value if key doesn't exist (Set if Not eXists)
+// Returns true if key was set, false if key already exists
+func (r *RedisClient) SetNX(ctx context.Context, key string, value interface{}, expiration time.Duration) (bool, error) {
+	return r.Client.SetNX(ctx, key, value, expiration).Result()
+}
+
 // Get retrieves a value by key
 func (r *RedisClient) Get(ctx context.Context, key string) (string, error) {
 	return r.Client.Get(ctx, key).Result()
@@ -82,8 +88,14 @@ func (r *RedisClient) GeoRadius(ctx context.Context, key string, longitude, lati
 }
 
 // SAdd adds members to a set
+// Only adds elements that don't already exist in the set
 func (r *RedisClient) SAdd(ctx context.Context, key string, members ...interface{}) error {
 	return r.Client.SAdd(ctx, key, members...).Err()
+}
+
+// SIsMember checks if a value is a member of a set
+func (r *RedisClient) SIsMember(ctx context.Context, key string, member interface{}) (bool, error) {
+	return r.Client.SIsMember(ctx, key, member).Result()
 }
 
 // SRem removes members from a set

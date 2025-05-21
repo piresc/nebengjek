@@ -5,10 +5,19 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/joho/godotenv"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
-func InitConfig() *models.Config {
+func InitConfig(configPath string) *models.Config {
+	local := GetEnv("APP_ENV", "local")
+	if local == "local" {
+		// Load config from file
+		err := godotenv.Load(configPath)
+		if err != nil {
+			log.Println("error loading config from file", err)
+		}
+	}
 	// Create config from environment variables
 	return loadConfigFromEnv()
 }

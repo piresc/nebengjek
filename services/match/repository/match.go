@@ -159,19 +159,20 @@ func (r *MatchRepo) UpdateMatchStatus(ctx context.Context, matchID string, statu
 
 // AddAvailableDriver adds a driver to the available drivers geo set
 func (r *MatchRepo) AddAvailableDriver(ctx context.Context, driverID string, location *models.Location) error {
-	// Store in geo set
+	// Store in geo set (always update location)
 	err := r.redisClient.GeoAdd(ctx, constants.KeyDriverGeo, location.Longitude, location.Latitude, driverID)
 	if err != nil {
-		return fmt.Errorf("failed to add driver location: %w", err)
+		return fmt.Errorf("failed to add/update driver location: %w", err)
 	}
 
-	// Add to available drivers set
+	// Add to available drivers set (if not already there)
+	// Redis SADD command only adds elements that don't already exist in the set
 	err = r.redisClient.SAdd(ctx, constants.KeyAvailableDrivers, driverID)
 	if err != nil {
 		return fmt.Errorf("failed to add driver to available set: %w", err)
 	}
 
-	// Store individual driver location
+	// Store individual driver location (always update this regardless of previous membership)
 	locationKey := fmt.Sprintf(constants.KeyDriverLocation, driverID)
 	locationData := map[string]interface{}{
 		constants.FieldLatitude:  location.Latitude,
@@ -242,6 +243,7 @@ func (r *MatchRepo) StoreMatchProposal(ctx context.Context, match *models.Match)
 
 // FindNearbyDrivers finds available drivers within the specified radius
 func (r *MatchRepo) FindNearbyDrivers(ctx context.Context, location *models.Location, radiusKm float64) ([]*models.NearbyUser, error) {
+	// Get drivers within radius from geo index
 	results, err := r.redisClient.GeoRadius(
 		ctx,
 		constants.KeyDriverGeo,
@@ -254,17 +256,27 @@ func (r *MatchRepo) FindNearbyDrivers(ctx context.Context, location *models.Loca
 		return nil, fmt.Errorf("failed to find nearby drivers: %w", err)
 	}
 
+	// Filter to keep only available drivers
 	nearbyDrivers := make([]*models.NearbyUser, 0, len(results))
 	for _, result := range results {
-		nearbyDrivers = append(nearbyDrivers, &models.NearbyUser{
-			ID: result.Name,
-			Location: models.Location{
-				Latitude:  result.Latitude,
-				Longitude: result.Longitude,
-				Timestamp: time.Now(),
-			},
-			Distance: result.Dist,
-		})
+		// Check if this driver is in the available set
+		isMember, err := r.redisClient.SIsMember(ctx, constants.KeyAvailableDrivers, result.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check driver availability: %w", err)
+		}
+
+		// Only include available drivers
+		if isMember {
+			nearbyDrivers = append(nearbyDrivers, &models.NearbyUser{
+				ID: result.Name,
+				Location: models.Location{
+					Latitude:  result.Latitude,
+					Longitude: result.Longitude,
+					Timestamp: time.Now(),
+				},
+				Distance: result.Dist,
+			})
+		}
 	}
 
 	return nearbyDrivers, nil
@@ -286,8 +298,25 @@ func (r *MatchRepo) ProcessLocationUpdate(ctx context.Context, driverID string, 
 	return nil
 }
 
+// ProcessPassengerLocationUpdate processes a location update for a passenger
+func (r *MatchRepo) ProcessPassengerLocationUpdate(ctx context.Context, passengerID string, location *models.Location) error {
+	// Update passenger's location in Redis
+	err := r.redisClient.GeoAdd(
+		ctx,
+		constants.KeyPassengerGeo,
+		location.Longitude,
+		location.Latitude,
+		passengerID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update passenger location: %w", err)
+	}
+	return nil
+}
+
 // AddAvailablePassenger adds a passenger to the Redis geospatial index
 func (r *MatchRepo) AddAvailablePassenger(ctx context.Context, passengerID string, location *models.Location) error {
+	// Store in geo set (always update location)
 	err := r.redisClient.GeoAdd(
 		ctx,
 		constants.KeyPassengerGeo,
@@ -298,6 +327,26 @@ func (r *MatchRepo) AddAvailablePassenger(ctx context.Context, passengerID strin
 	if err != nil {
 		return fmt.Errorf("failed to add passenger to geo index: %w", err)
 	}
+
+	// Add to available passengers set (if not already there)
+	// Redis SADD command only adds elements that don't already exist in the set
+	err = r.redisClient.SAdd(ctx, constants.KeyAvailablePassengers, passengerID)
+	if err != nil {
+		return fmt.Errorf("failed to add passenger to available set: %w", err)
+	}
+
+	// Store individual passenger location
+	locationKey := fmt.Sprintf(constants.KeyPassengerLocation, passengerID)
+	locationData := map[string]interface{}{
+		constants.FieldLatitude:  location.Latitude,
+		constants.FieldLongitude: location.Longitude,
+		constants.FieldTimestamp: time.Now().Unix(),
+	}
+	err = r.redisClient.HMSet(ctx, locationKey, locationData)
+	if err != nil {
+		return fmt.Errorf("failed to store passenger location: %w", err)
+	}
+
 	return nil
 }
 
@@ -309,11 +358,25 @@ func (r *MatchRepo) RemoveAvailablePassenger(ctx context.Context, passengerID st
 		return fmt.Errorf("failed to remove passenger from geo index: %w", err)
 	}
 
+	// Remove from available set
+	err = r.redisClient.SRem(ctx, constants.KeyAvailablePassengers, passengerID)
+	if err != nil {
+		return fmt.Errorf("failed to remove passenger from available set: %w", err)
+	}
+
+	// Remove individual location
+	locationKey := fmt.Sprintf(constants.KeyPassengerLocation, passengerID)
+	err = r.redisClient.Delete(ctx, locationKey)
+	if err != nil {
+		return fmt.Errorf("failed to remove passenger location data: %w", err)
+	}
+
 	return nil
 }
 
 // FindNearbyPassengers finds available passengers within the specified radius
 func (r *MatchRepo) FindNearbyPassengers(ctx context.Context, location *models.Location, radiusKm float64) ([]*models.NearbyUser, error) {
+	// Get passengers within radius from geo index
 	results, err := r.redisClient.GeoRadius(
 		ctx,
 		constants.KeyPassengerGeo,
@@ -326,17 +389,27 @@ func (r *MatchRepo) FindNearbyPassengers(ctx context.Context, location *models.L
 		return nil, fmt.Errorf("failed to find nearby passengers: %w", err)
 	}
 
+	// Filter to keep only available passengers
 	nearbyPassengers := make([]*models.NearbyUser, 0, len(results))
 	for _, result := range results {
-		nearbyPassengers = append(nearbyPassengers, &models.NearbyUser{
-			ID: result.Name,
-			Location: models.Location{
-				Latitude:  result.Latitude,
-				Longitude: result.Longitude,
-				Timestamp: time.Now(),
-			},
-			Distance: result.Dist,
-		})
+		// Check if this passenger is in the available set
+		isMember, err := r.redisClient.SIsMember(ctx, constants.KeyAvailablePassengers, result.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check passenger availability: %w", err)
+		}
+
+		// Only include available passengers
+		if isMember {
+			nearbyPassengers = append(nearbyPassengers, &models.NearbyUser{
+				ID: result.Name,
+				Location: models.Location{
+					Latitude:  result.Latitude,
+					Longitude: result.Longitude,
+					Timestamp: time.Now(),
+				},
+				Distance: result.Dist,
+			})
+		}
 	}
 
 	return nearbyPassengers, nil
@@ -497,4 +570,126 @@ func (r *MatchRepo) ConfirmMatchAtomically(ctx context.Context, matchID string, 
 	}
 
 	return nil
+}
+
+// CreatePendingMatch creates a match proposal in Redis with SetNX to ensure uniqueness
+// Returns the match ID if successful, empty string if a match already exists between the driver and passenger
+func (r *MatchRepo) CreatePendingMatch(ctx context.Context, match *models.Match) (string, error) {
+	// Generate a match ID
+	if match.ID == uuid.Nil {
+		match.ID = uuid.New()
+	}
+
+	matchID := match.ID.String()
+	driverID := match.DriverID.String()
+	passengerID := match.PassengerID.String()
+
+	// Create a key for this specific driver-passenger pair
+	pairKey := fmt.Sprintf(constants.KeyPendingMatchPair, driverID, passengerID)
+
+	// Try to set the key only if it doesn't exist (SetNX)
+	matchData, err := json.Marshal(match)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal match data: %w", err)
+	}
+
+	// Set with NX flag and 1 minute expiration
+	wasSet, err := r.redisClient.SetNX(ctx, pairKey, matchData, 1*time.Minute)
+	if err != nil {
+		return "", fmt.Errorf("failed to create pending match: %w", err)
+	}
+
+	// If the key already exists, return empty string to indicate no match was created
+	if !wasSet {
+		return "", nil
+	}
+
+	// Store references for both driver and passenger
+	driverKey := fmt.Sprintf(constants.KeyDriverMatch, driverID)
+	passengerKey := fmt.Sprintf(constants.KeyPassengerMatch, passengerID)
+
+	// Store for 1 minute to match the pending match expiration
+	err = r.redisClient.Set(ctx, driverKey, matchID, 1*time.Minute)
+	if err != nil {
+		// Clean up the main key if we can't set the reference
+		r.redisClient.Delete(ctx, pairKey)
+		return "", fmt.Errorf("failed to store driver match reference: %w", err)
+	}
+
+	err = r.redisClient.Set(ctx, passengerKey, matchID, 1*time.Minute)
+	if err != nil {
+		// Clean up the previously set keys if we can't set all references
+		r.redisClient.Delete(ctx, pairKey)
+		r.redisClient.Delete(ctx, driverKey)
+		return "", fmt.Errorf("failed to store passenger match reference: %w", err)
+	}
+
+	return matchID, nil
+}
+
+// ConfirmAndPersistMatch retrieves a pending match from Redis and persists it to the database
+func (r *MatchRepo) ConfirmAndPersistMatch(ctx context.Context, driverID, passengerID string) (*models.Match, error) {
+	// Get the pending match from Redis
+	pairKey := fmt.Sprintf(constants.KeyPendingMatchPair, driverID, passengerID)
+	matchData, err := r.redisClient.Get(ctx, pairKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pending match: %w", err)
+	}
+
+	var match models.Match
+	if err := json.Unmarshal([]byte(matchData), &match); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal match data: %w", err)
+	}
+
+	// Now save it to the database
+	// Start transaction
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Set timestamps and status
+	now := time.Now()
+	if match.CreatedAt.IsZero() {
+		match.CreatedAt = now
+	}
+	match.UpdatedAt = now
+	match.Status = models.MatchStatusAccepted
+
+	// Create DTO for database operation
+	dto := match.ToDTO()
+
+	// Insert match
+	query := `
+		INSERT INTO matches (
+			id, driver_id, passenger_id, 
+			driver_location, passenger_location,
+			status, created_at, updated_at
+		) VALUES (
+			:id, :driver_id, :passenger_id,
+			point(:driver_longitude, :driver_latitude), 
+			point(:passenger_longitude, :passenger_latitude),
+			:status, :created_at, :updated_at
+		)
+	`
+	_, err = tx.NamedExecContext(ctx, query, dto)
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert match: %w", err)
+	}
+
+	// Commit transaction
+	if err = tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	// Clean up Redis keys
+	r.redisClient.Delete(ctx, pairKey)
+
+	return &match, nil
+}
+
+// DeleteRedisKey deletes a key from Redis
+func (r *MatchRepo) DeleteRedisKey(ctx context.Context, key string) error {
+	return r.redisClient.Delete(ctx, key)
 }

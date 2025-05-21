@@ -18,6 +18,9 @@ type MatchRepo interface {
 
 	// Redis match proposal operations
 	StoreMatchProposal(ctx context.Context, match *models.Match) error
+	CreatePendingMatch(ctx context.Context, match *models.Match) (string, error)
+	ConfirmAndPersistMatch(ctx context.Context, driverID, passengerID string) (*models.Match, error)
+	DeleteRedisKey(ctx context.Context, key string) error
 	ConfirmMatchAtomically(ctx context.Context, matchID string, status models.MatchStatus) error
 
 	// Location-based operations

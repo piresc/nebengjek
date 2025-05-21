@@ -3,8 +3,7 @@ package constants
 // NATS Subjects
 const (
 	// User Service
-	SubjectUserBeacon  = "user.beacon"
-	SubjectUserUpdated = "user.updated"
+	SubjectUserBeacon = "user.beacon"
 
 	// Match Service
 	SubjectMatchFound    = "match.found"
@@ -20,6 +19,4 @@ const (
 	// Location Service
 	SubjectLocationUpdate    = "location.update"
 	SubjectLocationAggregate = "location.aggregate"
-	SubjectDriverLocation    = "driver.location"
-	SubjectDriverAvailable   = "driver.availability"
 )

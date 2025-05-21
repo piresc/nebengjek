@@ -18,7 +18,8 @@ import (
 
 func main() {
 	appName := "rides-service"
-	configs := config.InitConfig()
+	configPath := "./config/rides.env"
+	configs := config.InitConfig(configPath)
 
 	// Initialize database connection
 	postgresClient, err := database.NewPostgresClient(configs.Database)
@@ -59,7 +60,7 @@ func main() {
 
 	// Initialize Echo server
 	e := echo.New()
-	
+
 	// Register health endpoints
 	health.RegisterHealthEndpoints(e, appName)
 

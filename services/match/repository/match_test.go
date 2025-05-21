@@ -307,6 +307,66 @@ func TestAddAvailableDriver_Success(t *testing.T) {
 	assert.True(t, locationExists, "Driver location should be stored")
 }
 
+func TestAddAvailableDriver_ExistingDriver(t *testing.T) {
+	// Arrange
+	db, _ := setupMockDB(t)
+	redisClient, miniRedis := setupMockRedis(t)
+	defer miniRedis.Close()
+
+	// Create a custom redis client that intercepts calls for testing
+	redisClient.Client = redis.NewClient(&redis.Options{
+		Addr: miniRedis.Addr(),
+	})
+
+	repo := NewMatchRepository(&models.Config{}, db, redisClient)
+
+	ctx := context.Background()
+	driverID := uuid.New().String()
+	availableKey := constants.KeyAvailableDrivers
+
+	// Pre-add the driver to the available set
+	err := redisClient.Client.SAdd(ctx, availableKey, driverID).Err()
+	assert.NoError(t, err)
+
+	// Add initial location
+	initialLocation := &models.Location{
+		Latitude:  -6.175392,
+		Longitude: 106.827153,
+		Timestamp: time.Now(),
+	}
+	err = redisClient.Client.GeoAdd(ctx, constants.KeyDriverGeo,
+		&redis.GeoLocation{
+			Longitude: initialLocation.Longitude,
+			Latitude:  initialLocation.Latitude,
+			Name:      driverID,
+		}).Err()
+	assert.NoError(t, err)
+
+	// Update with new location
+	newLocation := &models.Location{
+		Latitude:  -6.175500, // Slightly different location
+		Longitude: 106.827200,
+		Timestamp: time.Now(),
+	}
+
+	// Act - update the existing driver
+	err = repo.AddAvailableDriver(ctx, driverID, newLocation)
+
+	// Assert
+	assert.NoError(t, err)
+
+	// Verify that the driver is still in the available set
+	setMembers, err := miniRedis.SMembers(availableKey)
+	assert.NoError(t, err)
+	assert.Contains(t, setMembers, driverID, "Driver should still be in available set")
+	assert.Equal(t, 1, len(setMembers), "There should only be one member in the set")
+
+	// Verify location was updated
+	locationKey := fmt.Sprintf(constants.KeyDriverLocation, driverID)
+	locationExists := miniRedis.Exists(locationKey)
+	assert.True(t, locationExists, "Driver location should be stored")
+}
+
 // TestRemoveAvailableDriver tests removing a driver from the available drivers pool
 func TestRemoveAvailableDriver_Success(t *testing.T) {
 	// Arrange

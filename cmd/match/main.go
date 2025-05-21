@@ -17,7 +17,8 @@ import (
 
 func main() {
 	appName := "match-service"
-	configs := config.InitConfig()
+	configPath := "./config/match.env"
+	configs := config.InitConfig(configPath)
 
 	// Initialize PostgreSQL database connection
 	postgresClient, err := database.NewPostgresClient(configs.Database)

@@ -21,7 +21,8 @@ import (
 
 func main() {
 	appName := "users-service"
-	configs := config.InitConfig()
+	configPath := "./config/users.env"
+	configs := config.InitConfig(configPath)
 
 	// Initialize PostgreSQL database connection
 	postgresClient, err := database.NewPostgresClient(configs.Database)
@@ -74,10 +75,10 @@ func main() {
 
 	// Initialize Echo router
 	e := echo.New()
-	
+
 	// Register health endpoints
 	health.RegisterHealthEndpoints(e, appName)
-	
+
 	// Register service routes
 	Handler.RegisterRoutes(e)
 

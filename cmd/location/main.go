@@ -17,7 +17,8 @@ import (
 
 func main() {
 	appName := "location-service"
-	configs := config.InitConfig()
+	configPath := "./config/location.env"
+	configs := config.InitConfig(configPath)
 
 	// Initialize Redis client
 	redisClient, err := database.NewRedisClient(configs.Redis)
@@ -52,7 +53,7 @@ func main() {
 
 	// Initialize Echo router
 	e := echo.New()
-	
+
 	// Register health endpoints
 	health.RegisterHealthEndpoints(e, appName)
 
