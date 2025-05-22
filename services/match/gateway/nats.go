@@ -55,3 +55,23 @@ func (g *matchGW) PublishMatchRejected(ctx context.Context, matchProp models.Mat
 	}
 	return g.natsClient.Publish(constants.SubjectMatchRejected, data)
 }
+
+// PublishMatchPendingCustomerConfirmation publishes a match pending customer confirmation event to NATS.
+func (g *matchGW) PublishMatchPendingCustomerConfirmation(ctx context.Context, mp models.MatchProposal) error {
+	fmt.Printf("Publishing match pending customer confirmation to NATS: MatchID %s, DriverID %s, PassengerID %s\n", mp.ID, mp.DriverID, mp.PassengerID)
+	fmt.Printf("Match pending customer confirmation event: %+v\n", mp)
+
+	data, err := json.Marshal(mp)
+	if err != nil {
+		fmt.Printf("Error marshalling match pending customer confirmation event for MatchID %s: %v\n", mp.ID, err)
+		return err
+	}
+
+	if err := g.natsClient.Publish(constants.SubjectMatchPendingCustomerConfirmation, data); err != nil {
+		fmt.Printf("Error publishing match pending customer confirmation event for MatchID %s to NATS: %v\n", mp.ID, err)
+		return err
+	}
+
+	fmt.Printf("Successfully published match pending customer confirmation for MatchID %s\n", mp.ID)
+	return nil
+}

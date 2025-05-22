@@ -26,4 +26,8 @@ type UserUC interface {
 	UpdateUserLocation(ctx context.Context, location *models.LocationUpdate) error
 
 	RideArrived(ctx context.Context, event *models.RideCompleteEvent) error
+
+	// HandleCustomerMatchDecision is called when a customer accepts or rejects a match confirmation.
+	// It publishes this decision to the specified NATS subject.
+	HandleCustomerMatchDecision(ctx context.Context, mp models.MatchProposal, natsSubject string) error
 }

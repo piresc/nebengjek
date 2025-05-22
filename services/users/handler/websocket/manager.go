@@ -80,6 +80,8 @@ func (m *WebSocketManager) handleMessage(client *models.WebSocketClient, msg []b
 		return m.handleLocationUpdate(client.UserID, wsMsg.Data)
 	case constants.EventRideArrived:
 		return m.handleRideArrived(client, wsMsg.Data)
+	case constants.EventCustomerMatchResponse: // New case for customer's match response
+		return m.handleCustomerMatchResponse(client, wsMsg.Data)
 	default:
 		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Unknown event type")
 	}

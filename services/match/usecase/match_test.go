@@ -1007,6 +1007,141 @@ func TestConfirmMatchStatus_UpdateRejectedMatch_WithError(t *testing.T) {
 	assert.NoError(t, err) // The function still succeeds even if rejecting other matches fails
 }
 
+// TestConfirmMatchStatus_DriverInitialAcceptance tests the scenario where a driver initially accepts a match.
+func TestConfirmMatchStatus_DriverInitialAcceptance(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockMatchRepo(ctrl)
+	mockGW := mocks.NewMockMatchGW(ctrl)
+	uc := NewMatchUC(mockRepo, mockGW)
+
+	matchID := "match-driver-accepts-123"
+	driverID := uuid.NewString()
+	passengerID := uuid.NewString()
+
+	mp := models.MatchProposal{
+		ID:          matchID,
+		DriverID:    driverID,
+		PassengerID: passengerID,
+		MatchStatus: models.MatchStatusPendingCustomerConfirmation, // Key for this scenario
+		// Locations can be zero for this test as they are not primary to the logic path
+	}
+
+	// Expected calls
+	mockRepo.EXPECT().UpdateMatchStatus(gomock.Any(), mp.ID, models.MatchStatusPendingCustomerConfirmation, driverID, passengerID).Return(nil).Times(1)
+	// The PublishMatchPendingCustomerConfirmation method is now active in the usecase.
+	mockGW.EXPECT().PublishMatchPendingCustomerConfirmation(gomock.Any(), mp).Return(nil).Times(1)
+
+	// Ensure other methods are NOT called
+	mockRepo.EXPECT().ConfirmAndPersistMatch(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	mockGW.EXPECT().PublishMatchConfirm(gomock.Any(), gomock.Any()).Times(0)
+
+	err := uc.ConfirmMatchStatus("someUnusedMatchID", mp) // The first argument `matchID` is unused by the current usecase implementation.
+	assert.NoError(t, err)
+}
+
+// TestConfirmMatchStatus_CustomerFinalAcceptance tests the scenario where a customer finally accepts the match.
+func TestConfirmMatchStatus_CustomerFinalAcceptance(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockMatchRepo(ctrl)
+	mockGW := mocks.NewMockMatchGW(ctrl)
+	uc := NewMatchUC(mockRepo, mockGW)
+
+	matchID := uuid.New() // Use actual UUID for persistedMatch
+	driverID := uuid.NewString()
+	passengerID := uuid.NewString()
+
+	mp := models.MatchProposal{
+		ID:          matchID.String(), // mp.ID is often the string version of the match ID
+		DriverID:    driverID,
+		PassengerID: passengerID,
+		MatchStatus: models.MatchStatusAccepted, // Key for this scenario
+	}
+
+	persistedMatch := &models.Match{
+		ID:          matchID,
+		DriverID:    converter.StrToUUID(driverID), // Assuming conversion for the model
+		PassengerID: converter.StrToUUID(passengerID),
+		Status:      models.MatchStatusAccepted,
+		// Populate other fields like locations if they affect the event published
+	}
+
+	// Expected calls
+	mockRepo.EXPECT().ConfirmAndPersistMatch(gomock.Any(), driverID, passengerID).Return(persistedMatch, nil).Times(1)
+	mockGW.EXPECT().PublishMatchConfirm(gomock.Any(), gomock.Any()). // gomock.Any() for event due to internal construction
+									DoAndReturn(func(_ context.Context, event models.MatchProposal) error {
+		assert.Equal(t, persistedMatch.ID.String(), event.ID)
+		assert.Equal(t, driverID, event.DriverID)
+		assert.Equal(t, passengerID, event.PassengerID)
+		assert.Equal(t, models.MatchStatusAccepted, event.MatchStatus)
+		return nil
+	}).Times(1)
+	mockRepo.EXPECT().RemoveAvailableDriver(gomock.Any(), driverID).Return(nil).Times(1)
+	mockRepo.EXPECT().RemoveAvailablePassenger(gomock.Any(), passengerID).Return(nil).Times(1)
+
+	err := uc.ConfirmMatchStatus(matchID.String(), mp)
+	assert.NoError(t, err)
+}
+
+// TestConfirmMatchStatus_Rejection tests the scenario where a match is rejected.
+func TestConfirmMatchStatus_Rejection(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockMatchRepo(ctrl)
+	mockGW := mocks.NewMockMatchGW(ctrl)
+	uc := NewMatchUC(mockRepo, mockGW)
+
+	matchID := "match-rejected-123"
+	driverID := uuid.NewString()
+	passengerID := uuid.NewString()
+
+	mp := models.MatchProposal{
+		ID:          matchID,
+		DriverID:    driverID,
+		PassengerID: passengerID,
+		MatchStatus: models.MatchStatusRejected, // Key for this scenario
+	}
+
+	// Expected calls for Redis cleanup
+	// Assuming these keys are constructed and deleted. The exact keys might vary.
+	// Using gomock.Any() for the key if the exact format is complex or unimportant for the test's focus.
+	mockRepo.EXPECT().DeleteRedisKey(gomock.Any(), gomock.AssignableToTypeOf("string")).Return().AnyTimes() // Allow multiple calls for different keys
+
+	mockGW.EXPECT().PublishMatchRejected(gomock.Any(), mp).Return(nil).Times(1)
+
+	err := uc.ConfirmMatchStatus("someUnusedMatchID", mp)
+	assert.NoError(t, err)
+}
+
+// TestConfirmMatchStatus_UnknownStatus tests error handling for an unknown match status.
+func TestConfirmMatchStatus_UnknownStatus(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockMatchRepo(ctrl)
+	mockGW := mocks.NewMockMatchGW(ctrl)
+	uc := NewMatchUC(mockRepo, mockGW)
+
+	matchID := "match-unknown-123"
+	driverID := uuid.NewString()
+	passengerID := uuid.NewString()
+
+	mp := models.MatchProposal{
+		ID:          matchID,
+		DriverID:    driverID,
+		PassengerID: passengerID,
+		MatchStatus: "SOME_INVALID_STATUS", // Key for this scenario
+	}
+
+	err := uc.ConfirmMatchStatus("someUnusedMatchID", mp)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown match status: SOME_INVALID_STATUS")
+}
+
 func TestHandleInactiveUser_Error(t *testing.T) {
 	// Arrange
 	ctrl := gomock.NewController(t)

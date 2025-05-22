@@ -12,4 +12,9 @@ type UserGW interface {
 	MatchAccept(mp *models.MatchProposal) error
 	PublishLocationUpdate(ctx context.Context, locationEvent *models.LocationUpdate) error
 	PublishRideArrived(ctx context.Context, event *models.RideCompleteEvent) error
+
+	// PublishCustomerConfirmedEvent publishes an event when a customer confirms a match.
+	PublishCustomerConfirmedEvent(ctx context.Context, mp models.MatchProposal) error
+	// PublishCustomerRejectedEvent publishes an event when a customer rejects a match.
+	PublishCustomerRejectedEvent(ctx context.Context, mp models.MatchProposal) error
 }

@@ -19,6 +19,9 @@ const (
 	// Ride events
 	EventRideCompleted = "ride_completed"
 	EventRideArrived   = "ride_arrived"
+
+	// Client-specific events (for incoming messages)
+	EventCustomerMatchResponse = "client.customer.match_response" // Customer responds to a match confirmation request
 )
 
 // WebSocket error codes

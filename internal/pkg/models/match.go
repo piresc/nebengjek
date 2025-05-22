@@ -13,6 +13,7 @@ const (
 	MatchStatusPending  MatchStatus = "PENDING"
 	MatchStatusAccepted MatchStatus = "ACCEPTED"
 	MatchStatusRejected MatchStatus = "REJECTED"
+	MatchStatusPendingCustomerConfirmation MatchStatus = "PENDING_CUSTOMER_CONFIRMATION"
 )
 
 // Match represents a ride-sharing match between a driver and a passenger
