@@ -8,7 +8,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/models"
-	"github.com/piresc/nebengjek/services/users/mocks" // Corrected mock path
+	"github.com/piresc/nebengjek/services/users/mocks" 
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,13 +18,8 @@ func TestHandleCustomerMatchDecision_Confirmed(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockUserGW := mocks.NewMockUserGW(ctrl)
-	// Assuming userRepo and cfg are not directly used by HandleCustomerMatchDecision,
-	// so they can be nil or also mocked if necessary for NewUserUC.
-	// Let's look at NewUserUC signature from services/users/usecase/init.go:
-	// func NewUserUC(userRepo users.UserRepo, userGW users.UserGW, cfg *models.Config) *UserUC
-	// So, mockUserRepo and a dummy cfg might be needed.
-	mockUserRepo := mocks.NewMockUserRepo(ctrl) // Added mockUserRepo
-	dummyCfg := &models.Config{}                 // Added dummyCfg
+	mockUserRepo := mocks.NewMockUserRepo(ctrl) 
+	dummyCfg := &models.Config{}                 
 
 	uc := NewUserUC(mockUserRepo, mockUserGW, dummyCfg)
 
@@ -37,7 +32,7 @@ func TestHandleCustomerMatchDecision_Confirmed(t *testing.T) {
 		ID:          matchID,
 		DriverID:    driverID,
 		PassengerID: passengerID,
-		MatchStatus: models.MatchStatusAccepted, // Key for this scenario
+		MatchStatus: models.MatchStatusAccepted, 
 	}
 	natsSubject := constants.SubjectCustomerMatchConfirmed
 
@@ -67,7 +62,7 @@ func TestHandleCustomerMatchDecision_Rejected(t *testing.T) {
 		ID:          matchID,
 		DriverID:    driverID,
 		PassengerID: passengerID,
-		MatchStatus: models.MatchStatusRejected, // Key for this scenario
+		MatchStatus: models.MatchStatusRejected, 
 	}
 	natsSubject := constants.SubjectCustomerMatchRejected
 
@@ -90,6 +85,7 @@ func TestHandleCustomerMatchDecision_Mismatch_ConfirmSubject_RejectStatus(t *tes
 
 	ctx := context.Background()
 	mp := models.MatchProposal{
+		ID:          "mismatch-1",
 		MatchStatus: models.MatchStatusRejected, // Mismatch
 	}
 	natsSubject := constants.SubjectCustomerMatchConfirmed
@@ -111,6 +107,7 @@ func TestHandleCustomerMatchDecision_Mismatch_RejectSubject_AcceptStatus(t *test
 
 	ctx := context.Background()
 	mp := models.MatchProposal{
+		ID:          "mismatch-2",
 		MatchStatus: models.MatchStatusAccepted, // Mismatch
 	}
 	natsSubject := constants.SubjectCustomerMatchRejected
@@ -131,14 +128,15 @@ func TestHandleCustomerMatchDecision_UnknownSubject(t *testing.T) {
 	uc := NewUserUC(mockUserRepo, mockUserGW, dummyCfg)
 
 	ctx := context.Background()
-	mp := models.MatchProposal{ // Status doesn't matter as much as subject here
+	mp := models.MatchProposal{ 
+		ID: "unknown-subject-match",
 		MatchStatus: models.MatchStatusAccepted,
 	}
 	natsSubject := "some.unknown.subject"
 
 	err := uc.HandleCustomerMatchDecision(ctx, mp, natsSubject)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "unknown nats subject for customer match decision: "+natsSubject)
+	assert.Contains(t, err.Error(), "unknown NATS subject for customer match decision: "+natsSubject)
 }
 
 // TestHandleCustomerMatchDecision_GatewayError_Confirmed tests error propagation from gateway on confirmed event.
@@ -153,6 +151,7 @@ func TestHandleCustomerMatchDecision_GatewayError_Confirmed(t *testing.T) {
 
 	ctx := context.Background()
 	mp := models.MatchProposal{
+		ID: "gw-err-confirm-1",
 		MatchStatus: models.MatchStatusAccepted,
 	}
 	natsSubject := constants.SubjectCustomerMatchConfirmed
@@ -162,8 +161,7 @@ func TestHandleCustomerMatchDecision_GatewayError_Confirmed(t *testing.T) {
 
 	err := uc.HandleCustomerMatchDecision(ctx, mp, natsSubject)
 	assert.Error(t, err)
-	assert.True(t, errors.Is(err, expectedError), "Expected error to wrap gateway error")
-	assert.Contains(t, err.Error(), "failed to publish customer match decision")
+	assert.Equal(t, expectedError, err) 
 }
 
 // TestHandleCustomerMatchDecision_GatewayError_Rejected tests error propagation from gateway on rejected event.
@@ -178,6 +176,7 @@ func TestHandleCustomerMatchDecision_GatewayError_Rejected(t *testing.T) {
 
 	ctx := context.Background()
 	mp := models.MatchProposal{
+		ID: "gw-err-reject-1",
 		MatchStatus: models.MatchStatusRejected,
 	}
 	natsSubject := constants.SubjectCustomerMatchRejected
@@ -187,18 +186,55 @@ func TestHandleCustomerMatchDecision_GatewayError_Rejected(t *testing.T) {
 
 	err := uc.HandleCustomerMatchDecision(ctx, mp, natsSubject)
 	assert.Error(t, err)
-	assert.True(t, errors.Is(err, expectedError), "Expected error to wrap gateway error")
-	assert.Contains(t, err.Error(), "failed to publish customer match decision")
+	assert.Equal(t, expectedError, err) 
 }
 
-// Note: The HandleCustomerMatchDecision method itself does not perform JSON marshalling;
-// it delegates this to the gateway methods (PublishCustomerConfirmedEvent/PublishCustomerRejectedEvent).
-// Therefore, a direct test for marshalling failure within HandleCustomerMatchDecision is not applicable.
-// Such tests would belong to the gateway method unit tests.
+// TestUpdateBeaconStatus_Success tests successful beacon status update.
+func TestUpdateBeaconStatus_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-// Also note: The path `github.com/piresc/nebengjek/services/users/mocks` assumes that
-// `go generate ./...` or similar has been run for the `users` service to generate mocks
-// from `gateways.go` and `repository.go` into that directory.
-// If mocks are generated differently (e.g., into a vendor directory or a global mocks directory),
-// the import path would need adjustment.
-// The current mock path `github.com/piresc/nebengjek/services/users/mocks` is standard for this project.
+	mockUserRepo := mocks.NewMockUserRepo(ctrl)
+	mockUserGW := mocks.NewMockUserGW(ctrl)
+	dummyCfg := &models.Config{}
+	uc := NewUserUC(mockUserRepo, mockUserGW, dummyCfg)
+	
+	ctx := context.Background()
+	req := &models.BeaconRequest{
+		UserID:   "user123",
+		IsActive: true,
+		Role:     "driver",
+		Location: &models.Location{Latitude: 1.0, Longitude: 1.0},
+	}
+
+	mockUserGW.EXPECT().PublishBeaconEvent(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+
+	err := uc.UpdateBeaconStatus(ctx, req)
+	assert.NoError(t, err)
+}
+
+// TestConfirmMatch_Success tests successful match confirmation by a driver.
+func TestConfirmMatch_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockUserRepo := mocks.NewMockUserRepo(ctrl)
+	mockUserGW := mocks.NewMockUserGW(ctrl)
+	dummyCfg := &models.Config{}
+	uc := NewUserUC(mockUserRepo, mockUserGW, dummyCfg)
+
+	ctx := context.Background()
+	driverID := "driver123"
+	mp := &models.MatchProposal{
+		ID: "matchconfirm-1",
+		DriverID: driverID,
+		PassengerID: "passenger123",
+		MatchStatus: models.MatchStatusPendingCustomerConfirmation,
+	}
+
+	mockUserRepo.EXPECT().GetUserByID(ctx, driverID).Return(&models.User{ID: driverID, Role: "driver"}, nil).Times(1)
+	mockUserGW.EXPECT().MatchAccept(mp).Return(nil).Times(1)
+	
+	err := uc.ConfirmMatch(ctx, mp, driverID)
+	assert.NoError(t, err)
+}

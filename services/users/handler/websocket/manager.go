@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 
+	"github.com/go-redis/redis/v8" // Import redis package
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
@@ -14,18 +15,21 @@ import (
 
 // WebSocketManager extends the base WebSocket manager for user-specific functionality
 type WebSocketManager struct {
-	userUC  users.UserUC
-	manager *pkgws.Manager
+	userUC      users.UserUC
+	manager     *pkgws.Manager
+	redisClient *redis.Client // Added Redis client
 }
 
 // NewWebSocketManager creates a new WebSocket manager for the user service
 func NewWebSocketManager(
 	userUC users.UserUC,
 	manager *pkgws.Manager,
+	redisClient *redis.Client, // Added Redis client to constructor
 ) *WebSocketManager {
 	return &WebSocketManager{
-		manager: manager,
-		userUC:  userUC,
+		manager:     manager,
+		userUC:      userUC,
+		redisClient: redisClient, // Store Redis client
 	}
 }
 

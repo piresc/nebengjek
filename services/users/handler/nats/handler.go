@@ -12,6 +12,7 @@ import (
 type NatsHandler struct {
 	wsManager  *websocket.WebSocketManager
 	natsClient *natspkg.Client
+	redisClient *redis.Client // Added Redis client
 	subs       []*nats.Subscription
 }
 
@@ -19,10 +20,12 @@ type NatsHandler struct {
 func NewNatsHandler(
 	wsManager *websocket.WebSocketManager,
 	natsClient *natspkg.Client,
+	redisClient *redis.Client, // Added Redis client to constructor
 ) *NatsHandler {
 	return &NatsHandler{
-		wsManager:  wsManager,
-		natsClient: natsClient,
+		wsManager:   wsManager,
+		natsClient:  natsClient,
+		redisClient: redisClient, // Store Redis client
 	}
 }
 

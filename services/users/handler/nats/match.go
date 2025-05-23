@@ -123,10 +123,34 @@ func (h *NatsHandler) handleMatchPendingCustomerConfirmationEvent(msg []byte) er
 	log.Printf("Notifying passenger %s for match confirmation request: %s", event.PassengerID, event.ID)
 	h.wsManager.NotifyClient(event.PassengerID, "server.customer.match_confirmation_request", event)
 
-	// TODO: Consider caching the 'event' (MatchProposal) temporarily if the WebSocket handler
-	// for 'client.customer.match_response' cannot reconstruct it or get all necessary fields
-	// (like DriverID, locations) from the client's response or session.
-	// For example: h.cache.Set("matchproposal:"+event.ID, event, 5*time.Minute)
+	// The event (models.MatchProposal) contains MatchID, DriverID, PassengerID, locations etc.
+	// This will be sent as the payload for the WebSocket message.
+	// The WebSocket message type is "server.customer.match_confirmation_request".
+	log.Printf("Notifying passenger %s for match confirmation request: %s", event.PassengerID, event.ID)
 
+	// Cache the MatchProposal details
+	if h.redisClient != nil {
+		ctx := context.Background() // Or use a context from the handler if available/appropriate
+		cacheKey := fmt.Sprintf("matchproposal:%s", event.ID)
+		jsonData, err := json.Marshal(event)
+		if err != nil {
+			log.Printf("handleMatchPendingCustomerConfirmationEvent: Error marshalling MatchProposal for caching (matchID: %s): %v", event.ID, err)
+			// Don't fail the whole operation, just log the caching error.
+		} else {
+			// Expiration, e.g., 5 minutes.
+			// This duration should be configurable in a real application.
+			err = h.redisClient.Set(ctx, cacheKey, jsonData, 5*time.Minute).Err()
+			if err != nil {
+				log.Printf("handleMatchPendingCustomerConfirmationEvent: Error caching MatchProposal (matchID: %s, key: %s): %v", event.ID, cacheKey, err)
+				// Don't fail the whole operation.
+			} else {
+				log.Printf("handleMatchPendingCustomerConfirmationEvent: Successfully cached MatchProposal (matchID: %s, key: %s)", event.ID, cacheKey)
+			}
+		}
+	} else {
+		log.Printf("handleMatchPendingCustomerConfirmationEvent: Redis client not available in NatsHandler, skipping cache for MatchProposal (matchID: %s)", event.ID)
+	}
+
+	h.wsManager.NotifyClient(event.PassengerID, "server.customer.match_confirmation_request", event)
 	return nil
 }

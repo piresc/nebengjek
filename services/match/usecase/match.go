@@ -147,87 +147,83 @@ func (uc *MatchUC) CreateMatch(ctx context.Context, match *models.Match) error {
 	return nil
 }
 
-// ConfirmMatchStatus handles match confirmation from either driver or passenger
-// The matchID parameter is currently unused, mp.ID is used instead.
-func (uc *MatchUC) ConfirmMatchStatus(matchID string, mp models.MatchProposal) error {
+// ConfirmMatchStatus handles different stages of match confirmation based on mp.MatchStatus.
+func (uc *MatchUC) ConfirmMatchStatus(mp models.MatchProposal) error {
 	ctx := context.Background()
 
-	// Scenario 1: Driver accepts, match moves to PENDING_CUSTOMER_CONFIRMATION
-	if mp.MatchStatus == models.MatchStatusPendingCustomerConfirmation {
-		// Update the match status in Redis to PENDING_CUSTOMER_CONFIRMATION
-		// Assuming UpdateMatchStatus updates the status of the match identified by mp.ID
-		// and potentially uses DriverID and PassengerID for verification or specific keying.
+	switch mp.MatchStatus {
+	case models.MatchStatusPendingCustomerConfirmation:
+		// Driver has accepted, waiting for customer's final confirmation.
+		// Update status in repository (e.g., Redis).
 		if err := uc.matchRepo.UpdateMatchStatus(ctx, mp.ID, models.MatchStatusPendingCustomerConfirmation, mp.DriverID, mp.PassengerID); err != nil {
 			return fmt.Errorf("failed to update match status to pending customer confirmation: %w", err)
 		}
 
-		// Prepare event for customer notification
-		pendingCustomerEvent := mp // mp already has target status
-		// mp.MatchStatus is already models.MatchStatusPendingCustomerConfirmation as per the if condition
-
-		// Publish this event using a new gateway method
-		if err := uc.matchGW.PublishMatchPendingCustomerConfirmation(ctx, pendingCustomerEvent); err != nil {
-			// Log the error but don't necessarily fail the whole operation,
-			// as the primary status update in Redis succeeded.
-			// Depending on requirements, this could be a hard failure.
-			log.Printf("Failed to publish match pending customer confirmation event for MatchID %s: %v", mp.ID, err)
+		// Publish event to notify relevant services (e.g., User service to inform passenger).
+		if err := uc.matchGW.PublishMatchPendingCustomerConfirmation(ctx, mp); err != nil {
+			log.Printf("Error publishing MatchPendingCustomerConfirmation for MatchID %s: %v. Propagating error.", mp.ID, err)
+			return err
 		}
 
-	// Scenario 2: Customer accepts the match (final confirmation)
-	} else if mp.MatchStatus == models.MatchStatusAccepted {
-		// For acceptance, we need to persist the match to database
+	case models.MatchStatusAccepted:
+		// Customer has accepted the match (final confirmation).
+		// Persist the match to the database.
 		persistedMatch, err := uc.matchRepo.ConfirmAndPersistMatch(ctx, mp.DriverID, mp.PassengerID)
 		if err != nil {
 			return fmt.Errorf("failed to confirm and persist match: %w", err)
 		}
 
-		// Create acceptance event
+		// Prepare event for NATS publication, using details from the persisted match.
 		acceptEvent := models.MatchProposal{
 			ID:             converter.UUIDToStr(persistedMatch.ID),
 			PassengerID:    converter.UUIDToStr(persistedMatch.PassengerID),
 			DriverID:       converter.UUIDToStr(persistedMatch.DriverID),
-			MatchStatus:    models.MatchStatusAccepted, // Final accepted status
+			MatchStatus:    models.MatchStatusAccepted,
 			DriverLocation: persistedMatch.DriverLocation,
 			UserLocation:   persistedMatch.PassengerLocation,
 		}
 
-		// Publish match confirmation
 		if err := uc.matchGW.PublishMatchConfirm(ctx, acceptEvent); err != nil {
-			return fmt.Errorf("failed to publish match acceptance: %w", err)
+			// Error already includes "failed to publish match acceptance" or similar from gateway.
+			return err
 		}
 
-		// Remove both users from available pools
+		// Remove both users from their respective available pools.
+		// Errors here are logged but not returned, as the match confirmation itself was successful.
 		if err := uc.matchRepo.RemoveAvailableDriver(ctx, mp.DriverID); err != nil {
-			log.Printf("Failed to remove available driver: %v", err)
+			log.Printf("Failed to remove available driver %s after match confirmation: %v", mp.DriverID, err)
 		}
-
 		if err := uc.matchRepo.RemoveAvailablePassenger(ctx, mp.PassengerID); err != nil {
-			log.Printf("Failed to remove available passenger: %v", err)
+			log.Printf("Failed to remove available passenger %s after match confirmation: %v", mp.PassengerID, err)
 		}
 
-	// Scenario 3: Driver or Customer rejects the match
-	} else if mp.MatchStatus == models.MatchStatusRejected {
-		// For rejections, we simply remove the pending match references
-		// These keys will expire automatically, but we clean up for immediate effect
+	case models.MatchStatusRejected:
+		// Driver or Customer has rejected the match.
+		// Remove pending match references from Redis.
+		// These are best-effort deletions; keys will expire naturally if deletion fails.
+		// Thus, errors from DeleteRedisKey are logged but not propagated.
 		driverKey := fmt.Sprintf(constants.KeyDriverMatch, mp.DriverID)
 		passengerKey := fmt.Sprintf(constants.KeyPassengerMatch, mp.PassengerID)
 		pairKey := fmt.Sprintf(constants.KeyPendingMatchPair, mp.DriverID, mp.PassengerID)
 
-		// Delete the keys - we don't care much about errors here as they'll expire anyway
-		uc.matchRepo.DeleteRedisKey(ctx, driverKey)
-		uc.matchRepo.DeleteRedisKey(ctx, passengerKey)
-		uc.matchRepo.DeleteRedisKey(ctx, pairKey)
-
-		// Create rejection event
-		rejectEvent := mp // mp already has MatchStatusRejected
-		// rejectEvent.MatchStatus = models.MatchStatusRejected // This is already set
-
-		// Publish rejection event
-		if err := uc.matchGW.PublishMatchRejected(ctx, rejectEvent); err != nil {
-			log.Printf("Failed to publish match rejection: %v", err)
+		if err := uc.matchRepo.DeleteRedisKey(ctx, driverKey); err != nil {
+			log.Printf("Error deleting Redis key %s for rejected match %s: %v", driverKey, mp.ID, err)
 		}
-	} else {
-		// Handle unknown status
+		if err := uc.matchRepo.DeleteRedisKey(ctx, passengerKey); err != nil {
+			log.Printf("Error deleting Redis key %s for rejected match %s: %v", passengerKey, mp.ID, err)
+		}
+		if err := uc.matchRepo.DeleteRedisKey(ctx, pairKey); err != nil {
+			log.Printf("Error deleting Redis key %s for rejected match %s: %v", pairKey, mp.ID, err)
+		}
+		
+		// Publish rejection event.
+		if err := uc.matchGW.PublishMatchRejected(ctx, mp); err != nil {
+			log.Printf("Error publishing MatchRejected for MatchID %s: %v. Propagating error.", mp.ID, err)
+			return err
+		}
+
+	default:
+		// Handle unknown or unsupported match status.
 		log.Printf("Unknown match status received: %s for match %s", mp.MatchStatus, mp.ID)
 		return fmt.Errorf("unknown match status: %s", mp.MatchStatus)
 	}
