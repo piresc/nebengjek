@@ -3,11 +3,13 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
+	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/converter"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/services/match/mocks"
@@ -191,9 +193,9 @@ func TestConfirmMatchStatus_AcceptSuccess(t *testing.T) {
 		MatchStatus: models.MatchStatusAccepted,
 	}
 
-	// The usecase first gets the match to validate users
+	// The usecase first gets the pending match from Redis
 	mockRepo.EXPECT().
-		GetMatch(gomock.Any(), matchID).
+		GetPendingMatchByID(gomock.Any(), matchID).
 		Return(&models.Match{
 			ID:          converter.StrToUUID(matchID),
 			DriverID:    driverID,
@@ -201,10 +203,15 @@ func TestConfirmMatchStatus_AcceptSuccess(t *testing.T) {
 			Status:      models.MatchStatusPending,
 		}, nil)
 
-	// Then it uses atomic operations to update match status
+	// Then it persists the match
 	mockRepo.EXPECT().
-		ConfirmMatchAtomically(gomock.Any(), matchID, models.MatchStatusAccepted).
-		Return(nil)
+		ConfirmAndPersistMatch(gomock.Any(), driverIDStr, passengerIDStr).
+		Return(&models.Match{
+			ID:          converter.StrToUUID(matchID),
+			DriverID:    driverID,
+			PassengerID: passengerID,
+			Status:      models.MatchStatusAccepted,
+		}, nil)
 
 	// Need to mock ListMatchesByPassenger as it's called when match is accepted
 	mockRepo.EXPECT().
@@ -219,15 +226,14 @@ func TestConfirmMatchStatus_AcceptSuccess(t *testing.T) {
 		RemoveAvailablePassenger(gomock.Any(), passengerIDStr).
 		Return(nil)
 
-	mockGW.EXPECT().
-		PublishMatchConfirm(gomock.Any(), gomock.Any()).
-		Return(nil)
+	// No need to call PublishMatchConfirm as it is no longer used
 
 	// Act
-	err := uc.ConfirmMatchStatus(matchID, matchProposal)
+	result, result, err := uc.ConfirmMatchStatus(matchID, matchProposal)
 
 	// Assert
 	assert.NoError(t, err)
+	assert.Equal(t, models.MatchStatusAccepted, result.MatchStatus)
 }
 
 func TestConfirmMatchStatus_RejectSuccess(t *testing.T) {
@@ -253,21 +259,29 @@ func TestConfirmMatchStatus_RejectSuccess(t *testing.T) {
 		MatchStatus: models.MatchStatusRejected,
 	}
 
-	mockRepo.EXPECT().
-		GetMatch(gomock.Any(), matchID).
-		Return(&models.Match{
-			ID:          converter.StrToUUID(matchID),
-			DriverID:    driverID,
-			PassengerID: passengerID,
-			Status:      models.MatchStatusPending,
-		}, nil)
+	// For rejection, the test should expect DeleteRedisKey calls instead of GetMatch
+	driverKey := fmt.Sprintf(constants.KeyDriverMatch, driverIDStr)
+	passengerKey := fmt.Sprintf(constants.KeyPassengerMatch, passengerIDStr)
+	pairKey := fmt.Sprintf(constants.KeyPendingMatchPair, driverIDStr, passengerIDStr)
 
 	mockRepo.EXPECT().
-		ConfirmMatchAtomically(gomock.Any(), matchID, models.MatchStatusRejected).
+		DeleteRedisKey(gomock.Any(), driverKey).
+		Return(nil)
+
+	mockRepo.EXPECT().
+		DeleteRedisKey(gomock.Any(), passengerKey).
+		Return(nil)
+
+	mockRepo.EXPECT().
+		DeleteRedisKey(gomock.Any(), pairKey).
+		Return(nil)
+
+	mockGW.EXPECT().
+		PublishMatchRejected(gomock.Any(), gomock.Any()).
 		Return(nil)
 
 	// Act
-	err := uc.ConfirmMatchStatus(matchID, matchProposal)
+	result, err := uc.ConfirmMatchStatus(matchID, matchProposal)
 
 	// Assert
 	assert.NoError(t, err)
@@ -300,7 +314,7 @@ func TestConfirmMatchStatus_AtomicUpdateError(t *testing.T) {
 
 	// Set up expectations
 	mockRepo.EXPECT().
-		GetMatch(gomock.Any(), matchID).
+		GetPendingMatchByID(gomock.Any(), matchID).
 		Return(&models.Match{
 			ID:          converter.StrToUUID(matchID),
 			DriverID:    driverID,
@@ -309,15 +323,15 @@ func TestConfirmMatchStatus_AtomicUpdateError(t *testing.T) {
 		}, nil)
 
 	mockRepo.EXPECT().
-		ConfirmMatchAtomically(gomock.Any(), matchID, models.MatchStatusAccepted).
-		Return(expectedError)
+		ConfirmAndPersistMatch(gomock.Any(), driverIDStr, passengerIDStr).
+		Return(nil, expectedError)
 
 	// Act
-	err := uc.ConfirmMatchStatus(matchID, matchProposal)
+	result, err := uc.ConfirmMatchStatus(matchID, matchProposal)
 
 	// Assert
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to confirm match")
+	assert.Contains(t, err.Error(), "failed to confirm and persist match")
 }
 
 func TestConfirmMatchStatus_GetMatchError(t *testing.T) {
@@ -345,15 +359,15 @@ func TestConfirmMatchStatus_GetMatchError(t *testing.T) {
 
 	// Set up expectations
 	mockRepo.EXPECT().
-		GetMatch(gomock.Any(), matchID).
+		GetPendingMatchByID(gomock.Any(), matchID).
 		Return(nil, expectedError)
 
 	// Act
-	err := uc.ConfirmMatchStatus(matchID, matchProposal)
+	result, err := uc.ConfirmMatchStatus(matchID, matchProposal)
 
 	// Assert
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to get match")
+	assert.Contains(t, err.Error(), "failed to get pending match")
 }
 
 func TestConfirmMatchStatus_PublishError(t *testing.T) {
@@ -392,15 +406,21 @@ func TestConfirmMatchStatus_PublishError(t *testing.T) {
 
 	// Set up expectations in the order they'll be called
 
-	// First, GetMatch is called to validate the users
+	// First, get the pending match
 	mockRepo.EXPECT().
-		GetMatch(gomock.Any(), matchID).
+		GetPendingMatchByID(gomock.Any(), matchID).
 		Return(matchObject, nil)
 
-	// Then ConfirmMatchAtomically is called to update the match status
+	// Then persist the match to database
+	confirmedMatch := &models.Match{
+		ID:          converter.StrToUUID(matchID),
+		DriverID:    driverID,
+		PassengerID: passengerID,
+		Status:      models.MatchStatusAccepted,
+	}
 	mockRepo.EXPECT().
-		ConfirmMatchAtomically(gomock.Any(), matchID, models.MatchStatusAccepted).
-		Return(nil)
+		ConfirmAndPersistMatch(gomock.Any(), driverIDStr, passengerIDStr).
+		Return(confirmedMatch, nil)
 
 	// The publish call will fail with our expected error
 	mockGW.EXPECT().
@@ -408,7 +428,7 @@ func TestConfirmMatchStatus_PublishError(t *testing.T) {
 		Return(expectedError)
 
 	// Act
-	err := uc.ConfirmMatchStatus(matchID, matchProposal)
+	result, err := uc.ConfirmMatchStatus(matchID, matchProposal)
 
 	// Assert
 	assert.Error(t, err)
@@ -911,7 +931,7 @@ func TestConfirmMatchStatus_WithOtherMatches(t *testing.T) {
 	mockRepo.EXPECT().RemoveAvailablePassenger(gomock.Any(), passengerIDStr).Return(nil)
 
 	// Act
-	err := uc.ConfirmMatchStatus(mainMatchIDStr, matchProposal)
+	result, err := uc.ConfirmMatchStatus(mainMatchIDStr, matchProposal)
 
 	// Assert
 	assert.NoError(t, err)
@@ -1001,7 +1021,7 @@ func TestConfirmMatchStatus_UpdateRejectedMatch_WithError(t *testing.T) {
 	mockRepo.EXPECT().RemoveAvailablePassenger(gomock.Any(), passengerIDStr).Return(nil)
 
 	// Act
-	err := uc.ConfirmMatchStatus(mainMatchIDStr, matchProposal)
+	result, err := uc.ConfirmMatchStatus(mainMatchIDStr, matchProposal)
 
 	// Assert
 	assert.NoError(t, err) // The function still succeeds even if rejecting other matches fails
@@ -1077,7 +1097,7 @@ func TestConfirmMatchStatus_InvalidUser(t *testing.T) {
 		}, nil)
 
 	// Act
-	err := uc.ConfirmMatchStatus(matchID, matchProposal)
+	result, err := uc.ConfirmMatchStatus(matchID, matchProposal)
 
 	// Assert
 	assert.Error(t, err)
@@ -1146,7 +1166,7 @@ func TestConfirmMatchStatus_RemoveAvailableUsersError(t *testing.T) {
 		Return(nil)
 
 	// Act
-	err := uc.ConfirmMatchStatus(matchIDStr, matchProposal)
+	result, err := uc.ConfirmMatchStatus(matchIDStr, matchProposal)
 
 	// Assert
 	assert.NoError(t, err) // Function continues despite error

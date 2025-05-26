@@ -56,7 +56,7 @@ func TestPublishBeaconEvent_Success(t *testing.T) {
 	defer sub.Unsubscribe()
 
 	// Create gateway and publish message
-	userGW := NewUserGW(nc)
+	userGW := NewUserGW(nc, "http://localhost:8080")
 	ctx := context.Background()
 	err = userGW.PublishBeaconEvent(ctx, beaconEvent)
 	require.NoError(t, err)
@@ -110,7 +110,7 @@ func TestMatchAccept_Success(t *testing.T) {
 	defer sub.Unsubscribe()
 
 	// Create gateway and publish message
-	userGW := NewUserGW(nc)
+	userGW := NewUserGW(nc, "http://localhost:8080")
 	err = userGW.MatchAccept(matchProposal)
 	require.NoError(t, err)
 
@@ -162,7 +162,7 @@ func TestPublishLocationUpdate_Success(t *testing.T) {
 	defer sub.Unsubscribe()
 
 	// Create gateway and publish message
-	userGW := NewUserGW(nc)
+	userGW := NewUserGW(nc, "http://localhost:8080")
 	err = userGW.PublishLocationUpdate(context.Background(), locationUpdate)
 	require.NoError(t, err)
 
@@ -204,7 +204,7 @@ func TestPublishRideArrived_Success(t *testing.T) {
 	defer sub.Unsubscribe()
 
 	// Create gateway and publish message
-	userGW := NewUserGW(nc)
+	userGW := NewUserGW(nc, "http://localhost:8080")
 	err = userGW.PublishRideArrived(context.Background(), rideCompleteEvent)
 	require.NoError(t, err)
 

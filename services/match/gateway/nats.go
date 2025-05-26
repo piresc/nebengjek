@@ -34,24 +34,18 @@ func (g *matchGW) PublishMatchFound(ctx context.Context, matchProp models.MatchP
 	return g.natsClient.Publish(constants.SubjectMatchFound, data)
 }
 
-// PublishMatchAccept publishes a beacon event to NATS
+// PublishMatchConfirm - No longer publishes to NATS, as match confirmations are now handled via HTTP
 func (g *matchGW) PublishMatchConfirm(ctx context.Context, matchProp models.MatchProposal) error {
-	fmt.Printf("Publishing match event to NATS driver %s, passenger %s\n", matchProp.DriverID, matchProp.PassengerID)
-	fmt.Printf("Match event: %+v\n", matchProp)
-	data, err := json.Marshal(matchProp)
-	if err != nil {
-		return err
-	}
-	return g.natsClient.Publish(constants.SubjectMatchConfirm, data)
+	// This method is kept to satisfy the interface, but no longer publishes to NATS
+	// Match confirmations are now returned directly to HTTP clients
+	fmt.Printf("Match confirmation handled via HTTP for driver %s, passenger %s\n", matchProp.DriverID, matchProp.PassengerID)
+	return nil
 }
 
-// PublishMatchRejected publishes a beacon event to NATS
+// PublishMatchRejected - No longer publishes to NATS, as match rejections are now handled via HTTP
 func (g *matchGW) PublishMatchRejected(ctx context.Context, matchProp models.MatchProposal) error {
-	fmt.Printf("Publishing match event to NATS driver %s, passenger %s\n", matchProp.DriverID, matchProp.PassengerID)
-	fmt.Printf("Match event: %+v\n", matchProp)
-	data, err := json.Marshal(matchProp)
-	if err != nil {
-		return err
-	}
-	return g.natsClient.Publish(constants.SubjectMatchRejected, data)
+	// This method is kept to satisfy the interface, but no longer publishes to NATS
+	// Match rejections are now returned directly to HTTP clients
+	fmt.Printf("Match rejection handled via HTTP for driver %s, passenger %s\n", matchProp.DriverID, matchProp.PassengerID)
+	return nil
 }

@@ -9,6 +9,14 @@ type Config struct {
 	NATS     NATSConfig
 	JWT      JWTConfig
 	Pricing  PricingConfig
+	Services ServicesConfig
+}
+
+// ServicesConfig contains URLs for other microservices
+type ServicesConfig struct {
+	MatchServiceURL    string
+	RidesServiceURL    string
+	LocationServiceURL string
 }
 
 // AppConfig contains application-specific configuration

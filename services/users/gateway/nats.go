@@ -19,14 +19,10 @@ func (g *UserGW) PublishBeaconEvent(ctx context.Context, event *models.BeaconEve
 	return g.natsClient.Publish(constants.SubjectUserBeacon, data)
 }
 
-// PublishMatchAccept publishes a match acceptance event to NATS
-func (g *UserGW) MatchAccept(mp *models.MatchProposal) error {
-	data, err := json.Marshal(mp)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Publishing match accept: %s\n", string(data))
-	return g.natsClient.Publish(constants.SubjectMatchAccepted, data)
+// MatchAccept sends a match confirmation via HTTP instead of NATS
+func (g *UserGW) MatchAccept(mp *models.MatchProposal) (*models.MatchProposal, error) {
+	fmt.Printf("Sending match accept via HTTP: %+v\n", mp)
+	return g.matchHTTPClient.ConfirmMatch(mp.ID, mp)
 }
 
 // PublishLocationUpdate publishes a location update event to NATS

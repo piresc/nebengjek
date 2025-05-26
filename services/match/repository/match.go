@@ -604,6 +604,15 @@ func (r *MatchRepo) CreatePendingMatch(ctx context.Context, match *models.Match)
 		return "", nil
 	}
 
+	// Also store by match ID for direct lookup
+	matchKey := fmt.Sprintf(constants.KeyMatchProposal, matchID)
+	err = r.redisClient.Set(ctx, matchKey, matchData, 1*time.Minute)
+	if err != nil {
+		// Clean up the main key if we can't set the reference
+		r.redisClient.Delete(ctx, pairKey)
+		return "", fmt.Errorf("failed to store match by ID: %w", err)
+	}
+
 	// Store references for both driver and passenger
 	driverKey := fmt.Sprintf(constants.KeyDriverMatch, driverID)
 	passengerKey := fmt.Sprintf(constants.KeyPassengerMatch, passengerID)
@@ -613,6 +622,7 @@ func (r *MatchRepo) CreatePendingMatch(ctx context.Context, match *models.Match)
 	if err != nil {
 		// Clean up the main key if we can't set the reference
 		r.redisClient.Delete(ctx, pairKey)
+		r.redisClient.Delete(ctx, matchKey)
 		return "", fmt.Errorf("failed to store driver match reference: %w", err)
 	}
 
@@ -620,6 +630,7 @@ func (r *MatchRepo) CreatePendingMatch(ctx context.Context, match *models.Match)
 	if err != nil {
 		// Clean up the previously set keys if we can't set all references
 		r.redisClient.Delete(ctx, pairKey)
+		r.redisClient.Delete(ctx, matchKey)
 		r.redisClient.Delete(ctx, driverKey)
 		return "", fmt.Errorf("failed to store passenger match reference: %w", err)
 	}

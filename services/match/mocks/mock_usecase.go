@@ -49,11 +49,12 @@ func (mr *MockMatchUCMockRecorder) HandleBeaconEvent(event interface{}) *gomock.
 }
 
 // ConfirmMatchStatus mocks base method.
-func (m *MockMatchUC) ConfirmMatchStatus(matchID string, mp models.MatchProposal) error {
+func (m *MockMatchUC) ConfirmMatchStatus(matchID string, mp models.MatchProposal) (models.MatchProposal, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ConfirmMatchStatus", matchID, mp)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(models.MatchProposal)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // ConfirmMatchStatus indicates an expected call of ConfirmMatchStatus.

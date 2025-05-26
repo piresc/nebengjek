@@ -84,7 +84,8 @@ func TestPublishMatchFound_Success(t *testing.T) {
 	}
 }
 
-// TestPublishMatchConfirm_Success tests successful publishing of match confirmation events
+// TestPublishMatchConfirm_Success tests the no-op behavior of match confirmation
+// which is now handled via HTTP rather than NATS
 func TestPublishMatchConfirm_Success(t *testing.T) {
 	// Create NATS client
 	nc, err := natspkg.NewClient(testNatsURL)
@@ -107,40 +108,16 @@ func TestPublishMatchConfirm_Success(t *testing.T) {
 		},
 	}
 
-	// Channel to receive the message
-	msgCh := make(chan *nats.Msg, 1)
-	sub, err := nc.Subscribe(constants.SubjectMatchConfirm, func(msg *nats.Msg) {
-		msgCh <- msg
-	})
-	require.NoError(t, err)
-	defer sub.Unsubscribe()
-
-	// Create gateway and publish message
+	// Create gateway and call the method
 	matchGW := NewMatchGW(nc)
 	err = matchGW.PublishMatchConfirm(context.Background(), matchProp)
+
+	// Should not return an error
 	require.NoError(t, err)
-
-	// Wait for the message and verify contents
-	select {
-	case msg := <-msgCh:
-		var receivedMatch models.MatchProposal
-		err = json.Unmarshal(msg.Data, &receivedMatch)
-		require.NoError(t, err)
-
-		assert.Equal(t, matchProp.ID, receivedMatch.ID)
-		assert.Equal(t, matchProp.DriverID, receivedMatch.DriverID)
-		assert.Equal(t, matchProp.PassengerID, receivedMatch.PassengerID)
-		assert.Equal(t, matchProp.MatchStatus, receivedMatch.MatchStatus)
-		assert.Equal(t, matchProp.DriverLocation.Latitude, receivedMatch.DriverLocation.Latitude)
-		assert.Equal(t, matchProp.DriverLocation.Longitude, receivedMatch.DriverLocation.Longitude)
-		assert.Equal(t, matchProp.UserLocation.Latitude, receivedMatch.UserLocation.Latitude)
-		assert.Equal(t, matchProp.UserLocation.Longitude, receivedMatch.UserLocation.Longitude)
-	case <-time.After(2 * time.Second):
-		t.Fatal("Did not receive published message")
-	}
 }
 
-// TestPublishMatchRejected_Success tests successful publishing of match rejection events
+// TestPublishMatchRejected_Success tests the no-op behavior of match rejection
+// which is now handled via HTTP rather than NATS
 func TestPublishMatchRejected_Success(t *testing.T) {
 	// Create NATS client
 	nc, err := natspkg.NewClient(testNatsURL)
@@ -163,35 +140,10 @@ func TestPublishMatchRejected_Success(t *testing.T) {
 		},
 	}
 
-	// Channel to receive the message
-	msgCh := make(chan *nats.Msg, 1)
-	sub, err := nc.Subscribe(constants.SubjectMatchRejected, func(msg *nats.Msg) {
-		msgCh <- msg
-	})
-	require.NoError(t, err)
-	defer sub.Unsubscribe()
-
-	// Create gateway and publish message
+	// Create gateway and call the method
 	matchGW := NewMatchGW(nc)
 	err = matchGW.PublishMatchRejected(context.Background(), matchProp)
+
+	// Should not return an error
 	require.NoError(t, err)
-
-	// Wait for the message and verify contents
-	select {
-	case msg := <-msgCh:
-		var receivedMatch models.MatchProposal
-		err = json.Unmarshal(msg.Data, &receivedMatch)
-		require.NoError(t, err)
-
-		assert.Equal(t, matchProp.ID, receivedMatch.ID)
-		assert.Equal(t, matchProp.DriverID, receivedMatch.DriverID)
-		assert.Equal(t, matchProp.PassengerID, receivedMatch.PassengerID)
-		assert.Equal(t, matchProp.MatchStatus, receivedMatch.MatchStatus)
-		assert.Equal(t, matchProp.DriverLocation.Latitude, receivedMatch.DriverLocation.Latitude)
-		assert.Equal(t, matchProp.DriverLocation.Longitude, receivedMatch.DriverLocation.Longitude)
-		assert.Equal(t, matchProp.UserLocation.Latitude, receivedMatch.UserLocation.Latitude)
-		assert.Equal(t, matchProp.UserLocation.Longitude, receivedMatch.UserLocation.Longitude)
-	case <-time.After(2 * time.Second):
-		t.Fatal("Did not receive published message")
-	}
 }

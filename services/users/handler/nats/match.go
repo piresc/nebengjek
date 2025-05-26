@@ -24,16 +24,7 @@ func (h *NatsHandler) initMatchConsumers() error {
 	}
 	h.subs = append(h.subs, matchSub)
 
-	// Subscribe to match accepted events
-	matchAcceptSub, err := h.natsClient.Subscribe(constants.SubjectMatchConfirm, func(msg *nats.Msg) {
-		if err := h.handleMatchConfirmEvent(msg.Data); err != nil {
-			fmt.Printf("Error handling match accepted event: %v\n", err)
-		}
-	})
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to match accepted events: %w", err)
-	}
-	h.subs = append(h.subs, matchAcceptSub)
+	// No longer subscribe to match accepted events - handled directly via HTTP response
 
 	// Subscribe to match rejected events
 	matchRejectSub, err := h.natsClient.Subscribe(constants.SubjectMatchRejected, func(msg *nats.Msg) {
@@ -59,19 +50,6 @@ func (h *NatsHandler) handleMatchEvent(msg []byte) error {
 	// Notify both driver and passenger
 	h.wsManager.NotifyClient(event.DriverID, constants.SubjectMatchFound, event)
 	h.wsManager.NotifyClient(event.PassengerID, constants.SubjectMatchFound, event)
-	return nil
-}
-
-// handleMatchAcceptedEvent processes match accepted events
-func (h *NatsHandler) handleMatchConfirmEvent(msg []byte) error {
-	var event models.MatchProposal
-	if err := json.Unmarshal(msg, &event); err != nil {
-		return fmt.Errorf("failed to unmarshal match accepted event: %w", err)
-	}
-
-	// Notify both driver and passenger about the acceptance
-	h.wsManager.NotifyClient(event.DriverID, constants.EventMatchConfirm, event)
-	h.wsManager.NotifyClient(event.PassengerID, constants.EventMatchConfirm, event)
 	return nil
 }
 

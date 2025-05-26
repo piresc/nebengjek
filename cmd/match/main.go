@@ -50,11 +50,11 @@ func main() {
 	// Initialize usecase
 	matchUC := usecase.NewMatchUC(matchRepo, matchGW)
 
-	// Initialize Echo router and handler
-	matchHandler := handler.NewMatchHandler(matchUC, natsClient)
+	// Initialize handlers
+	handler := handler.NewHandler(matchUC, natsClient)
 
 	// Initialize NATS consumers
-	if err := matchHandler.InitNATSConsumers(); err != nil {
+	if err := handler.InitNATSConsumers(); err != nil {
 		log.Fatalf("Failed to initialize NATS consumers: %v", err)
 	}
 
@@ -63,6 +63,9 @@ func main() {
 
 	// Register health endpoints
 	health.RegisterHealthEndpoints(e, appName)
+
+	// Register service routes
+	handler.RegisterRoutes(e)
 
 	// Start server
 	log.Printf("Starting %s on port %d", appName, configs.Server.Port)

@@ -65,6 +65,11 @@ func loadConfigFromEnv() *models.Config {
 	configs.JWT.Expiration = GetEnvAsInt("JWT_EXPIRATION", 0)
 	configs.JWT.Issuer = GetEnv("JWT_ISSUER", "")
 
+	// Services config
+	configs.Services.MatchServiceURL = GetEnv("MATCH_SERVICE_URL", "http://localhost:9993")
+	configs.Services.RidesServiceURL = GetEnv("RIDES_SERVICE_URL", "http://localhost:9992")
+	configs.Services.LocationServiceURL = GetEnv("LOCATION_SERVICE_URL", "http://localhost:9991")
+
 	return configs
 }
 

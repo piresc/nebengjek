@@ -20,6 +20,7 @@ type MatchRepo interface {
 	StoreMatchProposal(ctx context.Context, match *models.Match) error
 	CreatePendingMatch(ctx context.Context, match *models.Match) (string, error)
 	ConfirmAndPersistMatch(ctx context.Context, driverID, passengerID string) (*models.Match, error)
+	GetPendingMatchByID(ctx context.Context, matchID string) (*models.Match, error)
 	DeleteRedisKey(ctx context.Context, key string) error
 	ConfirmMatchAtomically(ctx context.Context, matchID string, status models.MatchStatus) error
 

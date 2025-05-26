@@ -38,11 +38,17 @@ func (m *WebSocketManager) handleMatchAccept(client *models.WebSocketClient, dat
 	}
 
 	// Update match status
-	err := m.userUC.ConfirmMatch(context.Background(), &matchProposalAccept, UserID)
+	result, err := m.userUC.ConfirmMatch(context.Background(), &matchProposalAccept, UserID)
 	if err != nil {
 		log.Printf("Error confirming match for driver %s: %v", client.UserID, err)
 		return m.manager.SendErrorMessage(client.Conn, constants.ErrorMatchUpdateFailed, err.Error())
 	}
+
+	// Directly notify both driver and passenger about the confirmation
+	// since we now have the result directly from the HTTP call
+	m.manager.NotifyClient(result.DriverID, constants.EventMatchConfirm, result)
+	m.manager.NotifyClient(result.PassengerID, constants.EventMatchConfirm, result)
+
 	return nil
 }
 

@@ -41,16 +41,7 @@ func (h *MatchHandler) InitNATSConsumers() error {
 	}
 	h.subs = append(h.subs, sub)
 
-	// Initialize match acceptance consumer
-	sub, err = h.natsClient.Subscribe(constants.SubjectMatchAccepted, func(msg *nats.Msg) {
-		if err := h.handleMatchAccept(msg.Data); err != nil {
-			log.Printf("Error handling match acceptance: %v", err)
-		}
-	})
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to match acceptance: %w", err)
-	}
-	h.subs = append(h.subs, sub)
+	// Note: Match confirmations are now handled directly via HTTP responses
 
 	return nil
 }
@@ -70,23 +61,4 @@ func (h *MatchHandler) handleBeaconEvent(msg []byte) error {
 	return h.matchUC.HandleBeaconEvent(event)
 }
 
-// handleMatchAccept processes match acceptance events
-func (h *MatchHandler) handleMatchAccept(msg []byte) error {
-	var matchAccept models.MatchProposal
-	if err := json.Unmarshal(msg, &matchAccept); err != nil {
-		log.Printf("Failed to unmarshal match accept event: %v", err)
-		return err
-	}
-
-	log.Printf("Received match acceptance: matchID=%s, driverID=%s, passengerID=%s",
-		matchAccept.ID, matchAccept.DriverID, matchAccept.PassengerID)
-
-	// Update match status in database
-	err := h.matchUC.ConfirmMatchStatus(matchAccept.ID, matchAccept)
-	if err != nil {
-		log.Printf("Failed to update match status: %v", err)
-		return err
-	}
-
-	return nil
-}
+// Note: Match confirmations are now handled directly via HTTP responses

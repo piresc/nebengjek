@@ -11,37 +11,13 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
-func (uc *MatchUC) handleActiveDriver(ctx context.Context, event models.BeaconEvent, location *models.Location) error {
-	// Add driver to available pool and look for nearby passengers
-	if err := uc.matchRepo.AddAvailableDriver(ctx, event.UserID, location); err != nil {
+// addDriverToPool adds a driver to the available pool without creating matches
+func (uc *MatchUC) addDriverToPool(ctx context.Context, driverID string, location *models.Location) error {
+	// Add driver to available pool
+	if err := uc.matchRepo.AddAvailableDriver(ctx, driverID, location); err != nil {
 		log.Printf("Failed to add available driver: %v", err)
 		return err
 	}
-
-	// Find nearby passengers to match with
-	nearbyPassengers, err := uc.matchRepo.FindNearbyPassengers(ctx, location, 1.0) // 1km radius
-	if err != nil {
-		log.Printf("Failed to find nearby passengers: %v", err)
-		return err
-	}
-	// Create match proposals for each nearby passenger
-	for _, passenger := range nearbyPassengers {
-		match := &models.Match{
-			DriverID:          converter.StrToUUID(event.UserID),
-			PassengerID:       converter.StrToUUID(passenger.ID),
-			DriverLocation:    event.Location,
-			PassengerLocation: passenger.Location,
-			Status:            models.MatchStatusPending,
-			CreatedAt:         time.Now(),
-			UpdatedAt:         time.Now(),
-		}
-
-		if err := uc.CreateMatch(ctx, match); err != nil {
-			log.Printf("Failed to create match with passenger %s: %v", passenger.ID, err)
-			continue
-		}
-	}
-
 	return nil
 }
 
@@ -105,8 +81,10 @@ func (uc *MatchUC) HandleBeaconEvent(event models.BeaconEvent) error {
 		}
 
 		if event.Role == "driver" {
-			return uc.handleActiveDriver(ctx, event, location)
+			// For single-sided matching, drivers only join the pool without creating matches
+			return uc.addDriverToPool(ctx, event.UserID, location)
 		}
+		// Only passengers initiate the matching process
 		return uc.handleActivePassenger(ctx, event, location)
 	}
 
@@ -148,14 +126,24 @@ func (uc *MatchUC) CreateMatch(ctx context.Context, match *models.Match) error {
 }
 
 // ConfirmMatchStatus handles match confirmation from either driver or passenger
-func (uc *MatchUC) ConfirmMatchStatus(matchID string, mp models.MatchProposal) error {
+func (uc *MatchUC) ConfirmMatchStatus(matchID string, mp models.MatchProposal) (models.MatchProposal, error) {
 	ctx := context.Background()
 
 	if mp.MatchStatus == models.MatchStatusAccepted {
-		// For acceptance, we need to persist the match to database
-		persistedMatch, err := uc.matchRepo.ConfirmAndPersistMatch(ctx, mp.DriverID, mp.PassengerID)
+		// For acceptance, we need to get the match details first
+		match, err := uc.matchRepo.GetPendingMatchByID(ctx, matchID)
 		if err != nil {
-			return fmt.Errorf("failed to confirm and persist match: %w", err)
+			return models.MatchProposal{}, fmt.Errorf("failed to get pending match: %w", err)
+		}
+
+		// Use the driver and passenger IDs from the match
+		driverID := match.DriverID.String()
+		passengerID := match.PassengerID.String()
+
+		// Persist the match to database
+		persistedMatch, err := uc.matchRepo.ConfirmAndPersistMatch(ctx, driverID, passengerID)
+		if err != nil {
+			return models.MatchProposal{}, fmt.Errorf("failed to confirm and persist match: %w", err)
 		}
 
 		// Create acceptance event
@@ -168,11 +156,6 @@ func (uc *MatchUC) ConfirmMatchStatus(matchID string, mp models.MatchProposal) e
 			UserLocation:   persistedMatch.PassengerLocation,
 		}
 
-		// Publish match confirmation
-		if err := uc.matchGW.PublishMatchConfirm(ctx, acceptEvent); err != nil {
-			return fmt.Errorf("failed to publish match acceptance: %w", err)
-		}
-
 		// Remove both users from available pools
 		if err := uc.matchRepo.RemoveAvailableDriver(ctx, mp.DriverID); err != nil {
 			log.Printf("Failed to remove available driver: %v", err)
@@ -181,6 +164,9 @@ func (uc *MatchUC) ConfirmMatchStatus(matchID string, mp models.MatchProposal) e
 		if err := uc.matchRepo.RemoveAvailablePassenger(ctx, mp.PassengerID); err != nil {
 			log.Printf("Failed to remove available passenger: %v", err)
 		}
+
+		// No longer publishing to NATS - will return directly to HTTP client
+		return acceptEvent, nil
 	} else {
 		// For rejections, we simply remove the pending match references
 		// These keys will expire automatically, but we clean up for immediate effect
@@ -197,11 +183,7 @@ func (uc *MatchUC) ConfirmMatchStatus(matchID string, mp models.MatchProposal) e
 		rejectEvent := mp
 		rejectEvent.MatchStatus = models.MatchStatusRejected
 
-		// Publish rejection event
-		if err := uc.matchGW.PublishMatchRejected(ctx, rejectEvent); err != nil {
-			log.Printf("Failed to publish match rejection: %v", err)
-		}
+		// No longer publishing to NATS - will return directly to HTTP client
+		return rejectEvent, nil
 	}
-
-	return nil
 }

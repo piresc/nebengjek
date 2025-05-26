@@ -49,7 +49,7 @@ func main() {
 	userRepo := repository.NewUserRepo(configs, postgresClient.GetDB(), redisClient)
 
 	// Initialize Gateway
-	userGW := gateway.NewUserGW(natsClient)
+	userGW := gateway.NewUserGW(natsClient, configs.Services.MatchServiceURL)
 
 	// Initialize UseCase
 	userUC := usecase.NewUserUC(userRepo, userGW, configs)

@@ -478,6 +478,10 @@ func TestFindNearbyDrivers_Success(t *testing.T) {
 	}).Err()
 	assert.NoError(t, err)
 
+	// Add driver1 to available drivers set
+	err = client.SAdd(ctx, constants.KeyAvailableDrivers, driver1ID).Err()
+	assert.NoError(t, err)
+
 	// Driver 2: 0.8km away
 	err = client.GeoAdd(ctx, constants.KeyDriverGeo, &redis.GeoLocation{
 		Name:      driver2ID,
@@ -486,12 +490,20 @@ func TestFindNearbyDrivers_Success(t *testing.T) {
 	}).Err()
 	assert.NoError(t, err)
 
+	// Add driver2 to available drivers set
+	err = client.SAdd(ctx, constants.KeyAvailableDrivers, driver2ID).Err()
+	assert.NoError(t, err)
+
 	// Driver 3: 1.2km away (outside 1km radius)
 	err = client.GeoAdd(ctx, constants.KeyDriverGeo, &redis.GeoLocation{
 		Name:      driver3ID,
 		Longitude: 106.827153,
 		Latitude:  -6.185392, // ~1.2km from test location
 	}).Err()
+	assert.NoError(t, err)
+
+	// Add driver3 to available drivers set
+	err = client.SAdd(ctx, constants.KeyAvailableDrivers, driver3ID).Err()
 	assert.NoError(t, err)
 
 	// Search location
@@ -611,6 +623,10 @@ func TestFindNearbyPassengers_Success(t *testing.T) {
 	}).Err()
 	assert.NoError(t, err)
 
+	// Add passenger1 to available passengers set
+	err = client.SAdd(ctx, constants.KeyAvailablePassengers, passenger1ID).Err()
+	assert.NoError(t, err)
+
 	// Passenger 2: 0.8km away
 	err = client.GeoAdd(ctx, constants.KeyPassengerGeo, &redis.GeoLocation{
 		Name:      passenger2ID,
@@ -619,12 +635,20 @@ func TestFindNearbyPassengers_Success(t *testing.T) {
 	}).Err()
 	assert.NoError(t, err)
 
+	// Add passenger2 to available passengers set
+	err = client.SAdd(ctx, constants.KeyAvailablePassengers, passenger2ID).Err()
+	assert.NoError(t, err)
+
 	// Passenger 3: 1.2km away (outside 1km radius)
 	err = client.GeoAdd(ctx, constants.KeyPassengerGeo, &redis.GeoLocation{
 		Name:      passenger3ID,
 		Longitude: 106.827153,
 		Latitude:  -6.185392, // ~1.2km from test location
 	}).Err()
+	assert.NoError(t, err)
+
+	// Add passenger3 to available passengers set
+	err = client.SAdd(ctx, constants.KeyAvailablePassengers, passenger3ID).Err()
 	assert.NoError(t, err)
 
 	// Search location

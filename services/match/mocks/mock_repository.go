@@ -64,6 +64,21 @@ func (mr *MockMatchRepoMockRecorder) AddAvailablePassenger(ctx, passengerID, loc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddAvailablePassenger", reflect.TypeOf((*MockMatchRepo)(nil).AddAvailablePassenger), ctx, passengerID, location)
 }
 
+// ConfirmAndPersistMatch mocks base method.
+func (m *MockMatchRepo) ConfirmAndPersistMatch(ctx context.Context, driverID, passengerID string) (*models.Match, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ConfirmAndPersistMatch", ctx, driverID, passengerID)
+	ret0, _ := ret[0].(*models.Match)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ConfirmAndPersistMatch indicates an expected call of ConfirmAndPersistMatch.
+func (mr *MockMatchRepoMockRecorder) ConfirmAndPersistMatch(ctx, driverID, passengerID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConfirmAndPersistMatch", reflect.TypeOf((*MockMatchRepo)(nil).ConfirmAndPersistMatch), ctx, driverID, passengerID)
+}
+
 // ConfirmMatchAtomically mocks base method.
 func (m *MockMatchRepo) ConfirmMatchAtomically(ctx context.Context, matchID string, status models.MatchStatus) error {
 	m.ctrl.T.Helper()
@@ -91,6 +106,35 @@ func (m *MockMatchRepo) CreateMatch(ctx context.Context, match *models.Match) (*
 func (mr *MockMatchRepoMockRecorder) CreateMatch(ctx, match interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateMatch", reflect.TypeOf((*MockMatchRepo)(nil).CreateMatch), ctx, match)
+}
+
+// CreatePendingMatch mocks base method.
+func (m *MockMatchRepo) CreatePendingMatch(ctx context.Context, match *models.Match) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreatePendingMatch", ctx, match)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreatePendingMatch indicates an expected call of CreatePendingMatch.
+func (mr *MockMatchRepoMockRecorder) CreatePendingMatch(ctx, match interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreatePendingMatch", reflect.TypeOf((*MockMatchRepo)(nil).CreatePendingMatch), ctx, match)
+}
+
+// DeleteRedisKey mocks base method.
+func (m *MockMatchRepo) DeleteRedisKey(ctx context.Context, key string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteRedisKey", ctx, key)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteRedisKey indicates an expected call of DeleteRedisKey.
+func (mr *MockMatchRepoMockRecorder) DeleteRedisKey(ctx, key interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRedisKey", reflect.TypeOf((*MockMatchRepo)(nil).DeleteRedisKey), ctx, key)
 }
 
 // FindNearbyDrivers mocks base method.
@@ -136,6 +180,21 @@ func (m *MockMatchRepo) GetMatch(ctx context.Context, matchID string) (*models.M
 func (mr *MockMatchRepoMockRecorder) GetMatch(ctx, matchID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMatch", reflect.TypeOf((*MockMatchRepo)(nil).GetMatch), ctx, matchID)
+}
+
+// GetPendingMatchByID mocks base method.
+func (m *MockMatchRepo) GetPendingMatchByID(ctx context.Context, matchID string) (*models.Match, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPendingMatchByID", ctx, matchID)
+	ret0, _ := ret[0].(*models.Match)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPendingMatchByID indicates an expected call of GetPendingMatchByID.
+func (mr *MockMatchRepoMockRecorder) GetPendingMatchByID(ctx, matchID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingMatchByID", reflect.TypeOf((*MockMatchRepo)(nil).GetPendingMatchByID), ctx, matchID)
 }
 
 // ListMatchesByDriver mocks base method.
