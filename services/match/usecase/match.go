@@ -54,6 +54,41 @@ func (uc *MatchUC) handleActivePassenger(ctx context.Context, event models.Beaco
 	return nil
 }
 
+func (uc *MatchUC) handleActivePassengerWithTarget(ctx context.Context, event models.FinderEvent, location *models.Location, targetLocation *models.Location) error {
+	if err := uc.matchRepo.AddAvailablePassenger(ctx, event.UserID, location); err != nil {
+		log.Printf("Failed to add available passenger: %v", err)
+		return err
+	}
+
+	// Find nearby drivers to match with
+	nearbyDrivers, err := uc.matchRepo.FindNearbyDrivers(ctx, location, 1.0) // 1km radius
+	if err != nil {
+		log.Printf("Failed to find nearby drivers: %v", err)
+		return err
+	}
+
+	// Create match proposals for each nearby driver
+	for _, driver := range nearbyDrivers {
+		match := &models.Match{
+			DriverID:          converter.StrToUUID(driver.ID),
+			PassengerID:       converter.StrToUUID(event.UserID),
+			DriverLocation:    driver.Location,
+			PassengerLocation: *location,
+			TargetLocation:    *targetLocation,
+			Status:            models.MatchStatusPending,
+			CreatedAt:         time.Now(),
+			UpdatedAt:         time.Now(),
+		}
+
+		if err := uc.CreateMatch(ctx, match); err != nil {
+			log.Printf("Failed to create match with driver %s: %v", driver.ID, err)
+			continue
+		}
+	}
+
+	return nil
+}
+
 func (uc *MatchUC) handleInactiveUser(ctx context.Context, userID string, role string) error {
 	var err error
 	if role == "driver" {
@@ -69,7 +104,7 @@ func (uc *MatchUC) handleInactiveUser(ctx context.Context, userID string, role s
 	return nil
 }
 
-// HandleBeaconEvent processes beacon events from NATS
+// HandleBeaconEvent processes beacon events from NATS for drivers
 func (uc *MatchUC) HandleBeaconEvent(event models.BeaconEvent) error {
 	ctx := context.Background()
 
@@ -79,15 +114,33 @@ func (uc *MatchUC) HandleBeaconEvent(event models.BeaconEvent) error {
 			Longitude: event.Location.Longitude,
 		}
 
-		if event.Role == "driver" {
-			// For single-sided matching, drivers only join the pool without creating matches
-			return uc.addDriverToPool(ctx, event.UserID, location)
-		}
-		// Only passengers initiate the matching process
-		return uc.handleActivePassenger(ctx, event, location)
+		// Beacon events are only for drivers
+		return uc.addDriverToPool(ctx, event.UserID, location)
 	}
 
-	return uc.handleInactiveUser(ctx, event.UserID, event.Role)
+	return uc.handleInactiveUser(ctx, event.UserID, "driver")
+}
+
+// HandleFinderEvent processes finder events from NATS for passengers
+func (uc *MatchUC) HandleFinderEvent(event models.FinderEvent) error {
+	ctx := context.Background()
+
+	if event.IsActive {
+		location := &models.Location{
+			Latitude:  event.Location.Latitude,
+			Longitude: event.Location.Longitude,
+		}
+
+		targetLocation := &models.Location{
+			Latitude:  event.TargetLocation.Latitude,
+			Longitude: event.TargetLocation.Longitude,
+		}
+
+		// Finder events are only for passengers who initiate the matching process
+		return uc.handleActivePassengerWithTarget(ctx, event, location, targetLocation)
+	}
+
+	return uc.handleInactiveUser(ctx, event.UserID, "passenger")
 }
 
 func (uc *MatchUC) CreateMatch(ctx context.Context, match *models.Match) error {
@@ -104,6 +157,7 @@ func (uc *MatchUC) CreateMatch(ctx context.Context, match *models.Match) error {
 		DriverID:       converter.UUIDToStr(createdMatch.DriverID),
 		UserLocation:   createdMatch.PassengerLocation,
 		DriverLocation: createdMatch.DriverLocation,
+		TargetLocation: createdMatch.TargetLocation,
 		MatchStatus:    createdMatch.Status,
 	}
 
@@ -130,8 +184,6 @@ func (uc *MatchUC) ConfirmMatchStatus(req *models.MatchConfirmRequest) (models.M
 	matchID := match.ID.String()
 	isDriver := req.UserID == driverID
 
-	var finalStatus models.MatchStatus = models.MatchStatusPending
-
 	if req.Status == string(models.MatchStatusAccepted) {
 		// Update match in database with confirmation
 		if isDriver {
@@ -142,7 +194,6 @@ func (uc *MatchUC) ConfirmMatchStatus(req *models.MatchConfirmRequest) (models.M
 
 		// Check if both parties have confirmed
 		if match.DriverConfirmed && match.PassengerConfirmed {
-			finalStatus = models.MatchStatusAccepted
 			match.Status = models.MatchStatusAccepted
 			log.Printf("Match %s fully confirmed by both parties", matchID)
 
@@ -150,32 +201,40 @@ func (uc *MatchUC) ConfirmMatchStatus(req *models.MatchConfirmRequest) (models.M
 			uc.matchRepo.RemoveAvailableDriver(ctx, driverID)
 			uc.matchRepo.RemoveAvailablePassenger(ctx, passengerID)
 		} else if match.DriverConfirmed {
-			finalStatus = models.MatchStatusDriverConfirmed
 			match.Status = models.MatchStatusDriverConfirmed
 			log.Printf("Match %s confirmed by driver, waiting for passenger", matchID)
 		} else if match.PassengerConfirmed {
-			finalStatus = models.MatchStatusPassengerConfirmed
 			match.Status = models.MatchStatusPassengerConfirmed
 			log.Printf("Match %s confirmed by passenger, waiting for driver", matchID)
 		}
 
 		// Update the match in the database
 		match.UpdatedAt = time.Now()
-		_, err = uc.matchRepo.ConfirmMatchByUser(ctx, matchID, req.UserID, isDriver)
+		updatedMatch, err := uc.matchRepo.ConfirmMatchByUser(ctx, matchID, req.UserID, isDriver)
 		if err != nil {
 			log.Printf("Warning: Failed to update match confirmation: %v", err)
 			// Continue anyway to return the response
+		} else {
+			// Use the updated match from the repository to ensure status is correct
+			match = updatedMatch
 		}
 
-		// Create response event with updated status
+		// Create response event with updated status from the match
 		responseEvent := models.MatchProposal{
 			ID:             matchID,
 			PassengerID:    passengerID,
 			DriverID:       driverID,
-			MatchStatus:    finalStatus,
+			MatchStatus:    match.Status,
 			DriverLocation: match.DriverLocation,
 			UserLocation:   match.PassengerLocation,
+			TargetLocation: match.TargetLocation,
 		}
+
+		// Log the response event to help with debugging
+		log.Printf("Created match proposal response: %+v", responseEvent)
+		log.Printf("Driver location: %+v", match.DriverLocation)
+		log.Printf("Passenger location: %+v", match.PassengerLocation)
+		log.Printf("Target location: %+v", match.TargetLocation)
 
 		return responseEvent, nil
 	} else if req.Status == string(models.MatchStatusRejected) {
@@ -183,20 +242,30 @@ func (uc *MatchUC) ConfirmMatchStatus(req *models.MatchConfirmRequest) (models.M
 		match.Status = models.MatchStatusRejected
 		match.UpdatedAt = time.Now()
 
-		err = uc.matchRepo.UpdateMatchStatus(ctx, matchID, models.MatchStatusRejected)
+		err := uc.matchRepo.UpdateMatchStatus(ctx, matchID, models.MatchStatusRejected)
 		if err != nil {
 			log.Printf("Warning: Failed to update match status to rejected: %v", err)
 			// Continue anyway to return the response
 		}
 
-		// Create rejection event
+		// After updating status, get the latest match to ensure we have the correct state
+		updatedMatch, err := uc.matchRepo.GetMatch(ctx, matchID)
+		if err != nil {
+			log.Printf("Warning: Failed to get updated match after rejection: %v", err)
+			// Continue with local match object if we couldn't fetch the updated one
+		} else {
+			match = updatedMatch
+		}
+
+		// Create rejection event with the updated match status
 		rejectEvent := models.MatchProposal{
 			ID:             matchID,
 			PassengerID:    passengerID,
 			DriverID:       driverID,
-			MatchStatus:    models.MatchStatusRejected,
+			MatchStatus:    match.Status,
 			DriverLocation: match.DriverLocation,
 			UserLocation:   match.PassengerLocation,
+			TargetLocation: match.TargetLocation,
 		}
 
 		return rejectEvent, nil

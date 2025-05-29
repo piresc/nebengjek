@@ -17,7 +17,7 @@ import (
 
 func main() {
 	appName := "match-service"
-	configPath := "./config/match.env"
+	configPath := "/Users/pirescerullo/GitHub/assessment/nebengjek/config/match.env"
 	configs := config.InitConfig(configPath)
 
 	// Initialize PostgreSQL database connection

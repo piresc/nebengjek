@@ -11,6 +11,7 @@ import (
 // MatchUC defines the interface for match business logic
 type MatchUC interface {
 	HandleBeaconEvent(event models.BeaconEvent) error
+	HandleFinderEvent(event models.FinderEvent) error
 	ConfirmMatchStatus(req *models.MatchConfirmRequest) (models.MatchProposal, error)
 	GetMatch(ctx context.Context, matchID string) (*models.Match, error)
 	GetPendingMatch(ctx context.Context, matchID string) (*models.Match, error)

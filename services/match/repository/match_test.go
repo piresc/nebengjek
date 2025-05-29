@@ -57,6 +57,7 @@ func TestCreateMatch_Success(t *testing.T) {
 	// Location data
 	driverLoc := models.Location{Latitude: -6.175392, Longitude: 106.827153}
 	passengerLoc := models.Location{Latitude: -6.185392, Longitude: 106.837153}
+	targetLoc := models.Location{Latitude: -6.195392, Longitude: 106.847153}
 
 	match := &models.Match{
 		// Don't set ID because the implementation will generate a new one
@@ -65,6 +66,7 @@ func TestCreateMatch_Success(t *testing.T) {
 		Status:            models.MatchStatusPending,
 		DriverLocation:    driverLoc,
 		PassengerLocation: passengerLoc,
+		TargetLocation:    targetLoc,
 	}
 
 	// Mock transaction behavior
@@ -80,7 +82,11 @@ func TestCreateMatch_Success(t *testing.T) {
 			driverLoc.Latitude,
 			passengerLoc.Longitude,
 			passengerLoc.Latitude,
+			targetLoc.Longitude,
+			targetLoc.Latitude,
 			models.MatchStatusPending,
+			false, // driver_confirmed
+			false, // passenger_confirmed
 			sqlmock.AnyArg(), // created_at
 			sqlmock.AnyArg(), // updated_at
 		).

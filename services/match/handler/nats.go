@@ -41,6 +41,17 @@ func (h *MatchHandler) InitNATSConsumers() error {
 	}
 	h.subs = append(h.subs, sub)
 
+	// Initialize finder events consumer
+	sub, err = h.natsClient.Subscribe(constants.SubjectUserFinder, func(msg *nats.Msg) {
+		if err := h.handleFinderEvent(msg.Data); err != nil {
+			log.Printf("Error handling finder event: %v", err)
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to finder events: %w", err)
+	}
+	h.subs = append(h.subs, sub)
+
 	// Note: Match confirmations are now handled directly via HTTP responses
 
 	return nil
@@ -54,11 +65,26 @@ func (h *MatchHandler) handleBeaconEvent(msg []byte) error {
 		return err
 	}
 
-	log.Printf("Received beacon event: userID=%s, Role=%s, IsActive=%v",
-		event.UserID, event.Role, event.IsActive)
+	log.Printf("Received beacon event: userID=%s, IsActive=%v",
+		event.UserID, event.IsActive)
 
 	// Forward the event to usecase for processing
 	return h.matchUC.HandleBeaconEvent(event)
 }
 
-// Note: Match confirmations are now handled directly via HTTP responses
+// handleFinderEvent processes finder events from the user service
+func (h *MatchHandler) handleFinderEvent(msg []byte) error {
+	var event models.FinderEvent
+	if err := json.Unmarshal(msg, &event); err != nil {
+		log.Printf("Failed to unmarshal finder event: %v", err)
+		return err
+	}
+
+	log.Printf("Received finder event: userID=%s, IsActive=%v, Location=(%f,%f), TargetLocation=(%f,%f)",
+		event.UserID, event.IsActive,
+		event.Location.Latitude, event.Location.Longitude,
+		event.TargetLocation.Latitude, event.TargetLocation.Longitude)
+
+	// Forward the event to usecase for processing
+	return h.matchUC.HandleFinderEvent(event)
+}

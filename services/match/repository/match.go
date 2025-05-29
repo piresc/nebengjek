@@ -91,13 +91,14 @@ func (r *MatchRepo) CreateMatch(ctx context.Context, match *models.Match) (*mode
 	insertQuery := `
 		INSERT INTO matches (
 			id, driver_id, passenger_id, 
-			driver_location, passenger_location,
+			driver_location, passenger_location, target_location,
 			status, driver_confirmed, passenger_confirmed,
 			created_at, updated_at
 		) VALUES (
 			:id, :driver_id, :passenger_id,
 			point(:driver_longitude, :driver_latitude), 
 			point(:passenger_longitude, :passenger_latitude),
+			point(:target_longitude, :target_latitude),
 			:status, :driver_confirmed, :passenger_confirmed,
 			:created_at, :updated_at
 		)
@@ -124,6 +125,8 @@ func (r *MatchRepo) GetMatch(ctx context.Context, matchID string) (*models.Match
 			(driver_location[1])::float8 as driver_latitude,
 			(passenger_location[0])::float8 as passenger_longitude,
 			(passenger_location[1])::float8 as passenger_latitude,
+			(target_location[0])::float8 as target_longitude,
+			(target_location[1])::float8 as target_latitude,
 			status, driver_confirmed, passenger_confirmed,
 			created_at, updated_at
 		FROM matches
@@ -135,6 +138,7 @@ func (r *MatchRepo) GetMatch(ctx context.Context, matchID string) (*models.Match
 		&dto.ID, &dto.DriverID, &dto.PassengerID,
 		&dto.DriverLongitude, &dto.DriverLatitude,
 		&dto.PassengerLongitude, &dto.PassengerLatitude,
+		&dto.TargetLongitude, &dto.TargetLatitude,
 		&dto.Status, &dto.DriverConfirmed, &dto.PassengerConfirmed,
 		&dto.CreatedAt, &dto.UpdatedAt,
 	)
@@ -458,7 +462,10 @@ func (r *MatchRepo) ListMatchesByDriver(ctx context.Context, driverID string) ([
             (driver_location[1])::float8 as driver_latitude,
             (passenger_location[0])::float8 as passenger_longitude,
             (passenger_location[1])::float8 as passenger_latitude,
-            status, created_at, updated_at
+            (target_location[0])::float8 as target_longitude,
+            (target_location[1])::float8 as target_latitude,
+            status, driver_confirmed, passenger_confirmed,
+            created_at, updated_at
         FROM matches
         WHERE driver_id = $1
         ORDER BY created_at DESC
@@ -477,7 +484,9 @@ func (r *MatchRepo) ListMatchesByDriver(ctx context.Context, driverID string) ([
 			&dto.ID, &dto.DriverID, &dto.PassengerID,
 			&dto.DriverLongitude, &dto.DriverLatitude,
 			&dto.PassengerLongitude, &dto.PassengerLatitude,
-			&dto.Status, &dto.CreatedAt, &dto.UpdatedAt,
+			&dto.TargetLongitude, &dto.TargetLatitude,
+			&dto.Status, &dto.DriverConfirmed, &dto.PassengerConfirmed,
+			&dto.CreatedAt, &dto.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan match: %w", err)
@@ -502,7 +511,10 @@ func (r *MatchRepo) ListMatchesByPassenger(ctx context.Context, passengerID uuid
             (driver_location[1])::float8 as driver_latitude,
             (passenger_location[0])::float8 as passenger_longitude,
             (passenger_location[1])::float8 as passenger_latitude,
-            status, created_at, updated_at
+            (target_location[0])::float8 as target_longitude,
+            (target_location[1])::float8 as target_latitude,
+            status, driver_confirmed, passenger_confirmed,
+            created_at, updated_at
         FROM matches
         WHERE passenger_id = $1
         ORDER BY created_at DESC
@@ -521,7 +533,9 @@ func (r *MatchRepo) ListMatchesByPassenger(ctx context.Context, passengerID uuid
 			&dto.ID, &dto.DriverID, &dto.PassengerID,
 			&dto.DriverLongitude, &dto.DriverLatitude,
 			&dto.PassengerLongitude, &dto.PassengerLatitude,
-			&dto.Status, &dto.CreatedAt, &dto.UpdatedAt,
+			&dto.TargetLongitude, &dto.TargetLatitude,
+			&dto.Status, &dto.DriverConfirmed, &dto.PassengerConfirmed,
+			&dto.CreatedAt, &dto.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan match: %w", err)
@@ -709,13 +723,14 @@ func (r *MatchRepo) ConfirmAndPersistMatch(ctx context.Context, driverID, passen
 	query := `
 		INSERT INTO matches (
 			id, driver_id, passenger_id, 
-			driver_location, passenger_location,
+			driver_location, passenger_location, target_location,
 			status, driver_confirmed, passenger_confirmed,
 			created_at, updated_at
 		) VALUES (
 			:id, :driver_id, :passenger_id,
 			point(:driver_longitude, :driver_latitude), 
 			point(:passenger_longitude, :passenger_latitude),
+			point(:target_longitude, :target_latitude),
 			:status, :driver_confirmed, :passenger_confirmed,
 			:created_at, :updated_at
 		)
@@ -756,6 +771,8 @@ func (r *MatchRepo) ConfirmMatchByUser(ctx context.Context, matchID string, user
 			(driver_location[1])::float8 as driver_latitude,
 			(passenger_location[0])::float8 as passenger_longitude,
 			(passenger_location[1])::float8 as passenger_latitude,
+			(target_location[0])::float8 as target_longitude,
+			(target_location[1])::float8 as target_latitude,
 			status, driver_confirmed, passenger_confirmed,
 			created_at, updated_at
 		FROM matches
@@ -770,6 +787,7 @@ func (r *MatchRepo) ConfirmMatchByUser(ctx context.Context, matchID string, user
 		&dto.ID, &dto.DriverID, &dto.PassengerID,
 		&dto.DriverLongitude, &dto.DriverLatitude,
 		&dto.PassengerLongitude, &dto.PassengerLatitude,
+		&dto.TargetLongitude, &dto.TargetLatitude,
 		&dto.Status, &dto.DriverConfirmed, &dto.PassengerConfirmed,
 		&dto.CreatedAt, &dto.UpdatedAt,
 	)

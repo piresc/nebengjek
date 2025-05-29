@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
 	httpclient "github.com/piresc/nebengjek/internal/pkg/http"
 	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/utils"
 )
 
 // MatchClient is an HTTP client for communicating with the match service
@@ -34,14 +36,6 @@ func NewHTTPGateway(matchServiceURL string) *HTTPGateway {
 	return &HTTPGateway{
 		matchClient: NewMatchClient(matchServiceURL),
 	}
-}
-
-// MatchConfirmResponse is the response structure for match confirmation
-type MatchConfirmResponse struct {
-	Success bool                 `json:"success"`
-	Message string               `json:"message,omitempty"`
-	MatchID string               `json:"match_id,omitempty"`
-	Match   models.MatchProposal `json:"match,omitempty"`
 }
 
 // MatchAccept sends a match confirmation request to the match service
@@ -76,19 +70,24 @@ func (g *HTTPGateway) MatchConfirm(req *models.MatchConfirmRequest) (*models.Mat
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	// Create a new reader from the response body for parsing
-	bodyReader := bytes.NewReader(respBody)
-
-	// Parse response
-	var response MatchConfirmResponse
-	if err := json.NewDecoder(bodyReader).Decode(&response); err != nil {
-		return nil, fmt.Errorf("failed to decode match confirmation response: %w, body: %s", err, string(respBody))
-	}
-
 	// Check response status
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("match confirmation failed: %s (status: %d)", response.Message, resp.StatusCode)
+		return nil, fmt.Errorf("match confirmation failed: (status: %d, body: %s)", resp.StatusCode, string(respBody))
 	}
 
-	return &response.Match, nil
+	// Parse the response using our utility function
+	var matchProposal models.MatchProposal
+	if err := utils.ParseJSONResponse(respBody, &matchProposal); err != nil {
+		// Log the raw response for debugging
+		log.Printf("Error parsing response. Raw response body: %s", string(respBody))
+		return nil, fmt.Errorf("failed to parse match confirmation response: %w", err)
+	}
+
+	// Log the received match proposal for debugging
+	log.Printf("Received match proposal from match service: %+v", matchProposal)
+	log.Printf("Driver location: %+v", matchProposal.DriverLocation)
+	log.Printf("User location: %+v", matchProposal.UserLocation)
+	log.Printf("Target location: %+v", matchProposal.TargetLocation)
+
+	return &matchProposal, nil
 }

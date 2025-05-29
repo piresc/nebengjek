@@ -16,6 +16,11 @@ func (g *UserGW) PublishBeaconEvent(ctx context.Context, event *models.BeaconEve
 	return g.natsGateway.PublishBeaconEvent(ctx, event)
 }
 
+// PublishFinderEvent forwards to the NATS gateway implementation
+func (g *UserGW) PublishFinderEvent(ctx context.Context, event *models.FinderEvent) error {
+	return g.natsGateway.PublishFinderEvent(ctx, event)
+}
+
 // PublishLocationUpdate forwards to the NATS gateway implementation
 func (g *UserGW) PublishLocationUpdate(ctx context.Context, locationEvent *models.LocationUpdate) error {
 	return g.natsGateway.PublishLocationUpdate(ctx, locationEvent)

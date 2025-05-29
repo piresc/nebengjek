@@ -7,6 +7,7 @@ const (
 
 	// User events
 	EventBeaconUpdate = "beacon_update"
+	EventFinderUpdate = "finder_update"
 
 	// Location events
 	EventLocationUpdate = "location_update"

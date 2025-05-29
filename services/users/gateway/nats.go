@@ -47,3 +47,12 @@ func (g *NATSGateway) PublishRideArrived(ctx context.Context, event *models.Ride
 	}
 	return g.client.Publish(constants.SubjectRideArrived, data)
 }
+
+// PublishFinderEvent publishes a finder event to NATS
+func (g *NATSGateway) PublishFinderEvent(ctx context.Context, event *models.FinderEvent) error {
+	data, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	return g.client.Publish(constants.SubjectUserFinder, data)
+}

@@ -21,7 +21,7 @@ import (
 
 func main() {
 	appName := "users-service"
-	configPath := "./config/users.env"
+	configPath := "/Users/pirescerullo/GitHub/assessment/nebengjek/config/users.env"
 	configs := config.InitConfig(configPath)
 
 	// Initialize PostgreSQL database connection

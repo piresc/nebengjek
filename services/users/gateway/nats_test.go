@@ -69,7 +69,6 @@ func TestPublishBeaconEvent_Success(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, beaconEvent.UserID, receivedEvent.UserID)
-		assert.Equal(t, beaconEvent.Role, receivedEvent.Role)
 		assert.Equal(t, beaconEvent.IsActive, receivedEvent.IsActive)
 		assert.Equal(t, beaconEvent.Location.Latitude, receivedEvent.Location.Latitude)
 		assert.Equal(t, beaconEvent.Location.Longitude, receivedEvent.Location.Longitude)

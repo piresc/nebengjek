@@ -43,6 +43,7 @@ func (m *WebSocketManager) handleMatchConfirmation(client *models.WebSocketClien
 		log.Printf("Error confirming match for user %s: %v", client.UserID, err)
 		return m.manager.SendErrorMessage(client.Conn, constants.ErrorMatchUpdateFailed, err.Error())
 	}
+	log.Print(result)
 
 	// Directly notify both driver and passenger about the confirmation
 	// since we now have the result directly from the HTTP call

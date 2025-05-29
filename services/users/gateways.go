@@ -11,9 +11,10 @@ import (
 // UserGW defines the user gateaways interface
 type UserGW interface {
 	// NATS Gateway
-	PublishBeaconEvent(ctx context.Context, beaconReq *models.BeaconEvent) error
+	PublishBeaconEvent(ctx context.Context, beaconEvent *models.BeaconEvent) error
+	PublishFinderEvent(ctx context.Context, finderevent *models.FinderEvent) error
 	PublishLocationUpdate(ctx context.Context, locationEvent *models.LocationUpdate) error
-	PublishRideArrived(ctx context.Context, event *models.RideCompleteEvent) error
+	PublishRideArrived(ctx context.Context, RideCompleteEvent *models.RideCompleteEvent) error
 
 	// HTTP Gateway
 	MatchConfirm(req *models.MatchConfirmRequest) (*models.MatchProposal, error)

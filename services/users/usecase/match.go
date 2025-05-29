@@ -15,13 +15,13 @@ func (uc *UserUC) ConfirmMatch(ctx context.Context, mp *models.MatchConfirmReque
 		return nil, fmt.Errorf("invalid match status: %s", mp.Status)
 	}
 
-	// Validate that the user exists and has the correct role
+	// Validate that the user exists
 	user, err := uc.userRepo.GetUserByID(ctx, mp.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
-	// Assign the user's role to the match proposal
 	mp.Role = user.Role
-	// Call the gateway with the user's role information
+
+	// Call the gateway to confirm the match
 	return uc.UserGW.MatchConfirm(mp)
 }

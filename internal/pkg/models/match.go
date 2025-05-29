@@ -24,6 +24,7 @@ type Match struct {
 	PassengerID        uuid.UUID   `json:"passenger_id" db:"passenger_id"`
 	DriverLocation     Location    `json:"driver_location" db:"driver_location"`
 	PassengerLocation  Location    `json:"passenger_location" db:"passenger_location"`
+	TargetLocation     Location    `json:"target_location" db:"target_location"`
 	Status             MatchStatus `json:"status" db:"status"`
 	DriverConfirmed    bool        `json:"driver_confirmed" db:"driver_confirmed"`
 	PassengerConfirmed bool        `json:"passenger_confirmed" db:"passenger_confirmed"`
@@ -40,6 +41,8 @@ type MatchDTO struct {
 	DriverLatitude     float64     `db:"driver_latitude"`
 	PassengerLongitude float64     `db:"passenger_longitude"`
 	PassengerLatitude  float64     `db:"passenger_latitude"`
+	TargetLongitude    float64     `db:"target_longitude"`
+	TargetLatitude     float64     `db:"target_latitude"`
 	Status             MatchStatus `db:"status"`
 	DriverConfirmed    bool        `db:"driver_confirmed"`
 	PassengerConfirmed bool        `db:"passenger_confirmed"`
@@ -57,6 +60,8 @@ func (m *Match) ToDTO() *MatchDTO {
 		DriverLatitude:     m.DriverLocation.Latitude,
 		PassengerLongitude: m.PassengerLocation.Longitude,
 		PassengerLatitude:  m.PassengerLocation.Latitude,
+		TargetLongitude:    m.TargetLocation.Longitude,
+		TargetLatitude:     m.TargetLocation.Latitude,
 		Status:             m.Status,
 		DriverConfirmed:    m.DriverConfirmed,
 		PassengerConfirmed: m.PassengerConfirmed,
@@ -81,6 +86,11 @@ func (dto *MatchDTO) ToMatch() *Match {
 			Longitude: dto.PassengerLongitude,
 			Timestamp: dto.CreatedAt,
 		},
+		TargetLocation: Location{
+			Latitude:  dto.TargetLatitude,
+			Longitude: dto.TargetLongitude,
+			Timestamp: dto.CreatedAt,
+		},
 		Status:             dto.Status,
 		DriverConfirmed:    dto.DriverConfirmed,
 		PassengerConfirmed: dto.PassengerConfirmed,
@@ -95,14 +105,15 @@ type MatchProposal struct {
 	DriverID       string      `json:"driver_id"`
 	UserLocation   Location    `json:"location"`
 	DriverLocation Location    `json:"driver_location"`
+	TargetLocation Location    `json:"target_location"`
 	MatchStatus    MatchStatus `json:"match_status"`
 }
 
 // MatchConfirmRequest is the request structure for confirming a match
 type MatchConfirmRequest struct {
 	ID     string `json:"match_id"`
-	UserID string
-	Role   string
+	UserID string `json:"user_id"`
+	Role   string `json:"role"`
 	Status string `json:"status"`
 }
 

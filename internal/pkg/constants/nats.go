@@ -4,6 +4,7 @@ package constants
 const (
 	// User Service
 	SubjectUserBeacon = "user.beacon"
+	SubjectUserFinder = "user.finder"
 
 	// Match Service
 	SubjectMatchFound    = "match.found"

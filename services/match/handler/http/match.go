@@ -1,6 +1,7 @@
 package http
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -18,14 +19,6 @@ func NewMatchHandler(matchUC match.MatchUC) *MatchHandler {
 	return &MatchHandler{
 		matchUC: matchUC,
 	}
-}
-
-// MatchConfirmResponse is the response structure for match confirmation
-type MatchConfirmResponse struct {
-	Success bool                 `json:"success"`
-	Message string               `json:"message,omitempty"`
-	MatchID string               `json:"match_id,omitempty"` // Changed to match snake_case convention
-	Match   models.MatchProposal `json:"match,omitempty"`
 }
 
 // ConfirmMatch handles the confirmation of a match by a user
@@ -52,19 +45,16 @@ func (h *MatchHandler) ConfirmMatch(c echo.Context) error {
 		return BadRequestResponse(c, "Status must be either ACCEPTED or REJECTED")
 	}
 
-	// Call the use case directly - let the usecase handle all validation logic
 	result, err := h.matchUC.ConfirmMatchStatus(&req)
 	if err != nil {
 		return ErrorResponseHandler(c, http.StatusInternalServerError, "Failed to confirm match: "+err.Error())
 	}
 
-	// Return success response with match details
-	responseData := MatchConfirmResponse{
-		Success: true,
-		Message: "Match confirmation processed successfully",
-		MatchID: matchID,
-		Match:   result,
-	}
+	// Log the result for debugging
+	log.Printf("Match confirmation result to be returned: %+v", result)
+	log.Printf("Driver location: %+v", result.DriverLocation)
+	log.Printf("User location: %+v", result.UserLocation)
+	log.Printf("Target location: %+v", result.TargetLocation)
 
-	return SuccessResponseWithData(c, http.StatusOK, "Match confirmation processed successfully", responseData)
+	return SuccessResponseWithData(c, http.StatusOK, "Match confirmation processed successfully", result)
 }
