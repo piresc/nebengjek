@@ -15,10 +15,12 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/labstack/echo-jwt/v4 v4.3.1
 	github.com/labstack/echo/v4 v4.13.3
+	github.com/lib/pq v1.10.9
 	github.com/mmcloughlin/geohash v0.10.0
 	github.com/nats-io/nats.go v1.41.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
+	github.com/nats-io/nats-server/test v1.0.6
 )
 
 require (
