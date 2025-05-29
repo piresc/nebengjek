@@ -6,7 +6,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/converter"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
@@ -92,29 +91,20 @@ func (uc *MatchUC) HandleBeaconEvent(event models.BeaconEvent) error {
 }
 
 func (uc *MatchUC) CreateMatch(ctx context.Context, match *models.Match) error {
-	// Create pending match in Redis with 1-minute expiration using SetNX
-	// This ensures we don't create duplicate matches between the same driver and passenger
-	matchID, err := uc.matchRepo.CreatePendingMatch(ctx, match)
+	// Create match directly in database, which will check for existing pending matches
+	createdMatch, err := uc.matchRepo.CreateMatch(ctx, match)
 	if err != nil {
-		return fmt.Errorf("failed to create pending match: %w", err)
-	}
-
-	// If matchID is empty, it means a match already exists between this driver and passenger
-	if matchID == "" {
-		// Skip creating another match proposal
-		log.Printf("Match already exists between driver %s and passenger %s",
-			converter.UUIDToStr(match.DriverID), converter.UUIDToStr(match.PassengerID))
-		return nil
+		return fmt.Errorf("failed to create match: %w", err)
 	}
 
 	// Create match proposal for notification
 	matchProposal := models.MatchProposal{
-		ID:             matchID,
-		PassengerID:    converter.UUIDToStr(match.PassengerID),
-		DriverID:       converter.UUIDToStr(match.DriverID),
-		UserLocation:   match.PassengerLocation,
-		DriverLocation: match.DriverLocation,
-		MatchStatus:    models.MatchStatusPending,
+		ID:             createdMatch.ID.String(),
+		PassengerID:    converter.UUIDToStr(createdMatch.PassengerID),
+		DriverID:       converter.UUIDToStr(createdMatch.DriverID),
+		UserLocation:   createdMatch.PassengerLocation,
+		DriverLocation: createdMatch.DriverLocation,
+		MatchStatus:    createdMatch.Status,
 	}
 
 	// Publish match proposal event
@@ -126,64 +116,113 @@ func (uc *MatchUC) CreateMatch(ctx context.Context, match *models.Match) error {
 }
 
 // ConfirmMatchStatus handles match confirmation from either driver or passenger
-func (uc *MatchUC) ConfirmMatchStatus(matchID string, mp models.MatchProposal) (models.MatchProposal, error) {
+func (uc *MatchUC) ConfirmMatchStatus(req *models.MatchConfirmRequest) (models.MatchProposal, error) {
 	ctx := context.Background()
 
-	if mp.MatchStatus == models.MatchStatusAccepted {
-		// For acceptance, we need to get the match details first
-		match, err := uc.matchRepo.GetPendingMatchByID(ctx, matchID)
+	// Get the match from database
+	match, err := uc.matchRepo.GetMatch(ctx, req.ID)
+	if err != nil {
+		return models.MatchProposal{}, fmt.Errorf("match not found in database: %w", err)
+	}
+
+	driverID := match.DriverID.String()
+	passengerID := match.PassengerID.String()
+	matchID := match.ID.String()
+	isDriver := req.UserID == driverID
+
+	var finalStatus models.MatchStatus = models.MatchStatusPending
+
+	if req.Status == string(models.MatchStatusAccepted) {
+		// Update match in database with confirmation
+		if isDriver {
+			match.DriverConfirmed = true
+		} else {
+			match.PassengerConfirmed = true
+		}
+
+		// Check if both parties have confirmed
+		if match.DriverConfirmed && match.PassengerConfirmed {
+			finalStatus = models.MatchStatusAccepted
+			match.Status = models.MatchStatusAccepted
+			log.Printf("Match %s fully confirmed by both parties", matchID)
+
+			// Remove users from available pools
+			uc.matchRepo.RemoveAvailableDriver(ctx, driverID)
+			uc.matchRepo.RemoveAvailablePassenger(ctx, passengerID)
+		} else if match.DriverConfirmed {
+			finalStatus = models.MatchStatusDriverConfirmed
+			match.Status = models.MatchStatusDriverConfirmed
+			log.Printf("Match %s confirmed by driver, waiting for passenger", matchID)
+		} else if match.PassengerConfirmed {
+			finalStatus = models.MatchStatusPassengerConfirmed
+			match.Status = models.MatchStatusPassengerConfirmed
+			log.Printf("Match %s confirmed by passenger, waiting for driver", matchID)
+		}
+
+		// Update the match in the database
+		match.UpdatedAt = time.Now()
+		_, err = uc.matchRepo.ConfirmMatchByUser(ctx, matchID, req.UserID, isDriver)
 		if err != nil {
-			return models.MatchProposal{}, fmt.Errorf("failed to get pending match: %w", err)
+			log.Printf("Warning: Failed to update match confirmation: %v", err)
+			// Continue anyway to return the response
 		}
 
-		// Use the driver and passenger IDs from the match
-		driverID := match.DriverID.String()
-		passengerID := match.PassengerID.String()
+		// Create response event with updated status
+		responseEvent := models.MatchProposal{
+			ID:             matchID,
+			PassengerID:    passengerID,
+			DriverID:       driverID,
+			MatchStatus:    finalStatus,
+			DriverLocation: match.DriverLocation,
+			UserLocation:   match.PassengerLocation,
+		}
 
-		// Persist the match to database
-		persistedMatch, err := uc.matchRepo.ConfirmAndPersistMatch(ctx, driverID, passengerID)
+		return responseEvent, nil
+	} else if req.Status == string(models.MatchStatusRejected) {
+		// For rejections, update the match status to rejected
+		match.Status = models.MatchStatusRejected
+		match.UpdatedAt = time.Now()
+
+		err = uc.matchRepo.UpdateMatchStatus(ctx, matchID, models.MatchStatusRejected)
 		if err != nil {
-			return models.MatchProposal{}, fmt.Errorf("failed to confirm and persist match: %w", err)
+			log.Printf("Warning: Failed to update match status to rejected: %v", err)
+			// Continue anyway to return the response
 		}
-
-		// Create acceptance event
-		acceptEvent := models.MatchProposal{
-			ID:             converter.UUIDToStr(persistedMatch.ID),
-			PassengerID:    converter.UUIDToStr(persistedMatch.PassengerID),
-			DriverID:       converter.UUIDToStr(persistedMatch.DriverID),
-			MatchStatus:    models.MatchStatusAccepted,
-			DriverLocation: persistedMatch.DriverLocation,
-			UserLocation:   persistedMatch.PassengerLocation,
-		}
-
-		// Remove both users from available pools
-		if err := uc.matchRepo.RemoveAvailableDriver(ctx, mp.DriverID); err != nil {
-			log.Printf("Failed to remove available driver: %v", err)
-		}
-
-		if err := uc.matchRepo.RemoveAvailablePassenger(ctx, mp.PassengerID); err != nil {
-			log.Printf("Failed to remove available passenger: %v", err)
-		}
-
-		// No longer publishing to NATS - will return directly to HTTP client
-		return acceptEvent, nil
-	} else {
-		// For rejections, we simply remove the pending match references
-		// These keys will expire automatically, but we clean up for immediate effect
-		driverKey := fmt.Sprintf(constants.KeyDriverMatch, mp.DriverID)
-		passengerKey := fmt.Sprintf(constants.KeyPassengerMatch, mp.PassengerID)
-		pairKey := fmt.Sprintf(constants.KeyPendingMatchPair, mp.DriverID, mp.PassengerID)
-
-		// Delete the keys - we don't care much about errors here as they'll expire anyway
-		uc.matchRepo.DeleteRedisKey(ctx, driverKey)
-		uc.matchRepo.DeleteRedisKey(ctx, passengerKey)
-		uc.matchRepo.DeleteRedisKey(ctx, pairKey)
 
 		// Create rejection event
-		rejectEvent := mp
-		rejectEvent.MatchStatus = models.MatchStatusRejected
+		rejectEvent := models.MatchProposal{
+			ID:             matchID,
+			PassengerID:    passengerID,
+			DriverID:       driverID,
+			MatchStatus:    models.MatchStatusRejected,
+			DriverLocation: match.DriverLocation,
+			UserLocation:   match.PassengerLocation,
+		}
 
-		// No longer publishing to NATS - will return directly to HTTP client
 		return rejectEvent, nil
 	}
+
+	return models.MatchProposal{}, fmt.Errorf("unsupported match status: %s", req.Status)
+}
+
+// GetMatch retrieves a match by ID
+func (uc *MatchUC) GetMatch(ctx context.Context, matchID string) (*models.Match, error) {
+	return uc.matchRepo.GetMatch(ctx, matchID)
+}
+
+// GetPendingMatch retrieves a pending match by ID
+func (uc *MatchUC) GetPendingMatch(ctx context.Context, matchID string) (*models.Match, error) {
+	match, err := uc.matchRepo.GetMatch(ctx, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find match: %w", err)
+	}
+
+	// Only return if it's in pending state
+	if match.Status == models.MatchStatusPending ||
+		match.Status == models.MatchStatusDriverConfirmed ||
+		match.Status == models.MatchStatusPassengerConfirmed {
+		return match, nil
+	}
+
+	return nil, fmt.Errorf("match is not in pending state")
 }

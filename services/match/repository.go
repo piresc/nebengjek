@@ -7,6 +7,8 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
+//go:generate mockgen -destination=mocks/mock_repository.go -package=mocks github.com/piresc/nebengjek/services/match MatchRepo
+
 // MatchRepository defines the interface for match data access operations
 type MatchRepo interface {
 	// Match CRUD operations
@@ -15,14 +17,7 @@ type MatchRepo interface {
 	UpdateMatchStatus(ctx context.Context, matchID string, status models.MatchStatus) error
 	ListMatchesByDriver(ctx context.Context, driverID string) ([]*models.Match, error)
 	ListMatchesByPassenger(ctx context.Context, passengerID uuid.UUID) ([]*models.Match, error)
-
-	// Redis match proposal operations
-	StoreMatchProposal(ctx context.Context, match *models.Match) error
-	CreatePendingMatch(ctx context.Context, match *models.Match) (string, error)
-	ConfirmAndPersistMatch(ctx context.Context, driverID, passengerID string) (*models.Match, error)
-	GetPendingMatchByID(ctx context.Context, matchID string) (*models.Match, error)
-	DeleteRedisKey(ctx context.Context, key string) error
-	ConfirmMatchAtomically(ctx context.Context, matchID string, status models.MatchStatus) error
+	ConfirmMatchByUser(ctx context.Context, matchID string, userID string, isDriver bool) (*models.Match, error)
 
 	// Location-based operations
 	AddAvailableDriver(ctx context.Context, driverID string, location *models.Location) error

@@ -74,8 +74,8 @@ func (m *WebSocketManager) handleMessage(client *models.WebSocketClient, msg []b
 	switch wsMsg.Event {
 	case constants.EventBeaconUpdate:
 		return m.handleBeaconUpdate(client, wsMsg.Data)
-	case constants.EventMatchAccept:
-		return m.handleMatchAccept(client, wsMsg.Data)
+	case constants.EventMatchConfirm:
+		return m.handleMatchConfirmation(client, wsMsg.Data)
 	case constants.EventLocationUpdate:
 		return m.handleLocationUpdate(client.UserID, wsMsg.Data)
 	case constants.EventRideArrived:

@@ -36,7 +36,7 @@ func NewRidesHandler(
 func (h *RidesHandler) InitNATSConsumers() error {
 	// Initialize rides acceptance consumer
 	sub, err := h.natsClient.Subscribe(constants.SubjectMatchAccepted, func(msg *nats.Msg) {
-		if err := h.handleMatchAccept(msg.Data); err != nil {
+		if err := h.handleMatchConfirmation(msg.Data); err != nil {
 			log.Printf("Error handling match acceptance: %v", err)
 		}
 	})
@@ -70,9 +70,9 @@ func (h *RidesHandler) InitNATSConsumers() error {
 	return nil
 }
 
-// handleMatchAccept processes rides acceptance events
-func (h *RidesHandler) handleMatchAccept(msg []byte) error {
-	var match models.MatchProposal
+// handleMatchConfirmation processes rides acceptance events
+func (h *RidesHandler) handleMatchConfirmation(msg []byte) error {
+	var match models.MatchConfirmRequest
 	if err := json.Unmarshal(msg, &match); err != nil {
 		log.Printf("Failed to unmarshal match proposal: %v", err)
 		return err

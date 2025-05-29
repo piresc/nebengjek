@@ -26,7 +26,9 @@ func NewHandler(
 
 // RegisterRoutes registers all HTTP routes
 func (h *Handler) RegisterRoutes(e *echo.Echo) {
-	h.matchHTTP.RegisterRoutes(e)
+	// Match routes
+	matchGroup := e.Group("/matches")
+	matchGroup.POST("/:matchID/confirm", h.matchHTTP.ConfirmMatch)
 }
 
 // InitNATSConsumers initializes all NATS consumers

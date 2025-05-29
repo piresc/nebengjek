@@ -7,14 +7,14 @@ import (
 
 // UserGW handles user gateway operations
 type UserGW struct {
-	natsClient      *natspkg.Client
-	matchHTTPClient *MatchHTTPClient
+	natsGateway *NATSGateway
+	httpGateway *HTTPGateway
 }
 
 // NewUserGW creates a new gateway instance with NATS and HTTP clients
 func NewUserGW(natsClient *natspkg.Client, matchServiceURL string) users.UserGW {
 	return &UserGW{
-		natsClient:      natsClient,
-		matchHTTPClient: NewMatchHTTPClient(matchServiceURL),
+		natsGateway: NewNATSGateway(natsClient),
+		httpGateway: NewHTTPGateway(matchServiceURL),
 	}
 }

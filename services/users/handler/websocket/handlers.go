@@ -28,26 +28,26 @@ func (m *WebSocketManager) handleBeaconUpdate(client *models.WebSocketClient, da
 	})
 }
 
-// handleMatchAccept processes match acceptance from drivers
-func (m *WebSocketManager) handleMatchAccept(client *models.WebSocketClient, data json.RawMessage) error {
-	UserID := client.UserID
+// handleMatchConfirmation processes match acceptance from drivers
+func (m *WebSocketManager) handleMatchConfirmation(client *models.WebSocketClient, data json.RawMessage) error {
 
-	var matchProposalAccept models.MatchProposal
-	if err := json.Unmarshal(data, &matchProposalAccept); err != nil {
+	var confirm models.MatchConfirmRequest
+	if err := json.Unmarshal(data, &confirm); err != nil {
 		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Invalid match proposal format")
 	}
+	confirm.UserID = client.UserID
 
 	// Update match status
-	result, err := m.userUC.ConfirmMatch(context.Background(), &matchProposalAccept, UserID)
+	result, err := m.userUC.ConfirmMatch(context.Background(), &confirm)
 	if err != nil {
-		log.Printf("Error confirming match for driver %s: %v", client.UserID, err)
+		log.Printf("Error confirming match for user %s: %v", client.UserID, err)
 		return m.manager.SendErrorMessage(client.Conn, constants.ErrorMatchUpdateFailed, err.Error())
 	}
 
 	// Directly notify both driver and passenger about the confirmation
 	// since we now have the result directly from the HTTP call
-	m.manager.NotifyClient(result.DriverID, constants.EventMatchConfirm, result)
-	m.manager.NotifyClient(result.PassengerID, constants.EventMatchConfirm, result)
+	m.manager.NotifyClient(result.DriverID, string(confirm.Status), result)
+	m.manager.NotifyClient(result.PassengerID, string(confirm.Status), result)
 
 	return nil
 }

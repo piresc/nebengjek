@@ -13,7 +13,6 @@ const (
 
 	// Match events
 	EventMatchConfirm  = "match_confirm"
-	EventMatchAccept   = "match_accept"
 	EventMatchRejected = "match_rejected"
 
 	// Ride events

@@ -34,7 +34,37 @@ func NewMatchRepository(
 }
 
 // CreateMatch creates a new match (trip) in the database
+// If a pending match already exists with the same driver and passenger, returns the existing match
 func (r *MatchRepo) CreateMatch(ctx context.Context, match *models.Match) (*models.Match, error) {
+	// First check if a pending match exists with the same driver and passenger
+	query := `
+		SELECT 
+			id, driver_id, passenger_id,
+			(driver_location[0])::float8 as driver_longitude,
+			(driver_location[1])::float8 as driver_latitude,
+			(passenger_location[0])::float8 as passenger_longitude,
+			(passenger_location[1])::float8 as passenger_latitude,
+			status, driver_confirmed, passenger_confirmed,
+			created_at, updated_at
+		FROM matches
+		WHERE driver_id = $1 AND passenger_id = $2 AND status = $3
+	`
+
+	var existingDTO models.MatchDTO
+	err := r.db.QueryRowContext(ctx, query, match.DriverID, match.PassengerID, models.MatchStatusPending).Scan(
+		&existingDTO.ID, &existingDTO.DriverID, &existingDTO.PassengerID,
+		&existingDTO.DriverLongitude, &existingDTO.DriverLatitude,
+		&existingDTO.PassengerLongitude, &existingDTO.PassengerLatitude,
+		&existingDTO.Status, &existingDTO.DriverConfirmed, &existingDTO.PassengerConfirmed,
+		&existingDTO.CreatedAt, &existingDTO.UpdatedAt,
+	)
+
+	if err == nil {
+		// A pending match already exists
+		return existingDTO.ToMatch(), nil
+	}
+
+	// No existing match found, create a new one
 	match.ID = uuid.New()
 
 	// Set timestamps
@@ -58,19 +88,21 @@ func (r *MatchRepo) CreateMatch(ctx context.Context, match *models.Match) (*mode
 	defer tx.Rollback()
 
 	// Insert match
-	query := `
+	insertQuery := `
 		INSERT INTO matches (
 			id, driver_id, passenger_id, 
 			driver_location, passenger_location,
-			status, created_at, updated_at
+			status, driver_confirmed, passenger_confirmed,
+			created_at, updated_at
 		) VALUES (
 			:id, :driver_id, :passenger_id,
 			point(:driver_longitude, :driver_latitude), 
 			point(:passenger_longitude, :passenger_latitude),
-			:status, :created_at, :updated_at
+			:status, :driver_confirmed, :passenger_confirmed,
+			:created_at, :updated_at
 		)
 	`
-	_, err = tx.NamedExecContext(ctx, query, dto)
+	_, err = tx.NamedExecContext(ctx, insertQuery, dto)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert match: %w", err)
 	}
@@ -92,7 +124,8 @@ func (r *MatchRepo) GetMatch(ctx context.Context, matchID string) (*models.Match
 			(driver_location[1])::float8 as driver_latitude,
 			(passenger_location[0])::float8 as passenger_longitude,
 			(passenger_location[1])::float8 as passenger_latitude,
-			status, created_at, updated_at
+			status, driver_confirmed, passenger_confirmed,
+			created_at, updated_at
 		FROM matches
 		WHERE id = $1
 	`
@@ -102,7 +135,8 @@ func (r *MatchRepo) GetMatch(ctx context.Context, matchID string) (*models.Match
 		&dto.ID, &dto.DriverID, &dto.PassengerID,
 		&dto.DriverLongitude, &dto.DriverLatitude,
 		&dto.PassengerLongitude, &dto.PassengerLatitude,
-		&dto.Status, &dto.CreatedAt, &dto.UpdatedAt,
+		&dto.Status, &dto.DriverConfirmed, &dto.PassengerConfirmed,
+		&dto.CreatedAt, &dto.UpdatedAt,
 	)
 
 	if err != nil {
@@ -676,12 +710,14 @@ func (r *MatchRepo) ConfirmAndPersistMatch(ctx context.Context, driverID, passen
 		INSERT INTO matches (
 			id, driver_id, passenger_id, 
 			driver_location, passenger_location,
-			status, created_at, updated_at
+			status, driver_confirmed, passenger_confirmed,
+			created_at, updated_at
 		) VALUES (
 			:id, :driver_id, :passenger_id,
 			point(:driver_longitude, :driver_latitude), 
 			point(:passenger_longitude, :passenger_latitude),
-			:status, :created_at, :updated_at
+			:status, :driver_confirmed, :passenger_confirmed,
+			:created_at, :updated_at
 		)
 	`
 	_, err = tx.NamedExecContext(ctx, query, dto)
@@ -700,7 +736,159 @@ func (r *MatchRepo) ConfirmAndPersistMatch(ctx context.Context, driverID, passen
 	return &match, nil
 }
 
+// ConfirmMatchByUser handles confirmation by either driver or passenger
+// Sets the appropriate confirmation flag and updates status if both parties have confirmed
+func (r *MatchRepo) ConfirmMatchByUser(ctx context.Context, matchID string, userID string, isDriver bool) (*models.Match, error) {
+	fmt.Printf("ConfirmMatchByUser called with matchID: %s, userID: %s, isDriver: %t\n", matchID, userID, isDriver)
+
+	// Begin transaction
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Get current match with FOR UPDATE lock to prevent race conditions
+	query := `
+		SELECT 
+			id, driver_id, passenger_id,
+			(driver_location[0])::float8 as driver_longitude,
+			(driver_location[1])::float8 as driver_latitude,
+			(passenger_location[0])::float8 as passenger_longitude,
+			(passenger_location[1])::float8 as passenger_latitude,
+			status, driver_confirmed, passenger_confirmed,
+			created_at, updated_at
+		FROM matches
+		WHERE id = $1
+		FOR UPDATE
+	`
+
+	fmt.Printf("Executing query for matchID: %s\n", matchID)
+
+	var dto models.MatchDTO
+	err = tx.QueryRowContext(ctx, query, matchID).Scan(
+		&dto.ID, &dto.DriverID, &dto.PassengerID,
+		&dto.DriverLongitude, &dto.DriverLatitude,
+		&dto.PassengerLongitude, &dto.PassengerLatitude,
+		&dto.Status, &dto.DriverConfirmed, &dto.PassengerConfirmed,
+		&dto.CreatedAt, &dto.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get match: %w", err)
+	}
+
+	// Convert to match object
+	match := dto.ToMatch()
+
+	// Verify the user is part of this match
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID format: %w (userID: %s)", err, userID)
+	}
+
+	if isDriver && match.DriverID != userUUID {
+		return nil, fmt.Errorf("user is not the driver for this match (userID: %s, driverID: %s)", userID, match.DriverID.String())
+	}
+	if !isDriver && match.PassengerID != userUUID {
+		return nil, fmt.Errorf("user is not the passenger for this match (userID: %s, passengerID: %s)", userID, match.PassengerID.String())
+	}
+
+	// Check if match is in a confirmable state
+	fmt.Printf("Current match status: %s, Driver confirmed: %t, Passenger confirmed: %t\n",
+		match.Status, match.DriverConfirmed, match.PassengerConfirmed)
+
+	if match.Status != models.MatchStatusPending &&
+		match.Status != models.MatchStatusDriverConfirmed &&
+		match.Status != models.MatchStatusPassengerConfirmed {
+		return nil, fmt.Errorf("match cannot be confirmed: current status is %s", match.Status)
+	}
+
+	// Update confirmation flags
+	if isDriver {
+		if match.DriverConfirmed {
+			return nil, fmt.Errorf("driver has already confirmed this match")
+		}
+		match.DriverConfirmed = true
+	} else {
+		if match.PassengerConfirmed {
+			return nil, fmt.Errorf("passenger has already confirmed this match")
+		}
+		match.PassengerConfirmed = true
+	}
+
+	// Determine new status based on confirmation state
+	var newStatus models.MatchStatus
+	if match.DriverConfirmed && match.PassengerConfirmed {
+		newStatus = models.MatchStatusAccepted
+		fmt.Printf("Both driver and passenger have confirmed, setting status to ACCEPTED\n")
+	} else if match.DriverConfirmed {
+		newStatus = models.MatchStatusDriverConfirmed
+		fmt.Printf("Only driver has confirmed, setting status to DRIVER_CONFIRMED\n")
+	} else if match.PassengerConfirmed {
+		newStatus = models.MatchStatusPassengerConfirmed
+		fmt.Printf("Only passenger has confirmed, setting status to PASSENGER_CONFIRMED\n")
+	} else {
+		newStatus = models.MatchStatusPending
+		fmt.Printf("Neither party has confirmed, keeping status as PENDING\n")
+	}
+
+	// Update match in database
+	match.Status = newStatus
+	match.UpdatedAt = time.Now()
+	updatedDTO := match.ToDTO()
+
+	updateQuery := `
+		UPDATE matches 
+		SET status = :status, 
+		    driver_confirmed = :driver_confirmed,
+		    passenger_confirmed = :passenger_confirmed,
+		    updated_at = :updated_at
+		WHERE id = :id
+	`
+
+	result, err := tx.NamedExecContext(ctx, updateQuery, updatedDTO)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update match: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return nil, fmt.Errorf("match not found or was modified by another transaction")
+	}
+
+	// If both parties have confirmed, remove them from available pools
+	if match.Status == models.MatchStatusAccepted {
+		if err := r.RemoveAvailableDriver(ctx, match.DriverID.String()); err != nil {
+			return nil, fmt.Errorf("failed to remove driver from available pool: %w", err)
+		}
+		if err := r.RemoveAvailablePassenger(ctx, match.PassengerID.String()); err != nil {
+			return nil, fmt.Errorf("failed to remove passenger from available pool: %w", err)
+		}
+	}
+
+	// Commit transaction
+	if err = tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return match, nil
+}
+
 // DeleteRedisKey deletes a key from Redis
 func (r *MatchRepo) DeleteRedisKey(ctx context.Context, key string) error {
 	return r.redisClient.Delete(ctx, key)
+}
+
+// StoreIDMapping stores a mapping between two IDs in Redis with an expiration
+func (r *MatchRepo) StoreIDMapping(ctx context.Context, key string, value string, expiration time.Duration) error {
+	return r.redisClient.Set(ctx, key, value, expiration)
+}
+
+// GetIDMapping retrieves a mapping for a match ID
+func (r *MatchRepo) GetIDMapping(ctx context.Context, originalID string) (string, error) {
+	key := fmt.Sprintf("match:id_mapping:%s", originalID)
+	return r.redisClient.Get(ctx, key)
 }
