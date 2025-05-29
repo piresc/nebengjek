@@ -83,11 +83,5 @@ func (g *HTTPGateway) MatchConfirm(req *models.MatchConfirmRequest) (*models.Mat
 		return nil, fmt.Errorf("failed to parse match confirmation response: %w", err)
 	}
 
-	// Log the received match proposal for debugging
-	log.Printf("Received match proposal from match service: %+v", matchProposal)
-	log.Printf("Driver location: %+v", matchProposal.DriverLocation)
-	log.Printf("User location: %+v", matchProposal.UserLocation)
-	log.Printf("Target location: %+v", matchProposal.TargetLocation)
-
 	return &matchProposal, nil
 }

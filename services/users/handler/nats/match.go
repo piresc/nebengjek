@@ -24,8 +24,6 @@ func (h *NatsHandler) initMatchConsumers() error {
 	}
 	h.subs = append(h.subs, matchSub)
 
-	// No longer subscribe to match accepted events - handled directly via HTTP response
-
 	// Subscribe to match rejected events
 	matchRejectSub, err := h.natsClient.Subscribe(constants.SubjectMatchRejected, func(msg *nats.Msg) {
 		if err := h.handleMatchRejectedEvent(msg.Data); err != nil {

@@ -8,8 +8,6 @@ const (
 
 	// Match Service
 	SubjectMatchFound    = "match.found"
-	SubjectMatchAccepted = "match.accepted"
-	SubjectMatchConfirm  = "match.confirmed"
 	SubjectMatchRejected = "match.rejected"
 
 	// Ride events
