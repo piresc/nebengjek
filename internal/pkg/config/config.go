@@ -70,6 +70,12 @@ func loadConfigFromEnv() *models.Config {
 	configs.Services.RidesServiceURL = GetEnv("RIDES_SERVICE_URL", "http://localhost:9992")
 	configs.Services.LocationServiceURL = GetEnv("LOCATION_SERVICE_URL", "http://localhost:9991")
 
+	// Match config
+	configs.Match.SearchRadiusKm = GetEnvAsFloat("MATCH_SEARCH_RADIUS_KM", 1.0)
+
+	// Rides config
+	configs.Rides.MinDistanceKm = GetEnvAsFloat("RIDES_MIN_DISTANCE_KM", 1.0)
+
 	return configs
 }
 
@@ -106,6 +112,21 @@ func GetEnvAsBool(key string, defaultValue bool) bool {
 	value, err := strconv.ParseBool(valueStr)
 	if err != nil {
 		log.Printf("Warning: Invalid boolean value for %s, using default: %v", key, defaultValue)
+		return defaultValue
+	}
+
+	return value
+}
+
+func GetEnvAsFloat(key string, defaultValue float64) float64 {
+	valueStr := GetEnv(key, "")
+	if valueStr == "" {
+		return defaultValue
+	}
+
+	value, err := strconv.ParseFloat(valueStr, 64)
+	if err != nil {
+		log.Printf("Warning: Invalid float value for %s, using default: %v", key, defaultValue)
 		return defaultValue
 	}
 

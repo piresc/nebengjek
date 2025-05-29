@@ -24,11 +24,13 @@ type RidesHandler struct {
 func NewRidesHandler(
 	ridesUC rides.RideUC,
 	client *natspkg.Client,
+	cfg *models.Config,
 ) *RidesHandler {
 	return &RidesHandler{
 		ridesUC:    ridesUC,
 		natsClient: client,
 		subs:       make([]*nats.Subscription, 0),
+		cfg:        cfg,
 	}
 }
 
@@ -98,8 +100,8 @@ func (h *RidesHandler) handleLocationAggregate(msg []byte) error {
 	log.Printf("Received location aggregate: rideID=%s, distance=%.2f km",
 		update.RideID, update.Distance)
 
-	// Only process if distance is >= 1km
-	if update.Distance >= 1.0 {
+	// Only process if distance is >= minimum configured distance
+	if update.Distance >= h.cfg.Rides.MinDistanceKm {
 		// Convert ride ID to UUID
 		rideUUID, err := uuid.Parse(update.RideID)
 		if err != nil {

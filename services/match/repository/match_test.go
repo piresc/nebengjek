@@ -85,8 +85,8 @@ func TestCreateMatch_Success(t *testing.T) {
 			targetLoc.Longitude,
 			targetLoc.Latitude,
 			models.MatchStatusPending,
-			false, // driver_confirmed
-			false, // passenger_confirmed
+			false,            // driver_confirmed
+			false,            // passenger_confirmed
 			sqlmock.AnyArg(), // created_at
 			sqlmock.AnyArg(), // updated_at
 		).

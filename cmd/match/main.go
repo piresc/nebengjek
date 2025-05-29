@@ -17,7 +17,7 @@ import (
 
 func main() {
 	appName := "match-service"
-	configPath := "/Users/pirescerullo/GitHub/assessment/nebengjek/config/match.env"
+	configPath := "config/match.env"
 	configs := config.InitConfig(configPath)
 
 	// Initialize PostgreSQL database connection
@@ -48,7 +48,7 @@ func main() {
 	matchGW := gateway.NewMatchGW(natsClient)
 
 	// Initialize usecase
-	matchUC := usecase.NewMatchUC(matchRepo, matchGW)
+	matchUC := usecase.NewMatchUC(configs, matchRepo, matchGW)
 
 	// Initialize handlers
 	handler := handler.NewHandler(matchUC, natsClient)

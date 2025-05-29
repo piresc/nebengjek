@@ -27,7 +27,7 @@ func (uc *MatchUC) handleActivePassenger(ctx context.Context, event models.Beaco
 	}
 
 	// Find nearby drivers to match with
-	nearbyDrivers, err := uc.matchRepo.FindNearbyDrivers(ctx, location, 1.0) // 1km radius
+	nearbyDrivers, err := uc.matchRepo.FindNearbyDrivers(ctx, location, uc.cfg.Match.SearchRadiusKm) // Configurable radius
 	if err != nil {
 		log.Printf("Failed to find nearby drivers: %v", err)
 		return err
@@ -61,7 +61,7 @@ func (uc *MatchUC) handleActivePassengerWithTarget(ctx context.Context, event mo
 	}
 
 	// Find nearby drivers to match with
-	nearbyDrivers, err := uc.matchRepo.FindNearbyDrivers(ctx, location, 1.0) // 1km radius
+	nearbyDrivers, err := uc.matchRepo.FindNearbyDrivers(ctx, location, uc.cfg.Match.SearchRadiusKm) // Configurable radius
 	if err != nil {
 		log.Printf("Failed to find nearby drivers: %v", err)
 		return err

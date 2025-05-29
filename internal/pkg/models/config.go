@@ -10,6 +10,8 @@ type Config struct {
 	JWT      JWTConfig
 	Pricing  PricingConfig
 	Services ServicesConfig
+	Match    MatchConfig
+	Rides    RidesConfig
 }
 
 // ServicesConfig contains URLs for other microservices
@@ -78,4 +80,14 @@ type PricingConfig struct {
 	PerKmRate     float64 `json:"per_km_rate"`
 	PerMinuteRate float64 `json:"per_minute_rate"`
 	SurgeFactor   float64 `json:"surge_factor"`
+}
+
+// MatchConfig contains match service specific configuration
+type MatchConfig struct {
+	SearchRadiusKm float64 `json:"search_radius_km"` // Radius in kilometers for matching users
+}
+
+// RidesConfig contains rides service specific configuration
+type RidesConfig struct {
+	MinDistanceKm float64 `json:"min_distance_km"` // Minimum distance in kilometers for billing
 }

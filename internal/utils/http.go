@@ -119,22 +119,22 @@ func ParseJSONResponse(respBody []byte, target interface{}) error {
 		if _, hasSuccess := dataMap["success"]; hasSuccess {
 			nestedSuccess, _ := dataMap["success"].(bool)
 			nestedError, hasError := dataMap["error"].(string)
-			
+
 			if hasError && !nestedSuccess {
 				return fmt.Errorf("API error in nested response: %s", nestedError)
 			}
-			
+
 			// If there's a nested data field, use that instead
 			if nestedData, hasData := dataMap["data"]; hasData && nestedData != nil {
 				nestedDataJSON, err := json.Marshal(nestedData)
 				if err != nil {
 					return fmt.Errorf("failed to re-marshal nested response data: %w", err)
 				}
-				
+
 				if err := json.Unmarshal(nestedDataJSON, target); err != nil {
 					return fmt.Errorf("failed to unmarshal nested response data into target: %w", err)
 				}
-				
+
 				return nil
 			}
 		}
