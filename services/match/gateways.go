@@ -10,4 +10,5 @@ import (
 type MatchGW interface {
 	PublishMatchFound(ctx context.Context, matchProp models.MatchProposal) error
 	PublishMatchRejected(ctx context.Context, matchProp models.MatchProposal) error
+	PublishMatchAccepted(ctx context.Context, matchProp models.MatchProposal) error
 }

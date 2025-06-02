@@ -1,4 +1,4 @@
-package handler
+package nats
 
 import (
 	"encoding/json"
@@ -52,6 +52,17 @@ func (h *MatchHandler) InitNATSConsumers() error {
 	}
 	h.subs = append(h.subs, sub)
 
+	// Subscribe to ride completed events to unlock users
+	sub, err = h.natsClient.Subscribe(constants.SubjectRideCompleted, func(msg *nats.Msg) {
+		if err := h.handleRideCompleted(msg.Data); err != nil {
+			log.Printf("Error handling ride completed event: %v", err)
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to ride completed events: %w", err)
+	}
+	h.subs = append(h.subs, sub)
+
 	// Note: Match confirmations are now handled directly via HTTP responses
 
 	return nil
@@ -87,4 +98,30 @@ func (h *MatchHandler) handleFinderEvent(msg []byte) error {
 
 	// Forward the event to usecase for processing
 	return h.matchUC.HandleFinderEvent(event)
+}
+
+// handleRideCompleted processes ride completed events to unlock users
+func (h *MatchHandler) handleRideCompleted(msg []byte) error {
+	var rideComplete models.RideComplete
+	if err := json.Unmarshal(msg, &rideComplete); err != nil {
+		log.Printf("Failed to unmarshal ride completed event: %v", err)
+		return err
+	}
+
+	log.Printf("Received ride completed event: rideID=%s, driverID=%s, PassengerID=%s",
+		rideComplete.Ride.RideID, rideComplete.Ride.DriverID, rideComplete.Ride.PassengerID)
+
+	// Add driver back to available pool
+	if err := h.matchUC.ReleaseDriver(rideComplete.Ride.DriverID.String()); err != nil {
+		log.Printf("Failed to release driver: %v", err)
+		// Continue even if this fails
+	}
+
+	// Add passenger back to available pool
+	if err := h.matchUC.ReleasePassenger(rideComplete.Ride.PassengerID.String()); err != nil {
+		log.Printf("Failed to release passenger: %v", err)
+		// Continue even if this fails
+	}
+
+	return nil
 }

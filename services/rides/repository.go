@@ -16,4 +16,5 @@ type RideRepo interface {
 	CompleteRide(ctx context.Context, ride *models.Ride) error
 	GetBillingLedgerSum(ctx context.Context, rideID string) (int, error)
 	CreatePayment(ctx context.Context, payment *models.Payment) error
+	UpdateRideStatus(ctx context.Context, rideID string, status models.RideStatus) error
 }

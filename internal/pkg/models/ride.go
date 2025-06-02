@@ -10,20 +10,31 @@ import (
 type RideStatus string
 
 const (
-	RideStatusPending   RideStatus = "pending"
-	RideStatusOngoing   RideStatus = "ongoing"
-	RideStatusCompleted RideStatus = "completed"
+	RideStatusPending      RideStatus = "PENDING"
+	RideStatusDriverPickup RideStatus = "PICKUP"
+	RideStatusOngoing      RideStatus = "ONGOING"
+	RideStatusCompleted    RideStatus = "COMPLETED"
 )
 
 // Ride represents a ride record
 type Ride struct {
-	RideID     uuid.UUID  `json:"ride_id" db:"ride_id"`
-	DriverID   uuid.UUID  `json:"driver_id" db:"driver_id"`
-	CustomerID uuid.UUID  `json:"customer_id" db:"customer_id"`
-	Status     RideStatus `json:"status" db:"status"`
-	TotalCost  int        `json:"total_cost" db:"total_cost"`
-	CreatedAt  time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt  time.Time  `json:"updated_at" db:"updated_at"`
+	RideID      uuid.UUID  `json:"ride_id" db:"ride_id"`
+	DriverID    uuid.UUID  `json:"driver_id" db:"driver_id"`
+	PassengerID uuid.UUID  `json:"passenger_id" db:"passenger_id"`
+	Status      RideStatus `json:"status" db:"status"`
+	TotalCost   int        `json:"total_cost" db:"total_cost"`
+	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
+}
+
+type RideResp struct {
+	RideID      string    `json:"ride_id"`
+	DriverID    string    `json:"driver_id"`
+	PassengerID string    `json:"passenger_id"`
+	Status      string    `json:"status"`
+	TotalCost   int       `json:"total_cost"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // BillingLedger represents an entry in the billing ledger
@@ -54,4 +65,28 @@ type Payment struct {
 type RideComplete struct {
 	Ride    Ride    `json:"ride"`
 	Payment Payment `json:"payment"`
+}
+
+// RideStartTripEvent represents an event to start trip after driver picks up passenger
+type RideStartTripEvent struct {
+	RideID            string    `json:"ride_id"`
+	DriverLocation    Location  `json:"driver_location"`
+	PassengerLocation Location  `json:"passenger_location"`
+	Timestamp         time.Time `json:"timestamp"`
+}
+
+// RideStartTripRequest represents a request to start a trip via HTTP
+type RideStartRequest struct {
+	RideID            string    `json:"ride_id"`
+	DriverLocation    *Location `json:"driver_location"`
+	PassengerLocation *Location `json:"passenger_location"`
+}
+
+// RidePickupEvent represents an event when a driver is on their way to pick up a passenger
+type RidePickupEvent struct {
+	RideID         string    `json:"ride_id"`
+	DriverID       string    `json:"driver_id"`
+	PassengerID    string    `json:"passenger_id"`
+	DriverLocation Location  `json:"driver_location"`
+	Timestamp      time.Time `json:"timestamp"`
 }

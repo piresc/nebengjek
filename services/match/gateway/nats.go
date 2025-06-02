@@ -44,3 +44,14 @@ func (g *matchGW) PublishMatchRejected(ctx context.Context, matchProp models.Mat
 	}
 	return g.natsClient.Publish(constants.SubjectMatchRejected, data)
 }
+
+// PublishMatchAccepted publishes a match accepted event to NATS when both users confirm
+func (g *matchGW) PublishMatchAccepted(ctx context.Context, matchProp models.MatchProposal) error {
+	fmt.Printf("Publishing match accepted event to NATS driver %s, passenger %s\n", matchProp.DriverID, matchProp.PassengerID)
+	fmt.Printf("Match accepted event: %+v\n", matchProp)
+	data, err := json.Marshal(matchProp)
+	if err != nil {
+		return err
+	}
+	return g.natsClient.Publish(constants.SubjectMatchAccepted, data)
+}

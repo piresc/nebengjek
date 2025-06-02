@@ -38,11 +38,11 @@ func TestPublishRideStarted_Success(t *testing.T) {
 
 	// Create test data
 	ride := &models.Ride{
-		RideID:     uuid.New(),
-		DriverID:   uuid.New(),
-		CustomerID: uuid.New(),
-		Status:     models.RideStatusOngoing,
-		TotalCost:  0,
+		RideID:      uuid.New(),
+		DriverID:    uuid.New(),
+		PassengerID: uuid.New(),
+		Status:      models.RideStatusOngoing,
+		TotalCost:   0,
 	}
 
 	// Channel to receive the message
@@ -67,7 +67,7 @@ func TestPublishRideStarted_Success(t *testing.T) {
 
 		assert.Equal(t, ride.RideID, publishedRide.RideID)
 		assert.Equal(t, ride.DriverID, publishedRide.DriverID)
-		assert.Equal(t, ride.CustomerID, publishedRide.CustomerID)
+		assert.Equal(t, ride.PassengerID, publishedRide.PassengerID)
 		assert.Equal(t, ride.Status, publishedRide.Status)
 	case <-time.After(2 * time.Second):
 		t.Fatal("Did not receive published message")
@@ -83,10 +83,10 @@ func TestPublishRideCompleted_Success(t *testing.T) {
 
 	// Create test data
 	ride := &models.Ride{
-		RideID:     uuid.New(),
-		DriverID:   uuid.New(),
-		CustomerID: uuid.New(),
-		Status:     models.RideStatusCompleted,
+		RideID:      uuid.New(),
+		DriverID:    uuid.New(),
+		PassengerID: uuid.New(),
+		Status:      models.RideStatusCompleted,
 	}
 
 	payment := &models.Payment{
@@ -124,7 +124,7 @@ func TestPublishRideCompleted_Success(t *testing.T) {
 
 		assert.Equal(t, rideComplete.Ride.RideID, publishedComplete.Ride.RideID)
 		assert.Equal(t, rideComplete.Ride.DriverID, publishedComplete.Ride.DriverID)
-		assert.Equal(t, rideComplete.Ride.CustomerID, publishedComplete.Ride.CustomerID)
+		assert.Equal(t, rideComplete.Ride.PassengerID, publishedComplete.Ride.PassengerID)
 		assert.Equal(t, rideComplete.Payment.AdjustedCost, publishedComplete.Payment.AdjustedCost)
 		assert.Equal(t, rideComplete.Payment.AdminFee, publishedComplete.Payment.AdminFee)
 		assert.Equal(t, rideComplete.Payment.DriverPayout, publishedComplete.Payment.DriverPayout)

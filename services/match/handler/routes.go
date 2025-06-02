@@ -5,12 +5,13 @@ import (
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/match"
 	httpHandler "github.com/piresc/nebengjek/services/match/handler/http"
+	natsHandler "github.com/piresc/nebengjek/services/match/handler/nats"
 )
 
 // Handler combines all handlers for the match service
 type Handler struct {
 	matchHTTP *httpHandler.MatchHandler
-	matchNATS *MatchHandler
+	matchNATS *natsHandler.MatchHandler
 }
 
 // NewHandler creates a new combined handler
@@ -20,7 +21,7 @@ func NewHandler(
 ) *Handler {
 	return &Handler{
 		matchHTTP: httpHandler.NewMatchHandler(matchUC),
-		matchNATS: NewMatchHandler(matchUC, natsClient),
+		matchNATS: natsHandler.NewMatchHandler(matchUC, natsClient),
 	}
 }
 

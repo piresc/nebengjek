@@ -80,6 +80,8 @@ func (m *WebSocketManager) handleMessage(client *models.WebSocketClient, msg []b
 		return m.handleMatchConfirmation(client, wsMsg.Data)
 	case constants.EventLocationUpdate:
 		return m.handleLocationUpdate(client.UserID, wsMsg.Data)
+	case constants.EventRideStarted:
+		return m.handleRideStart(client, wsMsg.Data)
 	case constants.EventRideArrived:
 		return m.handleRideArrived(client, wsMsg.Data)
 	default:

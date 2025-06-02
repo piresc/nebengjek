@@ -1,4 +1,4 @@
-package gateway
+package gateway_nats
 
 import (
 	"context"
@@ -30,6 +30,24 @@ func (g *NATSGateway) PublishBeaconEvent(ctx context.Context, event *models.Beac
 	return g.client.Publish(constants.SubjectUserBeacon, data)
 }
 
+// PublishFinderEvent publishes a finder event to NATS
+func (g *NATSGateway) PublishFinderEvent(ctx context.Context, event *models.FinderEvent) error {
+	data, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	return g.client.Publish(constants.SubjectUserFinder, data)
+}
+
+// PublishRideStartTrip publishes a ride start event to NATS
+func (g *NATSGateway) PublishRideStart(ctx context.Context, event *models.RideStartTripEvent) error {
+	data, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	return g.client.Publish(constants.SubjectRideStarted, data)
+}
+
 // PublishLocationUpdate publishes a location update event to NATS
 func (g *NATSGateway) PublishLocationUpdate(ctx context.Context, locationEvent *models.LocationUpdate) error {
 	data, err := json.Marshal(locationEvent)
@@ -46,13 +64,4 @@ func (g *NATSGateway) PublishRideArrived(ctx context.Context, event *models.Ride
 		return err
 	}
 	return g.client.Publish(constants.SubjectRideArrived, data)
-}
-
-// PublishFinderEvent publishes a finder event to NATS
-func (g *NATSGateway) PublishFinderEvent(ctx context.Context, event *models.FinderEvent) error {
-	data, err := json.Marshal(event)
-	if err != nil {
-		return err
-	}
-	return g.client.Publish(constants.SubjectUserFinder, data)
 }

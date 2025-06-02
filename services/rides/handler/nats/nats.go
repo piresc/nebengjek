@@ -36,25 +36,14 @@ func NewRidesHandler(
 
 // InitNATSConsumers initializes all NATS consumers for the rides service
 func (h *RidesHandler) InitNATSConsumers() error {
-	// Initialize rides acceptance consumer
+	// Initialize match accepted consumer
 	sub, err := h.natsClient.Subscribe(constants.SubjectMatchAccepted, func(msg *nats.Msg) {
-		if err := h.handleMatchConfirmation(msg.Data); err != nil {
-			log.Printf("Error handling match acceptance: %v", err)
+		if err := h.handleMatchAccepted(msg.Data); err != nil {
+			log.Printf("Error handling match accepted event: %v", err)
 		}
 	})
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to match acceptance: %w", err)
-	}
-	h.subs = append(h.subs, sub)
-
-	// Initialize location aggregate consumer
-	sub, err = h.natsClient.Subscribe(constants.SubjectLocationAggregate, func(msg *nats.Msg) {
-		if err := h.handleLocationAggregate(msg.Data); err != nil {
-			log.Printf("Error handling location aggregate: %v", err)
-		}
-	})
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to location aggregates: %w", err)
+		return fmt.Errorf("failed to subscribe to match accepted events: %w", err)
 	}
 	h.subs = append(h.subs, sub)
 
@@ -69,20 +58,34 @@ func (h *RidesHandler) InitNATSConsumers() error {
 	}
 	h.subs = append(h.subs, sub)
 
+	// Initialize location aggregate consumer
+	sub, err = h.natsClient.Subscribe(constants.SubjectLocationAggregate, func(msg *nats.Msg) {
+		if err := h.handleLocationAggregate(msg.Data); err != nil {
+			log.Printf("Error handling location aggregate: %v", err)
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to location aggregates: %w", err)
+	}
+	h.subs = append(h.subs, sub)
+
 	return nil
 }
 
-// handleMatchConfirmation processes rides acceptance events
-func (h *RidesHandler) handleMatchConfirmation(msg []byte) error {
-	var match models.MatchConfirmRequest
-	if err := json.Unmarshal(msg, &match); err != nil {
+// handleMatchAccepted processes match acceptance events to create rides
+func (h *RidesHandler) handleMatchAccepted(msg []byte) error {
+	var matchProposal models.MatchProposal
+	if err := json.Unmarshal(msg, &matchProposal); err != nil {
 		log.Printf("Failed to unmarshal match proposal: %v", err)
 		return err
 	}
 
-	// Process match acceptance
-	if err := h.ridesUC.CreateRide(match); err != nil {
-		log.Printf("Failed to process match acceptance: %v", err)
+	log.Printf("Received match accepted event: match_id=%s, driver_id=%s, passenger_id=%s",
+		matchProposal.ID, matchProposal.DriverID, matchProposal.PassengerID)
+
+	// Create a ride from the match proposal
+	if err := h.ridesUC.CreateRide(matchProposal); err != nil {
+		log.Printf("Failed to create ride from match: %v", err)
 		return err
 	}
 

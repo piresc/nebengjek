@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/utils"
 	"github.com/piresc/nebengjek/services/rides"
 )
 
@@ -37,10 +38,10 @@ func (uc *rideUC) CreateRide(mp models.MatchProposal) error {
 
 	// Create a new ride from the match proposal
 	ride := &models.Ride{
-		DriverID:   uuid.MustParse(mp.DriverID),
-		CustomerID: uuid.MustParse(mp.PassengerID),
-		Status:     models.RideStatusOngoing,
-		TotalCost:  0, // This will be calculated later
+		DriverID:    uuid.MustParse(mp.DriverID),
+		PassengerID: uuid.MustParse(mp.PassengerID),
+		Status:      models.RideStatusDriverPickup, // Set initial status to driver pickup
+		TotalCost:   0,                             // This will be calculated later
 	}
 
 	// Delegate to repository
@@ -49,7 +50,7 @@ func (uc *rideUC) CreateRide(mp models.MatchProposal) error {
 		log.Printf("Failed to create ride: %v", err)
 		return err
 	}
-	err = uc.ridesGW.PublishRideStarted(context.Background(), createdRide)
+	err = uc.ridesGW.PublishRidePickup(context.Background(), createdRide)
 	if err != nil {
 		log.Printf("Failed to publish ride started event: %v", err)
 		return err
@@ -163,4 +164,47 @@ func (uc *rideUC) CompleteRide(rideID string, adjustmentFactor float64) (*models
 		rideID, totalCost, adjustedCost, adminFee, driverPayout)
 
 	return payment, nil
+}
+
+// StartTrip updates a ride from driver_pickup to ongoing status
+func (uc *rideUC) StartRide(ctx context.Context, req models.RideStartRequest) (*models.Ride, error) {
+	// Get current ride to verify it exists and is in pickup state
+	ride, err := uc.ridesRepo.GetRide(ctx, req.RideID)
+	if err != nil {
+		return &models.Ride{}, fmt.Errorf("failed to get ride: %w", err)
+	}
+
+	if ride.Status != models.RideStatusDriverPickup {
+		return &models.Ride{}, fmt.Errorf("cannot start trip for ride not in driver_pickup state")
+	}
+
+	// Calculate distance using Haversine formula
+	driverLoc := utils.GeoPoint{
+		Latitude:  req.DriverLocation.Latitude,
+		Longitude: req.DriverLocation.Longitude,
+	}
+	passLoc := utils.GeoPoint{
+		Latitude:  req.PassengerLocation.Latitude,
+		Longitude: req.PassengerLocation.Longitude,
+	}
+	// Verify driver is close to passenger (within 100 meters)
+	// Calculate distance between driver and passenger
+	distanceKm := utils.CalculateDistance(driverLoc, passLoc)
+
+	// Convert km to meters
+	distanceMeters := distanceKm * 1000
+
+	// Check if driver is close enough to passenger (within 100 meters)
+	if distanceMeters > 100 {
+		return &models.Ride{}, fmt.Errorf("driver is too far from passenger (%.2f meters)", distanceMeters)
+	}
+
+	// Update ride status to ongoing
+	ride.Status = models.RideStatusOngoing
+	if err := uc.ridesRepo.UpdateRideStatus(ctx, ride.RideID.String(), models.RideStatusOngoing); err != nil {
+		return &models.Ride{}, fmt.Errorf("failed to update ride status to ongoing: %w", err)
+	}
+
+	log.Printf("Ride %s started. Driver picked up passenger.", req.RideID)
+	return ride, nil
 }

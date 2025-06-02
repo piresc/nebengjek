@@ -196,13 +196,8 @@ func (uc *MatchUC) handleMatchAcceptance(ctx context.Context, match *models.Matc
 
 	// If match is fully accepted, handle auto-rejection asynchronously
 	if updatedMatch.Status == models.MatchStatusAccepted {
-		// Start auto-rejection in background to not block HTTP response
-		go func() {
-			bgCtx := context.Background()
-			if err := uc.handleAutoRejectionForAcceptedMatch(bgCtx, updatedMatch); err != nil {
-				log.Printf("Warning: Failed to handle auto-rejection: %v", err)
-			}
-		}()
+		uc.startAsyncAutoRejection(updatedMatch)
+		uc.PublishMatchAccepted(updatedMatch)
 	}
 
 	responseEvent := uc.buildMatchProposal(updatedMatch)
@@ -211,8 +206,48 @@ func (uc *MatchUC) handleMatchAcceptance(ctx context.Context, match *models.Matc
 	return responseEvent, nil
 }
 
+func (uc *MatchUC) PublishMatchAccepted(match *models.Match) {
+	// Create match proposal for accepted match
+	PublishMatchAccepted := models.MatchProposal{
+		ID:             match.ID.String(),
+		PassengerID:    converter.UUIDToStr(match.PassengerID),
+		DriverID:       converter.UUIDToStr(match.DriverID),
+		UserLocation:   match.PassengerLocation,
+		DriverLocation: match.DriverLocation,
+		TargetLocation: match.TargetLocation,
+		MatchStatus:    match.Status,
+	}
+	if err := uc.matchGW.PublishMatchAccepted(context.Background(), PublishMatchAccepted); err != nil {
+		log.Printf("Failed to publish match accepted event: %v", err)
+	}
+}
+
+// startAsyncAutoRejection initiates the asynchronous auto-rejection process
+func (uc *MatchUC) startAsyncAutoRejection(match *models.Match) {
+	// Create context with timeout for background operation
+	bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+
+	// Start auto-rejection in background with proper context management
+	go func() {
+		defer cancel() // Ensure context is cleaned up
+
+		if err := uc.handleAutoRejectionForAcceptedMatch(bgCtx, match); err != nil {
+			log.Printf("Critical: Failed to handle auto-rejection for match %s: %v",
+				match.ID.String(), err)
+			// TODO: Add alerting/retry mechanism for critical failures
+		}
+	}()
+}
+
 // handleAutoRejectionForAcceptedMatch rejects all other pending matches for the same passenger
 func (uc *MatchUC) handleAutoRejectionForAcceptedMatch(ctx context.Context, acceptedMatch *models.Match) error {
+	// Add timeout check
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("auto-rejection cancelled: %w", ctx.Err())
+	default:
+	}
+
 	// Get all pending matches for this passenger
 	matches, err := uc.matchRepo.ListMatchesByPassenger(ctx, acceptedMatch.PassengerID)
 	if err != nil {
@@ -224,6 +259,13 @@ func (uc *MatchUC) handleAutoRejectionForAcceptedMatch(ctx context.Context, acce
 	eventBatch := make([]models.MatchProposal, 0)
 
 	for _, otherMatch := range matches {
+		// Check context again during processing
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("auto-rejection cancelled during processing: %w", ctx.Err())
+		default:
+		}
+
 		// Skip the accepted match
 		if otherMatch.ID == acceptedMatch.ID {
 			continue
@@ -235,52 +277,89 @@ func (uc *MatchUC) handleAutoRejectionForAcceptedMatch(ctx context.Context, acce
 			otherMatch.Status == models.MatchStatusPassengerConfirmed {
 
 			rejectionBatch = append(rejectionBatch, otherMatch.ID.String())
-
-			// Prepare rejection event
-			rejectEvent := models.MatchProposal{
-				ID:             otherMatch.ID.String(),
-				PassengerID:    converter.UUIDToStr(otherMatch.PassengerID),
-				DriverID:       converter.UUIDToStr(otherMatch.DriverID),
-				MatchStatus:    models.MatchStatusRejected,
-				DriverLocation: otherMatch.DriverLocation,
-				UserLocation:   otherMatch.PassengerLocation,
-				TargetLocation: otherMatch.TargetLocation,
-			}
-			eventBatch = append(eventBatch, rejectEvent)
+			eventBatch = append(eventBatch, uc.createRejectionEvent(otherMatch))
 		}
 	}
 
-	// Batch update match statuses using repository method
+	// Process rejection batch and publish events
+	if err := uc.processRejectionBatch(ctx, rejectionBatch, eventBatch); err != nil {
+		return fmt.Errorf("failed to process rejection batch: %w", err)
+	}
+
 	if len(rejectionBatch) > 0 {
-		if err := uc.matchRepo.BatchUpdateMatchStatus(ctx, rejectionBatch, models.MatchStatusRejected); err != nil {
-			log.Printf("Batch update failed, falling back to individual updates: %v", err)
-			// Fallback to individual updates
-			for i, matchID := range rejectionBatch {
-				if err := uc.matchRepo.UpdateMatchStatus(ctx, matchID, models.MatchStatusRejected); err != nil {
-					log.Printf("Failed to update rejected match status for match %s: %v", matchID, err)
-					continue
-				}
-
-				// Publish rejection event
-				if err := uc.matchGW.PublishMatchRejected(ctx, eventBatch[i]); err != nil {
-					log.Printf("Failed to publish match rejection for match %s: %v", matchID, err)
-				}
-			}
-		} else {
-			// Batch publish events
-			for _, event := range eventBatch {
-				if err := uc.matchGW.PublishMatchRejected(ctx, event); err != nil {
-					log.Printf("Failed to publish match rejection for match %s: %v", event.ID, err)
-				}
-			}
-		}
-
 		log.Printf("Auto-rejected %d matches for passenger %s",
 			len(rejectionBatch),
 			converter.UUIDToStr(acceptedMatch.PassengerID))
 	}
 
 	return nil
+}
+
+// processRejectionBatch handles the batch update of rejected matches and event publishing
+func (uc *MatchUC) processRejectionBatch(ctx context.Context, rejectionBatch []string, eventBatch []models.MatchProposal) error {
+	if len(rejectionBatch) == 0 {
+		return nil
+	}
+
+	// Attempt batch update
+	if err := uc.matchRepo.BatchUpdateMatchStatus(ctx, rejectionBatch, models.MatchStatusRejected); err != nil {
+		log.Printf("Batch update failed, falling back to individual updates: %v", err)
+		return uc.processIndividualRejections(ctx, rejectionBatch, eventBatch)
+	}
+
+	// Batch publish events
+	return uc.publishRejectionEvents(ctx, eventBatch)
+}
+
+// processIndividualRejections handles individual updates when batch update fails
+func (uc *MatchUC) processIndividualRejections(ctx context.Context, matchIDs []string, events []models.MatchProposal) error {
+	for i, matchID := range matchIDs {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("auto-rejection cancelled during fallback updates: %w", ctx.Err())
+		default:
+		}
+
+		if err := uc.matchRepo.UpdateMatchStatus(ctx, matchID, models.MatchStatusRejected); err != nil {
+			log.Printf("Failed to update rejected match status for match %s: %v", matchID, err)
+			continue
+		}
+
+		// Publish rejection event
+		if err := uc.matchGW.PublishMatchRejected(ctx, events[i]); err != nil {
+			log.Printf("Failed to publish match rejection for match %s: %v", matchID, err)
+		}
+	}
+	return nil
+}
+
+// publishRejectionEvents publishes all rejection events
+func (uc *MatchUC) publishRejectionEvents(ctx context.Context, events []models.MatchProposal) error {
+	for _, event := range events {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("auto-rejection cancelled during event publishing: %w", ctx.Err())
+		default:
+		}
+
+		if err := uc.matchGW.PublishMatchRejected(ctx, event); err != nil {
+			log.Printf("Failed to publish match rejection for match %s: %v", event.ID, err)
+		}
+	}
+	return nil
+}
+
+// createRejectionEvent creates a match proposal event for rejection
+func (uc *MatchUC) createRejectionEvent(match *models.Match) models.MatchProposal {
+	return models.MatchProposal{
+		ID:             match.ID.String(),
+		PassengerID:    converter.UUIDToStr(match.PassengerID),
+		DriverID:       converter.UUIDToStr(match.DriverID),
+		MatchStatus:    models.MatchStatusRejected,
+		DriverLocation: match.DriverLocation,
+		UserLocation:   match.PassengerLocation,
+		TargetLocation: match.TargetLocation,
+	}
 }
 
 // handleMatchRejection processes match rejection logic
@@ -342,4 +421,54 @@ func (uc *MatchUC) GetPendingMatch(ctx context.Context, matchID string) (*models
 	}
 
 	return nil, fmt.Errorf("match is not in pending state")
+}
+
+// ReleaseDriver adds a driver back to the available pool after a ride completes
+func (uc *MatchUC) ReleaseDriver(driverID string) error {
+	ctx := context.Background()
+
+	// Add driver back to the available pool
+	log.Printf("Releasing driver %s back to available pool", driverID)
+
+	// Get driver's last known location (if any)
+	location, err := uc.matchRepo.GetDriverLocation(ctx, driverID)
+	if err != nil {
+		log.Printf("Warning: Failed to get driver location: %v", err)
+		// If we can't get the location, we can't add them back to the geo index
+		return fmt.Errorf("failed to get driver location: %w", err)
+	}
+
+	// Re-add driver to available pool with their last known location
+	if err := uc.matchRepo.AddAvailableDriver(ctx, driverID, &location); err != nil {
+		log.Printf("Error adding driver back to available pool: %v", err)
+		return fmt.Errorf("failed to add driver back to available pool: %w", err)
+	}
+
+	log.Printf("Successfully released driver %s back to available pool", driverID)
+	return nil
+}
+
+// ReleasePassenger adds a passenger back to the available pool after a ride completes
+func (uc *MatchUC) ReleasePassenger(passengerID string) error {
+	ctx := context.Background()
+
+	// Add passenger back to the available pool
+	log.Printf("Releasing passenger %s back to available pool", passengerID)
+
+	// Get passenger's last known location (if any)
+	location, err := uc.matchRepo.GetPassengerLocation(ctx, passengerID)
+	if err != nil {
+		log.Printf("Warning: Failed to get passenger location: %v", err)
+		// If we can't get the location, we can't add them back to the geo index
+		return fmt.Errorf("failed to get passenger location: %w", err)
+	}
+
+	// Re-add passenger to available pool with their last known location
+	if err := uc.matchRepo.AddAvailablePassenger(ctx, passengerID, &location); err != nil {
+		log.Printf("Error adding passenger back to available pool: %v", err)
+		return fmt.Errorf("failed to add passenger back to available pool: %w", err)
+	}
+
+	log.Printf("Successfully released passenger %s back to available pool", passengerID)
+	return nil
 }

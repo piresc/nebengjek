@@ -21,7 +21,7 @@ import (
 
 func main() {
 	appName := "users-service"
-	configPath := "config/users.env"
+	configPath := "/Users/pirescerullo/GitHub/assessment/nebengjek/config/users.env"
 	configs := config.InitConfig(configPath)
 
 	// Initialize PostgreSQL database connection
@@ -49,7 +49,7 @@ func main() {
 	userRepo := repository.NewUserRepo(configs, postgresClient.GetDB(), redisClient)
 
 	// Initialize Gateway
-	userGW := gateway.NewUserGW(natsClient, configs.Services.MatchServiceURL)
+	userGW := gateway.NewUserGW(natsClient, configs.Services.MatchServiceURL, configs.Services.RidesServiceURL)
 
 	// Initialize UseCase
 	userUC := usecase.NewUserUC(userRepo, userGW, configs)

@@ -25,11 +25,11 @@ func TestCreateRide_Success(t *testing.T) {
 	repo := repository.NewRideRepository(&models.Config{}, db)
 
 	rideID := uuid.New()
-	r := &models.Ride{RideID: rideID, DriverID: uuid.New(), CustomerID: uuid.New(), Status: models.RideStatusPending, TotalCost: 0}
+	r := &models.Ride{RideID: rideID, DriverID: uuid.New(), PassengerID: uuid.New(), Status: models.RideStatusPending, TotalCost: 0}
 
 	// Expect insert
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO rides")).
-		WithArgs(r.RideID, r.DriverID, r.CustomerID, r.Status, r.TotalCost, sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WithArgs(r.RideID, r.DriverID, r.PassengerID, r.Status, r.TotalCost, sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	created, err := repo.CreateRide(r)
@@ -57,7 +57,7 @@ func TestGetRide_Error(t *testing.T) {
 	db, mock := setupMockDB(t)
 	repo := repository.NewRideRepository(&models.Config{}, db)
 
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT ride_id, driver_id, customer_id")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT ride_id, driver_id, passenger_id")).
 		WithArgs("id").
 		WillReturnError(assert.AnError)
 

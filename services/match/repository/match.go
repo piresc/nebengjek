@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -521,7 +522,7 @@ func (r *MatchRepo) BatchUpdateMatchStatus(ctx context.Context, matchIDs []strin
 	query := `
 		UPDATE matches 
 		SET status = $1, updated_at = $2 
-		WHERE id = ANY($3) AND status IN ('pending', 'driver_confirmed', 'passenger_confirmed')
+		WHERE id = ANY($3) AND status IN ('PENDING', 'DRIVER_CONFIRMED', 'PASSENGER_CONFIRMED')
 	`
 
 	result, err := r.db.ExecContext(ctx, query, status, time.Now(), pq.Array(uuidIDs))
@@ -536,4 +537,138 @@ func (r *MatchRepo) BatchUpdateMatchStatus(ctx context.Context, matchIDs []strin
 
 	log.Printf("Batch updated %d matches to status %s", rowsAffected, status)
 	return nil
+}
+
+// GetDriverLocation retrieves a driver's last known location
+func (r *MatchRepo) GetDriverLocation(ctx context.Context, driverID string) (models.Location, error) {
+	// Try to get from the Redis location key
+	locationKey := fmt.Sprintf(constants.KeyDriverLocation, driverID)
+	fields, err := r.redisClient.HGetAll(ctx, locationKey)
+	if err != nil {
+		return models.Location{}, fmt.Errorf("failed to get location from Redis: %w", err)
+	}
+
+	// If we got data from Redis, parse it
+	if len(fields) > 0 {
+		var lat, lng float64
+		var timestamp int64
+
+		if latStr, ok := fields[constants.FieldLatitude]; ok {
+			lat, _ = strconv.ParseFloat(latStr, 64)
+		}
+
+		if lngStr, ok := fields[constants.FieldLongitude]; ok {
+			lng, _ = strconv.ParseFloat(lngStr, 64)
+		}
+
+		if tsStr, ok := fields[constants.FieldTimestamp]; ok {
+			timestamp, _ = strconv.ParseInt(tsStr, 10, 64)
+		}
+
+		return models.Location{
+			Latitude:  lat,
+			Longitude: lng,
+			Timestamp: time.Unix(timestamp, 0),
+		}, nil
+	}
+
+	// If not in Redis, try to get the latest from the database
+	driverUUID, err := uuid.Parse(driverID)
+	if err != nil {
+		return models.Location{}, fmt.Errorf("invalid driver ID format: %w", err)
+	}
+
+	query := `
+		SELECT 
+			(driver_location[0])::float8 as driver_longitude,
+			(driver_location[1])::float8 as driver_latitude,
+			updated_at
+		FROM matches
+		WHERE driver_id = $1
+		ORDER BY updated_at DESC
+		LIMIT 1
+	`
+
+	var longitude, latitude float64
+	var timestamp time.Time
+	err = r.db.QueryRowContext(ctx, query, driverUUID).Scan(
+		&longitude, &latitude, &timestamp,
+	)
+
+	if err != nil {
+		return models.Location{}, fmt.Errorf("failed to get driver location from database: %w", err)
+	}
+
+	return models.Location{
+		Longitude: longitude,
+		Latitude:  latitude,
+		Timestamp: timestamp,
+	}, nil
+}
+
+// GetPassengerLocation retrieves a passenger's last known location
+func (r *MatchRepo) GetPassengerLocation(ctx context.Context, passengerID string) (models.Location, error) {
+	// Try to get from the Redis location key
+	locationKey := fmt.Sprintf(constants.KeyPassengerLocation, passengerID)
+	fields, err := r.redisClient.HGetAll(ctx, locationKey)
+	if err != nil {
+		return models.Location{}, fmt.Errorf("failed to get location from Redis: %w", err)
+	}
+
+	// If we got data from Redis, parse it
+	if len(fields) > 0 {
+		var lat, lng float64
+		var timestamp int64
+
+		if latStr, ok := fields[constants.FieldLatitude]; ok {
+			lat, _ = strconv.ParseFloat(latStr, 64)
+		}
+
+		if lngStr, ok := fields[constants.FieldLongitude]; ok {
+			lng, _ = strconv.ParseFloat(lngStr, 64)
+		}
+
+		if tsStr, ok := fields[constants.FieldTimestamp]; ok {
+			timestamp, _ = strconv.ParseInt(tsStr, 10, 64)
+		}
+
+		return models.Location{
+			Latitude:  lat,
+			Longitude: lng,
+			Timestamp: time.Unix(timestamp, 0),
+		}, nil
+	}
+
+	// If not in Redis, try to get the latest from the database
+	passengerUUID, err := uuid.Parse(passengerID)
+	if err != nil {
+		return models.Location{}, fmt.Errorf("invalid passenger ID format: %w", err)
+	}
+
+	query := `
+		SELECT 
+			(passenger_location[0])::float8 as passenger_longitude,
+			(passenger_location[1])::float8 as passenger_latitude,
+			updated_at
+		FROM matches
+		WHERE passenger_id = $1
+		ORDER BY updated_at DESC
+		LIMIT 1
+	`
+
+	var longitude, latitude float64
+	var timestamp time.Time
+	err = r.db.QueryRowContext(ctx, query, passengerUUID).Scan(
+		&longitude, &latitude, &timestamp,
+	)
+
+	if err != nil {
+		return models.Location{}, fmt.Errorf("failed to get passenger location from database: %w", err)
+	}
+
+	return models.Location{
+		Longitude: longitude,
+		Latitude:  latitude,
+		Timestamp: timestamp,
+	}, nil
 }

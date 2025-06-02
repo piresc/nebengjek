@@ -15,3 +15,21 @@ func (u *UserUC) RideArrived(ctx context.Context, event *models.RideCompleteEven
 	}
 	return nil
 }
+
+// RideStartTrip publishes a ride start trip event to NATS
+func (u *UserUC) RideStart(ctx context.Context, event *models.RideStartRequest) (*models.Ride, error) {
+
+	req := &models.RideStartRequest{
+		RideID:            event.RideID,
+		DriverLocation:    event.DriverLocation,
+		PassengerLocation: event.PassengerLocation,
+	}
+
+	// Make HTTP call to rides service
+	resp, err := u.UserGW.StartRide(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start ride via HTTP: %w", err)
+	}
+
+	return resp, nil
+}

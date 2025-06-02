@@ -9,8 +9,10 @@ const (
 	// Match Service
 	SubjectMatchFound    = "match.found"
 	SubjectMatchRejected = "match.rejected"
+	SubjectMatchAccepted = "match.accepted"
 
 	// Ride events
+	SubjectRidePickup    = "ride.pickup"
 	SubjectRideStarted   = "ride.started"
 	SubjectRideArrived   = "ride.arrived"
 	SubjectRideCompleted = "ride.completed"

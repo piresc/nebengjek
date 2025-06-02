@@ -1,4 +1,4 @@
-package gateway
+package gateway_nats
 
 import (
 	"context"

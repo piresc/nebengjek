@@ -48,7 +48,7 @@ func TestCreateRide_Success(t *testing.T) {
 		CreateRide(gomock.Any()).
 		DoAndReturn(func(ride *models.Ride) (*models.Ride, error) {
 			assert.Equal(t, uuid.MustParse(driverID), ride.DriverID)
-			assert.Equal(t, uuid.MustParse(passengerID), ride.CustomerID)
+			assert.Equal(t, uuid.MustParse(passengerID), ride.PassengerID)
 
 			// Add ride ID to simulate DB creation
 			ride.RideID = uuid.New()

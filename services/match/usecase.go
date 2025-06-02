@@ -15,4 +15,6 @@ type MatchUC interface {
 	ConfirmMatchStatus(req *models.MatchConfirmRequest) (models.MatchProposal, error)
 	GetMatch(ctx context.Context, matchID string) (*models.Match, error)
 	GetPendingMatch(ctx context.Context, matchID string) (*models.Match, error)
+	ReleaseDriver(driverID string) error
+	ReleasePassenger(passengerID string) error
 }

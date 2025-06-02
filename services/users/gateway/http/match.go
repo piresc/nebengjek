@@ -1,4 +1,4 @@
-package gateway
+package gateaway_http
 
 import (
 	"bytes"
@@ -29,12 +29,14 @@ func NewMatchClient(matchServiceURL string) *MatchClient {
 // HTTPGateway implements the HTTP client operations for the users service
 type HTTPGateway struct {
 	matchClient *MatchClient
+	rideClient  *RideClient
 }
 
 // NewHTTPGateway creates a new HTTP gateway for the users service
-func NewHTTPGateway(matchServiceURL string) *HTTPGateway {
+func NewHTTPGateway(matchServiceURL string, rideServiceURL string) *HTTPGateway {
 	return &HTTPGateway{
 		matchClient: NewMatchClient(matchServiceURL),
+		rideClient:  NewRideClient(rideServiceURL),
 	}
 }
 

@@ -24,6 +24,18 @@ func (h *NatsHandler) initMatchConsumers() error {
 	}
 	h.subs = append(h.subs, matchSub)
 
+	// Subscribe to match accepted events
+	matchAccSub, err := h.natsClient.Subscribe(constants.SubjectMatchAccepted, func(msg *nats.Msg) {
+		log.Printf("Received match accept event: %s\n", msg.Data)
+		if err := h.handleMatchAccEvent(msg.Data); err != nil {
+			fmt.Printf("Error handling match event: %v\n", err)
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to match accept events: %w", err)
+	}
+	h.subs = append(h.subs, matchAccSub)
+
 	// Subscribe to match rejected events
 	matchRejectSub, err := h.natsClient.Subscribe(constants.SubjectMatchRejected, func(msg *nats.Msg) {
 		if err := h.handleMatchRejectedEvent(msg.Data); err != nil {
@@ -48,6 +60,19 @@ func (h *NatsHandler) handleMatchEvent(msg []byte) error {
 	// Notify both driver and passenger
 	h.wsManager.NotifyClient(event.DriverID, constants.SubjectMatchFound, event)
 	h.wsManager.NotifyClient(event.PassengerID, constants.SubjectMatchFound, event)
+	return nil
+}
+
+// handleMatchEvent processes match events
+func (h *NatsHandler) handleMatchAccEvent(msg []byte) error {
+	var event models.MatchProposal
+	if err := json.Unmarshal(msg, &event); err != nil {
+		return fmt.Errorf("failed to unmarshal match event: %w", err)
+	}
+
+	// Notify both driver and passenger
+	h.wsManager.NotifyClient(event.DriverID, constants.SubjectMatchAccepted, event)
+	h.wsManager.NotifyClient(event.PassengerID, constants.SubjectMatchAccepted, event)
 	return nil
 }
 

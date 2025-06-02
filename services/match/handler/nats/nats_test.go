@@ -1,4 +1,4 @@
-package handler
+package nats
 
 import (
 	"encoding/json"

@@ -43,7 +43,7 @@ func (r *RideRepo) CreateRide(ride *models.Ride) (*models.Ride, error) {
 	// Insert the ride into the database
 	query := `
 		INSERT INTO rides (
-			ride_id, driver_id, customer_id, status, total_cost, created_at, updated_at
+			ride_id, driver_id, passenger_id, status, total_cost, created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7
 		) RETURNING ride_id
@@ -54,7 +54,7 @@ func (r *RideRepo) CreateRide(ride *models.Ride) (*models.Ride, error) {
 		query,
 		ride.RideID,
 		ride.DriverID,
-		ride.CustomerID,
+		ride.PassengerID,
 		ride.Status,
 		ride.TotalCost,
 		ride.CreatedAt,
@@ -132,7 +132,7 @@ func (r *RideRepo) GetRide(ctx context.Context, rideID string) (*models.Ride, er
 	var ride models.Ride
 
 	query := `
-		SELECT ride_id, driver_id, customer_id, status, total_cost, created_at, updated_at
+		SELECT ride_id, driver_id, passenger_id, status, total_cost, created_at, updated_at
 		FROM rides
 		WHERE ride_id = $1
 	`
@@ -215,6 +215,32 @@ func (r *RideRepo) CreatePayment(ctx context.Context, payment *models.Payment) e
 
 	if err != nil {
 		return fmt.Errorf("failed to create payment: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateRideStatus updates the status of a ride
+func (r *RideRepo) UpdateRideStatus(ctx context.Context, rideID string, status models.RideStatus) error {
+	query := `
+		UPDATE rides 
+		SET status = $1,
+			updated_at = NOW()
+		WHERE ride_id = $2
+	`
+
+	result, err := r.db.ExecContext(ctx, query, status, rideID)
+	if err != nil {
+		return fmt.Errorf("failed to update ride status: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get affected rows: %w", err)
+	}
+
+	if rows == 0 {
+		return fmt.Errorf("ride not found: %s", rideID)
 	}
 
 	return nil

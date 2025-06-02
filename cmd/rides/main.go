@@ -18,7 +18,7 @@ import (
 
 func main() {
 	appName := "rides-service"
-	configPath := "./config/rides.env"
+	configPath := "/Users/pirescerullo/GitHub/assessment/nebengjek/config/rides.env"
 	configs := config.InitConfig(configPath)
 
 	// Initialize database connection
@@ -51,7 +51,7 @@ func main() {
 		log.Fatalf("Failed to initialize ride use case: %v", err)
 	}
 
-	rideHandler := handler.NewRidesHandler(rideUC, natsClient, configs)
+	rideHandler := handler.NewHandler(rideUC, natsClient, configs)
 
 	// Initialize NATS consumers
 	if err := rideHandler.InitNATSConsumers(); err != nil {
@@ -63,6 +63,9 @@ func main() {
 
 	// Register health endpoints
 	health.RegisterHealthEndpoints(e, appName)
+
+	// Register HTTP routes
+	rideHandler.RegisterRoutes(e)
 
 	// Start server
 	serverAddr := fmt.Sprintf(":%d", configs.Server.Port)
