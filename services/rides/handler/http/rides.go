@@ -80,7 +80,7 @@ func (h *RidesHandler) ProcessPayment(c echo.Context) error {
 		return utils.BadRequestResponse(c, "Ride ID is required")
 	}
 
-	var req models.PaymentRequest
+	var req models.PaymentProccessRequest
 	if err := c.Bind(&req); err != nil {
 		return utils.BadRequestResponse(c, "Invalid request body: "+err.Error())
 	}

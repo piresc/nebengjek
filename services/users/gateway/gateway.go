@@ -17,7 +17,7 @@ func (g *UserGW) StartRide(req *models.RideStartRequest) (*models.Ride, error) {
 }
 
 // StartRide implements the UserGW interface method for starting a trip
-func (g *UserGW) ProcessPayment(req *models.PaymentRequest) (*models.Payment, error) {
+func (g *UserGW) ProcessPayment(req *models.PaymentProccessRequest) (*models.Payment, error) {
 	return g.httpGateway.ProcessPayment(req)
 }
 

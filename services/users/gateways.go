@@ -20,5 +20,5 @@ type UserGW interface {
 	MatchConfirm(req *models.MatchConfirmRequest) (*models.MatchProposal, error)
 	StartRide(req *models.RideStartRequest) (*models.Ride, error)
 	RideArrived(ctx context.Context, event *models.RideArrivalReq) (*models.PaymentRequest, error)
-	ProcessPayment(paymentReq *models.PaymentRequest) (*models.Payment, error)
+	ProcessPayment(paymentReq *models.PaymentProccessRequest) (*models.Payment, error)
 }

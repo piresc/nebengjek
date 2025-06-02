@@ -18,4 +18,5 @@ type RideRepo interface {
 	CreatePayment(ctx context.Context, payment *models.Payment) error
 	UpdateRideStatus(ctx context.Context, rideID string, status models.RideStatus) error
 	GetPaymentByRideID(ctx context.Context, rideID string) (*models.Payment, error)
+	UpdatePaymentStatus(ctx context.Context, paymentID string, status models.PaymentStatus) error
 }

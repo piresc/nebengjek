@@ -44,9 +44,12 @@ func (m *WebSocketManager) handleRideArrived(client *models.WebSocketClient, dat
 
 // handleProcessPayment processes payment requests from WebSocket clients
 func (m *WebSocketManager) handleProcessPayment(client *models.WebSocketClient, data json.RawMessage) error {
-	var paymentReq models.PaymentRequest
+	var paymentReq models.PaymentProccessRequest
 	if err := json.Unmarshal(data, &paymentReq); err != nil {
 		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Invalid payment request format")
+	}
+	if paymentReq.Status != models.PaymentStatusAccepted && paymentReq.Status != models.PaymentStatusRejected {
+		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Invalid payment status")
 	}
 
 	// Call the use case to process the payment

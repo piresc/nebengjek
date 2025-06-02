@@ -193,9 +193,9 @@ func (r *RideRepo) GetBillingLedgerSum(ctx context.Context, rideID string) (int,
 func (r *RideRepo) CreatePayment(ctx context.Context, payment *models.Payment) error {
 	query := `
 		INSERT INTO payments (
-			payment_id, ride_id, adjusted_cost, admin_fee, driver_payout, created_at
+			payment_id, ride_id, adjusted_cost, admin_fee, driver_payout, status, created_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6
+			$1, $2, $3, $4, $5, $6, $7
 		)
 	`
 
@@ -211,6 +211,7 @@ func (r *RideRepo) CreatePayment(ctx context.Context, payment *models.Payment) e
 		payment.AdjustedCost,
 		payment.AdminFee,
 		payment.DriverPayout,
+		payment.Status,
 		time.Now(),
 	)
 
@@ -252,7 +253,7 @@ func (r *RideRepo) GetPaymentByRideID(ctx context.Context, rideID string) (*mode
 	var payment models.Payment
 	rideIDUUID, err := uuid.Parse(rideID)
 	query := `
-		SELECT payment_id, ride_id, adjusted_cost, admin_fee, driver_payout, created_at
+		SELECT payment_id, ride_id, adjusted_cost, admin_fee, driver_payout, status, created_at
 		FROM payments
 		WHERE ride_id = $1
 	`
@@ -263,4 +264,25 @@ func (r *RideRepo) GetPaymentByRideID(ctx context.Context, rideID string) (*mode
 	}
 
 	return &payment, nil
+}
+
+// UpdatePaymentStatus updates the status of a payment
+func (r *RideRepo) UpdatePaymentStatus(ctx context.Context, paymentID string, status models.PaymentStatus) error {
+	query := `
+		UPDATE payments
+		SET status = $1
+		WHERE payment_id = $2
+	`
+
+	paymentUUID, err := uuid.Parse(paymentID)
+	if err != nil {
+		return fmt.Errorf("invalid payment ID format: %w", err)
+	}
+
+	_, err = r.db.ExecContext(ctx, query, status, paymentUUID)
+	if err != nil {
+		return fmt.Errorf("failed to update payment status: %w", err)
+	}
+
+	return nil
 }

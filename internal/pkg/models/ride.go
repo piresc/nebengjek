@@ -59,12 +59,13 @@ type RideArrivalReq struct {
 
 // Payment represents a payment record
 type Payment struct {
-	PaymentID    uuid.UUID `json:"payment_id" db:"payment_id"`
-	RideID       uuid.UUID `json:"ride_id" db:"ride_id"`
-	AdjustedCost int       `json:"adjusted_cost" db:"adjusted_cost"`
-	AdminFee     int       `json:"admin_fee" db:"admin_fee"`
-	DriverPayout int       `json:"driver_payout" db:"driver_payout"`
-	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+	PaymentID    uuid.UUID     `json:"payment_id" db:"payment_id"`
+	RideID       uuid.UUID     `json:"ride_id" db:"ride_id"`
+	AdjustedCost int           `json:"adjusted_cost" db:"adjusted_cost"`
+	AdminFee     int           `json:"admin_fee" db:"admin_fee"`
+	DriverPayout int           `json:"driver_payout" db:"driver_payout"`
+	Status       PaymentStatus `json:"status" db:"status"`
+	CreatedAt    time.Time     `json:"created_at" db:"created_at"`
 }
 
 type RideComplete struct {

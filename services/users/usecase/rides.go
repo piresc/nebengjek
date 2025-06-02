@@ -19,7 +19,7 @@ func (u *UserUC) RideArrived(ctx context.Context, event *models.RideArrivalReq) 
 }
 
 // ProcessPayment processes the payment for a completed ride
-func (u *UserUC) ProcessPayment(ctx context.Context, paymentReq *models.PaymentRequest) (*models.Payment, error) {
+func (u *UserUC) ProcessPayment(ctx context.Context, paymentReq *models.PaymentProccessRequest) (*models.Payment, error) {
 	// Call the ride service to process the payment
 	payment, err := u.UserGW.ProcessPayment(paymentReq)
 	if err != nil {

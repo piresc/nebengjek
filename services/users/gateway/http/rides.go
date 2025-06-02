@@ -125,7 +125,7 @@ func (g *HTTPGateway) RideArrived(req *models.RideArrivalReq) (*models.PaymentRe
 }
 
 // ProcessPayment sends a payment processing request to the ride service
-func (g *HTTPGateway) ProcessPayment(paymentReq *models.PaymentRequest) (*models.Payment, error) {
+func (g *HTTPGateway) ProcessPayment(paymentReq *models.PaymentProccessRequest) (*models.Payment, error) {
 	url := fmt.Sprintf("%s/rides/%s/payment", g.rideClient.client.BaseURL, paymentReq.RideID)
 
 	// Marshal request to JSON
