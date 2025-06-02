@@ -16,11 +16,9 @@ const (
 
 // PaymentRequest represents a request to process payment for a completed ride
 type PaymentRequest struct {
-	RideID           string  `json:"ride_id"`
-	PassengerID      string  `json:"passenger_id"`
-	TotalCost        int     `json:"total_cost"`
-	AdjustmentFactor float64 `json:"adjustment_factor"`
-	AdminFeePercent  float64 `json:"admin_fee_percent"`
+	RideID      string `json:"ride_id"`
+	PassengerID string `json:"passenger_id"`
+	TotalCost   int    `json:"total_cost"`
 }
 
 // PaymentResponse represents the response to a payment request

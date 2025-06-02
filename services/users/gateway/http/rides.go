@@ -118,9 +118,6 @@ func (g *HTTPGateway) RideArrived(req *models.RideArrivalReq) (*models.PaymentRe
 		return nil, fmt.Errorf("failed to parse ride arrival response: %w", err)
 	}
 
-	// Apply the adjustment factor from the request
-	paymentRequest.AdjustmentFactor = req.AdjustmentFactor
-
 	return &paymentRequest, nil
 }
 

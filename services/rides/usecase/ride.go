@@ -189,14 +189,12 @@ func (uc *rideUC) RideArrived(ctx context.Context, req models.RideArrivalReq) (*
 
 	// Create payment request
 	paymentRequest := &models.PaymentRequest{
-		RideID:           req.RideID,
-		PassengerID:      ride.PassengerID.String(),
-		TotalCost:        totalCost,
-		AdjustmentFactor: req.AdjustmentFactor,
-		AdminFeePercent:  0.05, // 5% admin fee
+		RideID:      req.RideID,
+		PassengerID: ride.PassengerID.String(),
+		TotalCost:   adjustedCost,
 	}
 
-	log.Printf("Ride %s arrived at destination. Total cost: %d IDR", req.RideID, totalCost)
+	log.Printf("Ride %s arrived at destination. Total cost: %d IDR", req.RideID, adjustedCost)
 
 	return paymentRequest, nil
 }
@@ -215,30 +213,44 @@ func (uc *rideUC) ProcessPayment(ctx context.Context, req models.PaymentProccess
 
 	payment, err := uc.ridesRepo.GetPaymentByRideID(ctx, req.RideID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to calculate total cost: %w", err)
+		return nil, fmt.Errorf("failed to get payment record: %w", err)
 	}
-	payment.Status = models.PaymentStatusAccepted
-	err = uc.ridesRepo.UpdatePaymentStatus(ctx, payment.PaymentID.String(), models.PaymentStatusAccepted)
+
+	// Validate current payment status
+	if payment.Status != models.PaymentStatusPending {
+		return nil, fmt.Errorf("cannot process payment with status: %s", payment.Status)
+	}
+
+	// validate total cost
+	if req.TotalCost != payment.AdjustedCost {
+		return nil, fmt.Errorf("total cost mismatch: expected %d, got %d", payment.AdjustedCost, req.TotalCost)
+	}
+
+	// update payment status
+	payment.Status = req.Status
+	err = uc.ridesRepo.UpdatePaymentStatus(ctx, payment.PaymentID.String(), req.Status)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update payment status: %w", err)
 	}
+	// payment status need to accepted for ride to be completed
+	if req.Status == models.PaymentStatusAccepted {
+		// Mark ride as completed
+		ride.Status = models.RideStatusCompleted
+		if err := uc.ridesRepo.CompleteRide(ctx, ride); err != nil {
+			return nil, fmt.Errorf("failed to mark ride as completed: %w", err)
+		}
 
-	// Mark ride as completed
-	ride.Status = models.RideStatusCompleted
-	if err := uc.ridesRepo.CompleteRide(ctx, ride); err != nil {
-		return nil, fmt.Errorf("failed to mark ride as completed: %w", err)
-	}
+		// Create ride complete data for the event
+		var rideComplete = models.RideComplete{
+			Ride:    *ride,
+			Payment: *payment,
+		}
 
-	// Create ride complete data for the event
-	var rideComplete = models.RideComplete{
-		Ride:    *ride,
-		Payment: *payment,
-	}
-
-	// Publish payment processed event
-	if err := uc.ridesGW.PublishRideCompleted(ctx, rideComplete); err != nil {
-		// Log but don't fail the transaction
-		log.Printf("Warning: Failed to publish ride completed event: %v", err)
+		// Publish payment processed event
+		if err := uc.ridesGW.PublishRideCompleted(ctx, rideComplete); err != nil {
+			// Log but don't fail the transaction
+			log.Printf("Warning: Failed to publish ride completed event: %v", err)
+		}
 	}
 
 	return payment, nil
