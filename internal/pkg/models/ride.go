@@ -52,6 +52,11 @@ type RideCompleteEvent struct {
 	AdjustmentFactor float64 `json:"adjustment_factor"`
 }
 
+type RideArrivalReq struct {
+	RideID           string  `json:"ride_id"`
+	AdjustmentFactor float64 `json:"adjustment_factor"`
+}
+
 // Payment represents a payment record
 type Payment struct {
 	PaymentID    uuid.UUID `json:"payment_id" db:"payment_id"`
@@ -89,4 +94,11 @@ type RidePickupEvent struct {
 	PassengerID    string    `json:"passenger_id"`
 	DriverLocation Location  `json:"driver_location"`
 	Timestamp      time.Time `json:"timestamp"`
+}
+
+type RideArrival struct {
+	RideID           string  `json:"ride_id"`
+	DriverID         string  `json:"driver_id"`
+	PassengerID      string  `json:"passenger_id"`
+	AdjustmentFactor float64 `json:"adjustment_factor"`
 }

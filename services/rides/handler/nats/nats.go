@@ -47,17 +47,6 @@ func (h *RidesHandler) InitNATSConsumers() error {
 	}
 	h.subs = append(h.subs, sub)
 
-	// Subscribe to ride arrival events
-	sub, err = h.natsClient.Subscribe(constants.SubjectRideArrived, func(msg *nats.Msg) {
-		if err := h.handleRideArrived(msg.Data); err != nil {
-			log.Printf("Error handling ride arrival: %v", err)
-		}
-	})
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to ride arrivals: %w", err)
-	}
-	h.subs = append(h.subs, sub)
-
 	// Initialize location aggregate consumer
 	sub, err = h.natsClient.Subscribe(constants.SubjectLocationAggregate, func(msg *nats.Msg) {
 		if err := h.handleLocationAggregate(msg.Data); err != nil {
@@ -127,25 +116,6 @@ func (h *RidesHandler) handleLocationAggregate(msg []byte) error {
 			log.Printf("Failed to process billing update: %v", err)
 			return err
 		}
-	}
-
-	return nil
-}
-
-// handleRideArrived processes ride arrival events and completes the ride
-func (h *RidesHandler) handleRideArrived(msg []byte) error {
-	var event models.RideCompleteEvent
-	if err := json.Unmarshal(msg, &event); err != nil {
-		log.Printf("Failed to unmarshal ride arrival event: %v", err)
-		return err
-	}
-
-	log.Printf("Ride arrived event received: rideID=%s, adjustmentFactor=%.2f", event.RideID, event.AdjustmentFactor)
-
-	// Complete ride which will calculate payment and publish ride.completed
-	if _, err := h.ridesUC.CompleteRide(event.RideID, event.AdjustmentFactor); err != nil {
-		log.Printf("Error completing ride on arrival: %v", err)
-		return err
 	}
 
 	return nil

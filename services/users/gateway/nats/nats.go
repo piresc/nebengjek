@@ -56,12 +56,3 @@ func (g *NATSGateway) PublishLocationUpdate(ctx context.Context, locationEvent *
 	}
 	return g.client.Publish(constants.SubjectLocationUpdate, data)
 }
-
-// PublishRideArrived publishes a ride arrived event to NATS
-func (g *NATSGateway) PublishRideArrived(ctx context.Context, event *models.RideCompleteEvent) error {
-	data, err := json.Marshal(event)
-	if err != nil {
-		return err
-	}
-	return g.client.Publish(constants.SubjectRideArrived, data)
-}

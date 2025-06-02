@@ -17,10 +17,12 @@ const (
 	EventMatchRejected = "match_rejected"
 
 	// Ride events
-	EventRideStarted   = "ride_started"   // When a ride is created
-	EventRidePickup    = "ride_pickup"    // When driver is on the way to pick up passenger
-	EventRideArrived   = "ride_arrived"   // When driver indicates arrival
-	EventRideCompleted = "ride_completed" // When ride is completed and payment processed
+	EventRideStarted      = "ride_started"      // When a ride is created
+	EventRidePickup       = "ride_pickup"       // When driver is on the way to pick up passenger
+	EventRideArrived      = "ride_arrived"      // When driver indicates arrival
+	EventPaymentRequest   = "payment_request"   // When payment request is generated after arrival
+	EventPaymentProcessed = "payment_processed" // When payment is processed
+	EventRideCompleted    = "ride_completed"    // When ride is completed and payment processed
 )
 
 // WebSocket error codes

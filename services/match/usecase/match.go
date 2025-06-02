@@ -472,3 +472,31 @@ func (uc *MatchUC) ReleasePassenger(passengerID string) error {
 	log.Printf("Successfully released passenger %s back to available pool", passengerID)
 	return nil
 }
+
+// RemoveDriverFromPool removes a driver from the available pool (locks them)
+func (uc *MatchUC) RemoveDriverFromPool(ctx context.Context, driverID string) error {
+	log.Printf("Locking driver %s (removing from available pool)", driverID)
+
+	// Remove driver from available pool
+	if err := uc.matchRepo.RemoveAvailableDriver(ctx, driverID); err != nil {
+		log.Printf("Error removing driver from available pool: %v", err)
+		return fmt.Errorf("failed to remove driver from available pool: %w", err)
+	}
+
+	log.Printf("Successfully locked driver %s (removed from available pool)", driverID)
+	return nil
+}
+
+// RemovePassengerFromPool removes a passenger from the available pool (locks them)
+func (uc *MatchUC) RemovePassengerFromPool(ctx context.Context, passengerID string) error {
+	log.Printf("Locking passenger %s (removing from available pool)", passengerID)
+
+	// Remove passenger from available pool
+	if err := uc.matchRepo.RemoveAvailablePassenger(ctx, passengerID); err != nil {
+		log.Printf("Error removing passenger from available pool: %v", err)
+		return fmt.Errorf("failed to remove passenger from available pool: %w", err)
+	}
+
+	log.Printf("Successfully locked passenger %s (removed from available pool)", passengerID)
+	return nil
+}

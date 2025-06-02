@@ -130,6 +130,7 @@ func (r *RideRepo) UpdateTotalCost(ctx context.Context, rideID string, additiona
 // GetRide gets a ride by ID
 func (r *RideRepo) GetRide(ctx context.Context, rideID string) (*models.Ride, error) {
 	var ride models.Ride
+	rideIDUUID, err := uuid.Parse(rideID)
 
 	query := `
 		SELECT ride_id, driver_id, passenger_id, status, total_cost, created_at, updated_at
@@ -137,7 +138,7 @@ func (r *RideRepo) GetRide(ctx context.Context, rideID string) (*models.Ride, er
 		WHERE ride_id = $1
 	`
 
-	err := r.db.GetContext(ctx, &ride, query, rideID)
+	err = r.db.GetContext(ctx, &ride, query, rideIDUUID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ride: %w", err)
 	}
@@ -149,12 +150,12 @@ func (r *RideRepo) GetRide(ctx context.Context, rideID string) (*models.Ride, er
 func (r *RideRepo) CompleteRide(ctx context.Context, ride *models.Ride) error {
 	query := `
 		UPDATE rides 
-		SET status = 'completed',
+		SET status = $1,
 			updated_at = NOW()
-		WHERE ride_id = $1
+		WHERE ride_id = $2
 	`
 
-	result, err := r.db.ExecContext(ctx, query, ride.RideID)
+	result, err := r.db.ExecContext(ctx, query, models.RideStatusCompleted, ride.RideID)
 	if err != nil {
 		return fmt.Errorf("failed to complete ride: %w", err)
 	}
@@ -244,4 +245,22 @@ func (r *RideRepo) UpdateRideStatus(ctx context.Context, rideID string, status m
 	}
 
 	return nil
+}
+
+// GetPaymentByRideID retrieves payment information for a specific ride
+func (r *RideRepo) GetPaymentByRideID(ctx context.Context, rideID string) (*models.Payment, error) {
+	var payment models.Payment
+	rideIDUUID, err := uuid.Parse(rideID)
+	query := `
+		SELECT payment_id, ride_id, adjusted_cost, admin_fee, driver_payout, created_at
+		FROM payments
+		WHERE ride_id = $1
+	`
+
+	err = r.db.GetContext(ctx, &payment, query, rideIDUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get payment for ride %s: %w", rideID, err)
+	}
+
+	return &payment, nil
 }

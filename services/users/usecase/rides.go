@@ -8,12 +8,25 @@ import (
 )
 
 // RideArrived publishes a ride arrival event to NATS
-func (u *UserUC) RideArrived(ctx context.Context, event *models.RideCompleteEvent) error {
-	err := u.UserGW.PublishRideArrived(ctx, event)
+func (u *UserUC) RideArrived(ctx context.Context, event *models.RideArrivalReq) (*models.PaymentRequest, error) {
+	// First notify the ride service about the arrival via HTTP
+	paymentReq, err := u.UserGW.RideArrived(ctx, event)
 	if err != nil {
-		return fmt.Errorf("failed to publish ride arrived event: %w", err)
+		return nil, fmt.Errorf("failed to notify ride service of arrival via HTTP: %w", err)
 	}
-	return nil
+
+	return paymentReq, nil
+}
+
+// ProcessPayment processes the payment for a completed ride
+func (u *UserUC) ProcessPayment(ctx context.Context, paymentReq *models.PaymentRequest) (*models.Payment, error) {
+	// Call the ride service to process the payment
+	payment, err := u.UserGW.ProcessPayment(paymentReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to process payment: %w", err)
+	}
+
+	return payment, nil
 }
 
 // RideStartTrip publishes a ride start trip event to NATS

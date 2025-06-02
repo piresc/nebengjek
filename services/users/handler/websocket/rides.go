@@ -27,14 +27,37 @@ func (m *WebSocketManager) handleRideStart(client *models.WebSocketClient, data 
 
 // handleRideArrived processes ride arrival events from WebSocket clients
 func (m *WebSocketManager) handleRideArrived(client *models.WebSocketClient, data json.RawMessage) error {
-	var event models.RideCompleteEvent
+	var event models.RideArrivalReq
 	if err := json.Unmarshal(data, &event); err != nil {
 		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Invalid ride arrival format")
 	}
 
-	// Publish to NATS for rides-service to process completion
-	if err := m.userUC.RideArrived(context.Background(), &event); err != nil {
+	// Call the use case to process the ride arrival via HTTP
+	paymentReq, err := m.userUC.RideArrived(context.Background(), &event)
+	if err != nil {
 		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Failed to process ride arrival")
+	}
+	m.manager.NotifyClient(paymentReq.PassengerID, constants.EventPaymentRequest, paymentReq)
+
+	return nil
+}
+
+// handleProcessPayment processes payment requests from WebSocket clients
+func (m *WebSocketManager) handleProcessPayment(client *models.WebSocketClient, data json.RawMessage) error {
+	var paymentReq models.PaymentRequest
+	if err := json.Unmarshal(data, &paymentReq); err != nil {
+		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Invalid payment request format")
+	}
+
+	// Call the use case to process the payment
+	payment, err := m.userUC.ProcessPayment(context.Background(), &paymentReq)
+	if err != nil {
+		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Failed to process payment")
+	}
+
+	// Notify the client about the processed payment
+	if err := m.manager.SendMessage(client.Conn, constants.EventPaymentProcessed, payment); err != nil {
+		return err
 	}
 
 	return nil

@@ -33,6 +33,8 @@ func (h *Handler) RegisterRoutes(e *echo.Echo) {
 	// Rides routes
 	ridesGroup := e.Group("/rides")
 	ridesGroup.POST("/:rideID/confirm", h.ridesHTTP.StartRide)
+	ridesGroup.POST("/:rideID/arrive", h.ridesHTTP.RideArrived)
+	ridesGroup.POST("/:rideID/payment", h.ridesHTTP.ProcessPayment)
 }
 
 // InitNATSConsumers initializes all NATS consumers

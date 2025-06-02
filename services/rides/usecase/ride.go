@@ -97,7 +97,7 @@ func (uc *rideUC) ProcessBillingUpdate(rideID string, entry *models.BillingLedge
 }
 
 // CompleteRide handles completing a ride and processing payment
-func (uc *rideUC) CompleteRide(rideID string, adjustmentFactor float64) (*models.Payment, error) {
+func (uc *rideUC) CompleteRide(rideID string) (*models.Payment, error) {
 	ctx := context.Background()
 
 	// Get current ride to verify it exists and is active
@@ -110,40 +110,7 @@ func (uc *rideUC) CompleteRide(rideID string, adjustmentFactor float64) (*models
 		return nil, fmt.Errorf("cannot complete ride that is not ongoing")
 	}
 
-	// 1. Get total cost from billing ledger (to ensure accuracy)
-	totalCost, err := uc.ridesRepo.GetBillingLedgerSum(ctx, rideID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to calculate total cost: %w", err)
-	}
-
-	// 2. Validate adjustment factor
-	if adjustmentFactor < 0 || adjustmentFactor > 1.0 {
-		adjustmentFactor = 1.0 // Reset to 100% if invalid
-	}
-
-	// 3. Calculate adjusted cost
-	adjustedCost := int(float64(totalCost) * adjustmentFactor)
-
-	// 4. Calculate admin fee (5%)
-	adminFee := int(float64(adjustedCost) * 0.05)
-
-	// 5. Calculate driver payout
-	driverPayout := adjustedCost - adminFee
-
-	// 6. Create payment record
-	payment := &models.Payment{
-		PaymentID:    uuid.New(),
-		RideID:       ride.RideID,
-		AdjustedCost: adjustedCost,
-		AdminFee:     adminFee,
-		DriverPayout: driverPayout,
-		CreatedAt:    time.Now(),
-	}
-
-	// 7. Save payment record
-	if err := uc.ridesRepo.CreatePayment(ctx, payment); err != nil {
-		return nil, fmt.Errorf("failed to create payment record: %w", err)
-	}
+	payment, err := uc.ridesRepo.GetPaymentByRideID(ctx, rideID)
 
 	// 8. Mark ride as completed
 	ride.Status = models.RideStatusCompleted
@@ -159,9 +126,6 @@ func (uc *rideUC) CompleteRide(rideID string, adjustmentFactor float64) (*models
 		// Log but don't fail the transaction
 		log.Printf("Warning: Failed to publish ride completed event: %v", err)
 	}
-
-	log.Printf("Ride %s completed. Total: %d IDR, Adjusted: %d IDR, Admin Fee: %d IDR, Driver Payout: %d IDR",
-		rideID, totalCost, adjustedCost, adminFee, driverPayout)
 
 	return payment, nil
 }
@@ -207,4 +171,135 @@ func (uc *rideUC) StartRide(ctx context.Context, req models.RideStartRequest) (*
 
 	log.Printf("Ride %s started. Driver picked up passenger.", req.RideID)
 	return ride, nil
+}
+
+// RideArrived handles when a ride arrives at the destination but before payment processing
+func (uc *rideUC) RideArrived(ctx context.Context, req models.RideArrivalReq) (*models.PaymentRequest, error) {
+	// Get current ride to verify it exists and is active
+	ride, err := uc.ridesRepo.GetRide(ctx, req.RideID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ride: %w", err)
+	}
+
+	if ride.Status != models.RideStatusOngoing {
+		return nil, fmt.Errorf("cannot process arrival for ride that is not ongoing")
+	}
+
+	// Get total cost from billing ledger (to ensure accuracy)
+	totalCost, err := uc.ridesRepo.GetBillingLedgerSum(ctx, req.RideID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate total cost: %w", err)
+	}
+
+	// 2. Validate adjustment factor
+	if req.AdjustmentFactor < 0 || req.AdjustmentFactor > 1.0 {
+		req.AdjustmentFactor = 1.0 // Reset to 100% if invalid
+	}
+
+	// 3. Calculate adjusted cost
+	adjustedCost := int(float64(totalCost) * req.AdjustmentFactor)
+
+	// 4. Calculate admin fee (5%)
+	adminFee := int(float64(adjustedCost) * 0.05)
+
+	// 5. Calculate driver payout
+	driverPayout := adjustedCost - adminFee
+
+	// 6. Create payment record
+	payment := &models.Payment{
+		PaymentID:    uuid.New(),
+		RideID:       ride.RideID,
+		AdjustedCost: adjustedCost,
+		AdminFee:     adminFee,
+		DriverPayout: driverPayout,
+		CreatedAt:    time.Now(),
+	}
+
+	// 7. Save payment record
+	if err := uc.ridesRepo.CreatePayment(ctx, payment); err != nil {
+		return nil, fmt.Errorf("failed to create payment record: %w", err)
+	}
+
+	// Create payment request
+	paymentRequest := &models.PaymentRequest{
+		RideID:           req.RideID,
+		PassengerID:      ride.PassengerID.String(),
+		TotalCost:        totalCost,
+		AdjustmentFactor: req.AdjustmentFactor,
+		AdminFeePercent:  0.05, // 5% admin fee
+	}
+
+	log.Printf("Ride %s arrived at destination. Total cost: %d IDR", req.RideID, totalCost)
+
+	return paymentRequest, nil
+}
+
+// ProcessPayment processes the payment for a completed ride
+func (uc *rideUC) ProcessPayment(ctx context.Context, req models.PaymentRequest) (*models.Payment, error) {
+	// Get current ride to verify it exists and is active
+	ride, err := uc.ridesRepo.GetRide(ctx, req.RideID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ride: %w", err)
+	}
+
+	if ride.Status != models.RideStatusOngoing {
+		return nil, fmt.Errorf("cannot process payment for ride that is not ongoing")
+	}
+
+	// Validate adjustment factor
+	adjustmentFactor := req.AdjustmentFactor
+	if adjustmentFactor < 0 || adjustmentFactor > 1.0 {
+		adjustmentFactor = 1.0 // Reset to 100% if invalid
+	}
+
+	// Calculate adjusted cost
+	adjustedCost := int(float64(req.TotalCost) * adjustmentFactor)
+
+	// Calculate admin fee (using the provided percentage or default to 5%)
+	adminFeePercent := req.AdminFeePercent
+	if adminFeePercent <= 0 || adminFeePercent > 0.3 { // Cap admin fee at 30%
+		adminFeePercent = 0.05 // Default to 5%
+	}
+	adminFee := int(float64(adjustedCost) * adminFeePercent)
+
+	// Calculate driver payout
+	driverPayout := adjustedCost - adminFee
+
+	// Create payment record
+	payment := &models.Payment{
+		PaymentID:    uuid.New(),
+		RideID:       ride.RideID,
+		AdjustedCost: adjustedCost,
+		AdminFee:     adminFee,
+		DriverPayout: driverPayout,
+		CreatedAt:    time.Now(),
+	}
+
+	// Save payment record
+	if err := uc.ridesRepo.CreatePayment(ctx, payment); err != nil {
+		return nil, fmt.Errorf("failed to create payment record: %w", err)
+	}
+
+	// Mark ride as completed
+	ride.Status = models.RideStatusCompleted
+	if err := uc.ridesRepo.CompleteRide(ctx, ride); err != nil {
+		return nil, fmt.Errorf("failed to mark ride as completed: %w", err)
+	}
+
+	// Create ride complete data for the event
+	var rideComplete = models.RideComplete{
+		Ride:    *ride,
+		Payment: *payment,
+	}
+
+	// Publish payment processed event
+	if err := uc.ridesGW.PublishRideCompleted(ctx, rideComplete); err != nil {
+		// Log but don't fail the transaction
+		log.Printf("Warning: Failed to publish ride completed event: %v", err)
+	}
+
+	log.Printf("Ride %s payment processed. Total: %d IDR, Adjusted: %d IDR, Admin Fee: %d IDR, Driver Payout: %d IDR",
+		req.RideID, req.TotalCost, adjustedCost, adminFee, driverPayout)
+
+	return payment, nil
 }

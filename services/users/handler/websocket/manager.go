@@ -84,6 +84,8 @@ func (m *WebSocketManager) handleMessage(client *models.WebSocketClient, msg []b
 		return m.handleRideStart(client, wsMsg.Data)
 	case constants.EventRideArrived:
 		return m.handleRideArrived(client, wsMsg.Data)
+	case constants.EventPaymentProcessed:
+		return m.handleProcessPayment(client, wsMsg.Data)
 	default:
 		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Unknown event type")
 	}

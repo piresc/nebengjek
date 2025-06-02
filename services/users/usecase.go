@@ -30,5 +30,6 @@ type UserUC interface {
 
 	// handle ride events
 	RideStart(ctx context.Context, event *models.RideStartRequest) (*models.Ride, error)
-	RideArrived(ctx context.Context, event *models.RideCompleteEvent) error
+	RideArrived(ctx context.Context, req *models.RideArrivalReq) (*models.PaymentRequest, error)
+	ProcessPayment(ctx context.Context, paymentReq *models.PaymentRequest) (*models.Payment, error)
 }

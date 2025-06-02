@@ -17,4 +17,6 @@ type MatchUC interface {
 	GetPendingMatch(ctx context.Context, matchID string) (*models.Match, error)
 	ReleaseDriver(driverID string) error
 	ReleasePassenger(passengerID string) error
+	RemoveDriverFromPool(ctx context.Context, driverID string) error
+	RemovePassengerFromPool(ctx context.Context, passengerID string) error
 }

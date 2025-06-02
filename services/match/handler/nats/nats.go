@@ -1,6 +1,7 @@
 package nats
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -52,6 +53,17 @@ func (h *MatchHandler) InitNATSConsumers() error {
 	}
 	h.subs = append(h.subs, sub)
 
+	// Subscribe to ride pickup events to lock drivers
+	sub, err = h.natsClient.Subscribe(constants.SubjectRidePickup, func(msg *nats.Msg) {
+		if err := h.handleRidePickup(msg.Data); err != nil {
+			log.Printf("Error handling ride pickup event: %v", err)
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to ride pickup events: %w", err)
+	}
+	h.subs = append(h.subs, sub)
+
 	// Subscribe to ride completed events to unlock users
 	sub, err = h.natsClient.Subscribe(constants.SubjectRideCompleted, func(msg *nats.Msg) {
 		if err := h.handleRideCompleted(msg.Data); err != nil {
@@ -98,6 +110,32 @@ func (h *MatchHandler) handleFinderEvent(msg []byte) error {
 
 	// Forward the event to usecase for processing
 	return h.matchUC.HandleFinderEvent(event)
+}
+
+// handleRidePickup processes ride pickup events to lock drivers
+func (h *MatchHandler) handleRidePickup(msg []byte) error {
+	var ridePickup models.RideResp
+	if err := json.Unmarshal(msg, &ridePickup); err != nil {
+		log.Printf("Failed to unmarshal ride pickup event: %v", err)
+		return err
+	}
+
+	log.Printf("Received ride pickup event: rideID=%s, driverID=%s, PassengerID=%s",
+		ridePickup.RideID, ridePickup.DriverID, ridePickup.PassengerID)
+
+	// Remove driver from available pool (lock them)
+	if err := h.matchUC.RemoveDriverFromPool(context.Background(), ridePickup.DriverID); err != nil {
+		log.Printf("Failed to lock driver: %v", err)
+		// Continue even if this fails - don't block ride flow
+	}
+
+	// Remove passenger from available pool (lock them)
+	if err := h.matchUC.RemovePassengerFromPool(context.Background(), ridePickup.PassengerID); err != nil {
+		log.Printf("Failed to lock passenger: %v", err)
+		// Continue even if this fails - don't block ride flow
+	}
+
+	return nil
 }
 
 // handleRideCompleted processes ride completed events to unlock users
