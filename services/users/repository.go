@@ -6,6 +6,8 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
+//go:generate mockgen -destination=mocks/mock_repository.go -package=mocks github.com/piresc/nebengjek/services/users UserRepo
+
 // UserRepo defines the user repository interface
 type UserRepo interface {
 	// User management

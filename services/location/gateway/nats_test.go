@@ -3,68 +3,154 @@ package gateway
 import (
 	"context"
 	"encoding/json"
-	"os"
+	"errors"
 	"testing"
-	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/models"
-	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	natsserver "github.com/nats-io/nats-server/test"
 )
 
-var testNatsURL = "nats://127.0.0.1:8369"
-
-func TestMain(m *testing.M) {
-	opts := natsserver.DefaultTestOptions
-	opts.Port = 8369
-	testNatsServer := natsserver.RunServer(&opts)
-	code := m.Run()
-	testNatsServer.Shutdown()
-	os.Exit(code)
+// MockNATSClient simulates NATS client behavior for testing
+type MockNATSClient struct {
+	publishedMessages map[string][]byte
+	publishError      error
 }
 
-// TestPublishLocationAggregate_Success tests successful publishing of location aggregates
+// NewMockNATSClient creates a new mock NATS client
+func NewMockNATSClient() *MockNATSClient {
+	return &MockNATSClient{
+		publishedMessages: make(map[string][]byte),
+	}
+}
+
+// Publish simulates publishing a message
+func (m *MockNATSClient) Publish(subject string, data []byte) error {
+	if m.publishError != nil {
+		return m.publishError
+	}
+	m.publishedMessages[subject] = data
+	return nil
+}
+
+// GetConn returns nil as we don't need a real connection for testing
+func (m *MockNATSClient) GetConn() *nats.Conn {
+	return nil
+}
+
+// Subscribe is not used in our tests but required by the interface
+func (m *MockNATSClient) Subscribe(subject string, handler nats.MsgHandler) (*nats.Subscription, error) {
+	return nil, nil
+}
+
+// Close is not used in our tests but required by the interface
+func (m *MockNATSClient) Close() {
+	// No-op for mock
+}
+
+// GetPublishedMessage returns the last published message for a subject
+func (m *MockNATSClient) GetPublishedMessage(subject string) ([]byte, bool) {
+	data, exists := m.publishedMessages[subject]
+	return data, exists
+}
+
+// SetPublishError sets an error to return on publish
+func (m *MockNATSClient) SetPublishError(err error) {
+	m.publishError = err
+}
+
+// TestPublishLocationAggregate_Success tests successful publishing of location aggregate events
 func TestPublishLocationAggregate_Success(t *testing.T) {
-	// Create mock NATS client
-	nc, err := natspkg.NewClient(testNatsURL)
-	require.NoError(t, err, "Failed to connect to NATS server")
-	defer nc.Close()
+	// Create a mock NATS client
+	mockClient := NewMockNATSClient()
+
+	// Create the actual location gateway with the mock client
+	gw := NewLocationGW(mockClient)
+
 	// Create test data
-	aggregate := models.LocationAggregate{
-		RideID:    "ride-123",
-		Distance:  0.5,
-		Latitude:  -6.175392,
-		Longitude: 106.827153,
+	locationAggregate := models.LocationAggregate{
+		RideID:    "ride123",
+		Latitude:  -6.2088,
+		Longitude: 106.8456,
+		Distance:  100.5,
 	}
 
-	// Channel to receive the message
-	msgCh := make(chan *nats.Msg, 1)
-	sub, err := nc.Subscribe(constants.SubjectLocationAggregate, func(msg *nats.Msg) {
-		msgCh <- msg
-	})
-	require.NoError(t, err)
-	defer sub.Unsubscribe()
+	// Test successful publish
+	ctx := context.Background()
+	err := gw.PublishLocationAggregate(ctx, locationAggregate)
 
-	locationGW := NewLocationGW(nc)
-	err = locationGW.PublishLocationAggregate(context.Background(), aggregate)
+	// Assertions
+	assert.NoError(t, err)
 
-	// Wait for the message
-	select {
-	case msg := <-msgCh:
-		var publishedAggregate models.LocationAggregate
-		err = json.Unmarshal(msg.Data, &publishedAggregate)
-		require.NoError(t, err)
+	// Verify the message was published to the correct subject
+	publishedData, exists := mockClient.GetPublishedMessage(constants.SubjectLocationAggregate)
+	assert.True(t, exists)
 
-		assert.Equal(t, aggregate.RideID, publishedAggregate.RideID)
-		assert.Equal(t, aggregate.Distance, publishedAggregate.Distance)
-		assert.Equal(t, aggregate.Latitude, publishedAggregate.Latitude)
-		assert.Equal(t, aggregate.Longitude, publishedAggregate.Longitude)
-	case <-time.After(2 * time.Second):
-		t.Fatal("Did not receive published message")
+	// Verify the published data
+	var publishedAggregate models.LocationAggregate
+	err = json.Unmarshal(publishedData, &publishedAggregate)
+	assert.NoError(t, err)
+	assert.Equal(t, locationAggregate.RideID, publishedAggregate.RideID)
+	assert.Equal(t, locationAggregate.Latitude, publishedAggregate.Latitude)
+	assert.Equal(t, locationAggregate.Longitude, publishedAggregate.Longitude)
+	assert.Equal(t, locationAggregate.Distance, publishedAggregate.Distance)
+}
+
+// TestPublishLocationAggregate_Error tests error handling during location aggregate publishing
+func TestPublishLocationAggregate_Error(t *testing.T) {
+	// Create a mock NATS client
+	mockClient := NewMockNATSClient()
+
+	// Set up the mock to return an error
+	mockClient.SetPublishError(errors.New("publish failed"))
+
+	// Create the actual location gateway with the mock client
+	gw := NewLocationGW(mockClient)
+
+	// Create test data
+	locationAggregate := models.LocationAggregate{
+		RideID:    "ride123",
+		Latitude:  -6.2088,
+		Longitude: 106.8456,
+		Distance:  100.5,
 	}
+
+	// Test publish with error
+	ctx := context.Background()
+	err := gw.PublishLocationAggregate(ctx, locationAggregate)
+
+	// Assertions
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "publish failed")
+}
+
+// TestNewLocationGWWithClient tests the concrete client constructor
+func TestNewLocationGWWithClient(t *testing.T) {
+	// Create a mock NATS client
+	mockClient := NewMockNATSClient()
+
+	// Create the location gateway using the concrete client constructor
+	// We can't directly test this with our mock, but we can test that it creates a gateway
+	gw := NewLocationGW(mockClient)
+
+	// Verify that the gateway was created successfully
+	assert.NotNil(t, gw)
+
+	// Test that it can publish (this also tests the functionality)
+	locationAggregate := models.LocationAggregate{
+		RideID:    "ride456",
+		Latitude:  -6.2088,
+		Longitude: 106.8456,
+		Distance:  200.0,
+	}
+
+	ctx := context.Background()
+	err := gw.PublishLocationAggregate(ctx, locationAggregate)
+	assert.NoError(t, err)
+
+	// Verify the message was published
+	publishedData, exists := mockClient.GetPublishedMessage(constants.SubjectLocationAggregate)
+	assert.True(t, exists)
+	assert.NotEmpty(t, publishedData)
 }

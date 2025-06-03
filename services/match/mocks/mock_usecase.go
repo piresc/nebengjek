@@ -36,18 +36,18 @@ func (m *MockMatchUC) EXPECT() *MockMatchUCMockRecorder {
 }
 
 // ConfirmMatchStatus mocks base method.
-func (m *MockMatchUC) ConfirmMatchStatus(arg0, arg1 string, arg2 bool, arg3 models.MatchStatus) (models.MatchProposal, error) {
+func (m *MockMatchUC) ConfirmMatchStatus(arg0 *models.MatchConfirmRequest) (models.MatchProposal, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ConfirmMatchStatus", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "ConfirmMatchStatus", arg0)
 	ret0, _ := ret[0].(models.MatchProposal)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ConfirmMatchStatus indicates an expected call of ConfirmMatchStatus.
-func (mr *MockMatchUCMockRecorder) ConfirmMatchStatus(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+func (mr *MockMatchUCMockRecorder) ConfirmMatchStatus(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConfirmMatchStatus", reflect.TypeOf((*MockMatchUC)(nil).ConfirmMatchStatus), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConfirmMatchStatus", reflect.TypeOf((*MockMatchUC)(nil).ConfirmMatchStatus), arg0)
 }
 
 // GetMatch mocks base method.
@@ -92,4 +92,74 @@ func (m *MockMatchUC) HandleBeaconEvent(arg0 models.BeaconEvent) error {
 func (mr *MockMatchUCMockRecorder) HandleBeaconEvent(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleBeaconEvent", reflect.TypeOf((*MockMatchUC)(nil).HandleBeaconEvent), arg0)
+}
+
+// HandleFinderEvent mocks base method.
+func (m *MockMatchUC) HandleFinderEvent(arg0 models.FinderEvent) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HandleFinderEvent", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// HandleFinderEvent indicates an expected call of HandleFinderEvent.
+func (mr *MockMatchUCMockRecorder) HandleFinderEvent(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleFinderEvent", reflect.TypeOf((*MockMatchUC)(nil).HandleFinderEvent), arg0)
+}
+
+// ReleaseDriver mocks base method.
+func (m *MockMatchUC) ReleaseDriver(arg0 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReleaseDriver", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ReleaseDriver indicates an expected call of ReleaseDriver.
+func (mr *MockMatchUCMockRecorder) ReleaseDriver(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleaseDriver", reflect.TypeOf((*MockMatchUC)(nil).ReleaseDriver), arg0)
+}
+
+// ReleasePassenger mocks base method.
+func (m *MockMatchUC) ReleasePassenger(arg0 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReleasePassenger", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ReleasePassenger indicates an expected call of ReleasePassenger.
+func (mr *MockMatchUCMockRecorder) ReleasePassenger(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleasePassenger", reflect.TypeOf((*MockMatchUC)(nil).ReleasePassenger), arg0)
+}
+
+// RemoveDriverFromPool mocks base method.
+func (m *MockMatchUC) RemoveDriverFromPool(arg0 context.Context, arg1 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveDriverFromPool", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveDriverFromPool indicates an expected call of RemoveDriverFromPool.
+func (mr *MockMatchUCMockRecorder) RemoveDriverFromPool(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveDriverFromPool", reflect.TypeOf((*MockMatchUC)(nil).RemoveDriverFromPool), arg0, arg1)
+}
+
+// RemovePassengerFromPool mocks base method.
+func (m *MockMatchUC) RemovePassengerFromPool(arg0 context.Context, arg1 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemovePassengerFromPool", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemovePassengerFromPool indicates an expected call of RemovePassengerFromPool.
+func (mr *MockMatchUCMockRecorder) RemovePassengerFromPool(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemovePassengerFromPool", reflect.TypeOf((*MockMatchUC)(nil).RemovePassengerFromPool), arg0, arg1)
 }

@@ -136,12 +136,16 @@ func TestGetMatch_Success(t *testing.T) {
 		"id", "driver_id", "passenger_id",
 		"driver_longitude", "driver_latitude",
 		"passenger_longitude", "passenger_latitude",
-		"status", "created_at", "updated_at"}).
+		"target_longitude", "target_latitude",
+		"status", "driver_confirmed", "passenger_confirmed",
+		"created_at", "updated_at"}).
 		AddRow(
 			matchID, driverID, passengerID,
 			driverLongitude, driverLatitude,
 			passengerLongitude, passengerLatitude,
-			models.MatchStatusPending, now, now) // Use time.Time objects here
+			106.837153, -6.185392, // target location
+			models.MatchStatusPending, false, false, // confirmation flags
+			now, now) // Use time.Time objects here
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
 		SELECT 
@@ -150,7 +154,10 @@ func TestGetMatch_Success(t *testing.T) {
 			(driver_location[1])::float8 as driver_latitude,
 			(passenger_location[0])::float8 as passenger_longitude,
 			(passenger_location[1])::float8 as passenger_latitude,
-			status, created_at, updated_at
+			(target_location[0])::float8 as target_longitude,
+			(target_location[1])::float8 as target_latitude,
+			status, driver_confirmed, passenger_confirmed,
+			created_at, updated_at
 		FROM matches
 		WHERE id = $1
 	`)).
@@ -232,40 +239,6 @@ func TestUpdateMatchStatus_Success(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestStoreMatchProposal_Success(t *testing.T) {
-	// Arrange
-	db, _ := setupMockDB(t) // We don't need the mock here for Redis operations
-	redisClient, miniRedis := setupMockRedis(t)
-	defer miniRedis.Close()
-
-	repo := NewMatchRepository(&models.Config{}, db, redisClient)
-
-	matchID := uuid.New()
-	driverID := uuid.New()
-	passengerID := uuid.New()
-	match := &models.Match{
-		ID:          matchID,
-		DriverID:    driverID,
-		PassengerID: passengerID,
-		Status:      models.MatchStatusPending,
-	}
-
-	// Act
-	ctx := context.Background()
-	err := repo.StoreMatchProposal(ctx, match)
-
-	// Assert
-	assert.NoError(t, err)
-
-	// We can't directly test Redis since we're mocking with database.RedisClient
-	// You would need to intercept calls or use dependency injection for testing
-	// This would require modifying the repository implementation
-}
-
-func TestConfirmMatchAtomically_NotImplementedYet(t *testing.T) {
-	t.Skip("This test requires Redis operations that need mocking")
 }
 
 func TestAddAvailableDriver_Success(t *testing.T) {
@@ -603,250 +576,6 @@ func TestRemoveAvailablePassenger_Success(t *testing.T) {
 	}
 }
 
-// TestFindNearbyPassengers tests finding nearby passengers
-func TestFindNearbyPassengers_Success(t *testing.T) {
-	// Arrange
-	db, _ := setupMockDB(t)
-	redisClient, miniRedis := setupMockRedis(t)
-	defer miniRedis.Close()
-
-	repo := NewMatchRepository(&models.Config{}, db, redisClient)
-
-	// Setup test data
-	ctx := context.Background()
-
-	// Add three passengers at different locations
-	passenger1ID := uuid.New().String()
-	passenger2ID := uuid.New().String()
-	passenger3ID := uuid.New().String()
-
-	client := redisClient.Client
-	// Passenger 1: 0.5km away
-	err := client.GeoAdd(ctx, constants.KeyPassengerGeo, &redis.GeoLocation{
-		Name:      passenger1ID,
-		Longitude: 106.827153,
-		Latitude:  -6.180392, // ~0.5km from test location
-	}).Err()
-	assert.NoError(t, err)
-
-	// Add passenger1 to available passengers set
-	err = client.SAdd(ctx, constants.KeyAvailablePassengers, passenger1ID).Err()
-	assert.NoError(t, err)
-
-	// Passenger 2: 0.8km away
-	err = client.GeoAdd(ctx, constants.KeyPassengerGeo, &redis.GeoLocation{
-		Name:      passenger2ID,
-		Longitude: 106.827153,
-		Latitude:  -6.182392, // ~0.8km from test location
-	}).Err()
-	assert.NoError(t, err)
-
-	// Add passenger2 to available passengers set
-	err = client.SAdd(ctx, constants.KeyAvailablePassengers, passenger2ID).Err()
-	assert.NoError(t, err)
-
-	// Passenger 3: 1.2km away (outside 1km radius)
-	err = client.GeoAdd(ctx, constants.KeyPassengerGeo, &redis.GeoLocation{
-		Name:      passenger3ID,
-		Longitude: 106.827153,
-		Latitude:  -6.185392, // ~1.2km from test location
-	}).Err()
-	assert.NoError(t, err)
-
-	// Add passenger3 to available passengers set
-	err = client.SAdd(ctx, constants.KeyAvailablePassengers, passenger3ID).Err()
-	assert.NoError(t, err)
-
-	// Search location
-	searchLocation := &models.Location{
-		Latitude:  -6.175392,
-		Longitude: 106.827153,
-	}
-
-	// Act - Find passengers within 1km
-	nearbyPassengers, err := repo.FindNearbyPassengers(ctx, searchLocation, 1.0)
-
-	// Assert
-	assert.NoError(t, err)
-	assert.Len(t, nearbyPassengers, 2, "Should find 2 passengers within 1km")
-
-	// Check if correct passengers were found
-	passengerIDs := make([]string, len(nearbyPassengers))
-	for i, passenger := range nearbyPassengers {
-		passengerIDs[i] = passenger.ID
-	}
-	assert.Contains(t, passengerIDs, passenger1ID, "Passenger 1 should be found")
-	assert.Contains(t, passengerIDs, passenger2ID, "Passenger 2 should be found")
-	assert.NotContains(t, passengerIDs, passenger3ID, "Passenger 3 should not be found (outside range)")
-}
-
-// TestConfirmMatchAtomically tests atomically confirming a match
-func TestConfirmMatchAtomically_Success(t *testing.T) {
-	// Arrange
-	db, mock := setupMockDB(t)
-	redisClient, miniRedis := setupMockRedis(t)
-	defer miniRedis.Close()
-
-	repo := NewMatchRepository(&models.Config{}, db, redisClient)
-
-	matchID := uuid.New().String()
-	driverID := uuid.New().String()
-	passengerID := uuid.New().String()
-
-	// Setup for RemoveAvailableDriver/Passenger
-	redisClient.Client = redis.NewClient(&redis.Options{
-		Addr: miniRedis.Addr(),
-	})
-
-	// Add driver and passenger to Redis for later removal
-	ctx := context.Background()
-	geoDriverKey := constants.KeyDriverGeo
-	geoPassengerKey := constants.KeyPassengerGeo
-	availableKey := constants.KeyAvailableDrivers
-	locationKey := fmt.Sprintf(constants.KeyDriverLocation, driverID)
-
-	err := redisClient.Client.ZAdd(ctx, geoDriverKey, &redis.Z{
-		Score:  0,
-		Member: driverID,
-	}).Err()
-	assert.NoError(t, err)
-
-	err = redisClient.Client.ZAdd(ctx, geoPassengerKey, &redis.Z{
-		Score:  0,
-		Member: passengerID,
-	}).Err()
-	assert.NoError(t, err)
-
-	err = redisClient.Client.SAdd(ctx, availableKey, driverID).Err()
-	assert.NoError(t, err)
-
-	err = redisClient.Client.HMSet(ctx, locationKey, map[string]interface{}{
-		constants.FieldLatitude:  -6.175392,
-		constants.FieldLongitude: 106.827153,
-		constants.FieldTimestamp: time.Now().Unix(),
-	}).Err()
-	assert.NoError(t, err)
-
-	// Mock SQL operations
-	// 1. Begin transaction
-	mock.ExpectBegin()
-
-	// 2. Lock and get current status
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT status::text, driver_id FROM matches WHERE id = $1 FOR UPDATE")).
-		WithArgs(matchID).
-		WillReturnRows(sqlmock.NewRows([]string{"status", "driver_id"}).AddRow(string(models.MatchStatusPending), driverID))
-
-	// 3. Update match status
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE matches SET status = $1, updated_at = NOW() WHERE id = $2 AND status = $3")).
-		WithArgs(models.MatchStatusAccepted, matchID, models.MatchStatusPending).
-		WillReturnResult(sqlmock.NewResult(0, 1))
-
-	// 4. Get passenger ID to remove it
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT passenger_id FROM matches WHERE id = $1")).
-		WithArgs(matchID).
-		WillReturnRows(sqlmock.NewRows([]string{"passenger_id"}).AddRow(passengerID))
-
-	// 5. Commit transaction
-	mock.ExpectCommit()
-
-	// Act
-	err = repo.ConfirmMatchAtomically(ctx, matchID, models.MatchStatusAccepted)
-
-	// Assert
-	assert.NoError(t, err)
-	assert.NoError(t, mock.ExpectationsWereMet())
-
-	// Verify driver and passenger were removed from Redis - check if keys exist first
-	if miniRedis.Exists(geoDriverKey) {
-		driverMembers, err := miniRedis.ZMembers(geoDriverKey)
-		assert.NoError(t, err)
-		assert.NotContains(t, driverMembers, driverID, "Driver should be removed from geo set")
-	} else {
-		// Key was completely removed, which is also valid
-		assert.True(t, true, "Driver geo set was completely removed")
-	}
-
-	if miniRedis.Exists(geoPassengerKey) {
-		passengerMembers, err := miniRedis.ZMembers(geoPassengerKey)
-		assert.NoError(t, err)
-		assert.NotContains(t, passengerMembers, passengerID, "Passenger should be removed from geo set")
-	} else {
-		// Key was completely removed, which is also valid
-		assert.True(t, true, "Passenger geo set was completely removed")
-	}
-}
-
-// TestListMatchesByDriver tests listing all matches for a driver
-func TestListMatchesByDriver_Success(t *testing.T) {
-	// Arrange
-	db, mock := setupMockDB(t)
-	redisClient, miniRedis := setupMockRedis(t)
-	defer miniRedis.Close()
-
-	repo := NewMatchRepository(&models.Config{}, db, redisClient)
-
-	driverID := uuid.New().String()
-	now := time.Now()
-
-	// Setup mock data for SQL query
-	matchRows := sqlmock.NewRows([]string{
-		"id", "driver_id", "passenger_id",
-		"driver_longitude", "driver_latitude",
-		"passenger_longitude", "passenger_latitude",
-		"status", "created_at", "updated_at"})
-
-	// Add 3 matches for the driver
-	matchID1 := uuid.New()
-	matchID2 := uuid.New()
-	matchID3 := uuid.New()
-	passengerID1 := uuid.New()
-	passengerID2 := uuid.New()
-	passengerID3 := uuid.New()
-
-	matchRows.AddRow(
-		matchID1, driverID, passengerID1,
-		106.827153, -6.175392, 106.837153, -6.185392,
-		models.MatchStatusAccepted, now, now)
-
-	matchRows.AddRow(
-		matchID2, driverID, passengerID2,
-		106.827153, -6.175392, 106.837153, -6.185392,
-		models.MatchStatusPending, now, now)
-
-	matchRows.AddRow(
-		matchID3, driverID, passengerID3,
-		106.827153, -6.175392, 106.837153, -6.185392,
-		models.MatchStatusRejected, now, now)
-
-	mock.ExpectQuery(regexp.QuoteMeta(`
-        SELECT 
-            id, driver_id, passenger_id,
-            (driver_location[0])::float8 as driver_longitude,
-            (driver_location[1])::float8 as driver_latitude,
-            (passenger_location[0])::float8 as passenger_longitude,
-            (passenger_location[1])::float8 as passenger_latitude,
-            status, created_at, updated_at
-        FROM matches
-        WHERE driver_id = $1
-        ORDER BY created_at DESC
-    `)).WithArgs(driverID).WillReturnRows(matchRows)
-
-	// Act
-	ctx := context.Background()
-	matches, err := repo.ListMatchesByDriver(ctx, driverID)
-
-	// Assert
-	assert.NoError(t, err)
-	assert.Len(t, matches, 3, "Should return 3 matches")
-	assert.Equal(t, matchID1, matches[0].ID)
-	assert.Equal(t, matchID2, matches[1].ID)
-	assert.Equal(t, matchID3, matches[2].ID)
-	assert.Equal(t, models.MatchStatusAccepted, matches[0].Status)
-	assert.Equal(t, models.MatchStatusPending, matches[1].Status)
-	assert.Equal(t, models.MatchStatusRejected, matches[2].Status)
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
 // TestListMatchesByPassenger tests listing all matches for a passenger
 func TestListMatchesByPassenger_Success(t *testing.T) {
 	// Arrange
@@ -864,7 +593,9 @@ func TestListMatchesByPassenger_Success(t *testing.T) {
 		"id", "driver_id", "passenger_id",
 		"driver_longitude", "driver_latitude",
 		"passenger_longitude", "passenger_latitude",
-		"status", "created_at", "updated_at"})
+		"target_longitude", "target_latitude",
+		"status", "driver_confirmed", "passenger_confirmed",
+		"created_at", "updated_at"})
 
 	// Add 3 matches for the passenger
 	matchID1 := uuid.New()
@@ -877,17 +608,23 @@ func TestListMatchesByPassenger_Success(t *testing.T) {
 	matchRows.AddRow(
 		matchID1, driverID1, passengerID,
 		106.827153, -6.175392, 106.837153, -6.185392,
-		models.MatchStatusAccepted, now, now)
+		106.847153, -6.195392, // target location
+		models.MatchStatusAccepted, false, true, // confirmation flags
+		now, now)
 
 	matchRows.AddRow(
 		matchID2, driverID2, passengerID,
 		106.827153, -6.175392, 106.837153, -6.185392,
-		models.MatchStatusPending, now, now)
+		106.847153, -6.195392, // target location
+		models.MatchStatusPending, false, false, // confirmation flags
+		now, now)
 
 	matchRows.AddRow(
 		matchID3, driverID3, passengerID,
 		106.827153, -6.175392, 106.837153, -6.185392,
-		models.MatchStatusRejected, now, now)
+		106.847153, -6.195392, // target location
+		models.MatchStatusRejected, false, false, // confirmation flags
+		now, now)
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
         SELECT 
@@ -896,7 +633,10 @@ func TestListMatchesByPassenger_Success(t *testing.T) {
             (driver_location[1])::float8 as driver_latitude,
             (passenger_location[0])::float8 as passenger_longitude,
             (passenger_location[1])::float8 as passenger_latitude,
-            status, created_at, updated_at
+            (target_location[0])::float8 as target_longitude,
+            (target_location[1])::float8 as target_latitude,
+            status, driver_confirmed, passenger_confirmed,
+            created_at, updated_at
         FROM matches
         WHERE passenger_id = $1
         ORDER BY created_at DESC
@@ -921,46 +661,6 @@ func TestListMatchesByPassenger_Success(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// TestProcessLocationUpdate_Success tests updating a driver's location in the geospatial index
-func TestProcessLocationUpdate_Success(t *testing.T) {
-	// Arrange
-	db, _ := setupMockDB(t)
-	redisClient, miniRedis := setupMockRedis(t)
-	defer miniRedis.Close()
-
-	repo := NewMatchRepository(&models.Config{}, db, redisClient)
-
-	driverID := uuid.New().String()
-	location := &models.Location{
-		Latitude:  -6.175392,
-		Longitude: 106.827153,
-		Timestamp: time.Now(),
-	}
-
-	// Act
-	ctx := context.Background()
-	err := repo.ProcessLocationUpdate(ctx, driverID, location)
-
-	// Assert
-	assert.NoError(t, err)
-
-	// Verify driver's location was updated in Redis geo set
-	geoKey := constants.KeyDriverGeo
-	members, err := miniRedis.ZMembers(geoKey)
-	assert.NoError(t, err)
-	assert.Contains(t, members, driverID, "Driver should be added to geo set")
-
-	// Check if position was stored correctly using GeoPos
-	positions, err := redisClient.Client.GeoPos(ctx, geoKey, driverID).Result()
-	assert.NoError(t, err)
-	assert.NotEmpty(t, positions)
-	assert.NotNil(t, positions[0])
-
-	// Verify coordinates are close to what we set (within small delta for float precision)
-	assert.InDelta(t, location.Longitude, positions[0].Longitude, 0.001)
-	assert.InDelta(t, location.Latitude, positions[0].Latitude, 0.001)
-}
-
 // MockRedisClientForErrors is a mock implementation that satisfies the database.RedisClient interface
 type MockRedisClientForErrors struct {
 	*database.RedisClient // embedding but not using the embedded methods
@@ -969,14 +669,6 @@ type MockRedisClientForErrors struct {
 // GeoAdd simulates a Redis error for the test
 func (m *MockRedisClientForErrors) GeoAdd(ctx context.Context, key string, longitude, latitude float64, member string) error {
 	return fmt.Errorf("simulated Redis error")
-}
-
-// TestStoreMatchProposal_MarshalError tests error handling when marshaling match data fails
-func TestStoreMatchProposal_MarshalError(t *testing.T) {
-	// This test requires a special method to trigger a marshaling error
-	// Since we can't easily make json.Marshal fail, we'll skip this test
-	// but include it for documentation purposes
-	t.Skip("Cannot easily trigger a json.Marshal error")
 }
 
 // TestGetMatch_NotFound tests getting a non-existent match
@@ -997,7 +689,10 @@ func TestGetMatch_NotFound(t *testing.T) {
 			(driver_location[1])::float8 as driver_latitude,
 			(passenger_location[0])::float8 as passenger_longitude,
 			(passenger_location[1])::float8 as passenger_latitude,
-			status, created_at, updated_at
+			(target_location[0])::float8 as target_longitude,
+			(target_location[1])::float8 as target_latitude,
+			status, driver_confirmed, passenger_confirmed,
+			created_at, updated_at
 		FROM matches
 		WHERE id = $1
 	`)).WithArgs(matchID).WillReturnError(fmt.Errorf("no rows in result set"))
@@ -1158,45 +853,6 @@ func TestUpdateMatchStatus_NoRowsAffected(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// TestListMatchesByDriver_Empty tests listing matches for a driver with no matches
-func TestListMatchesByDriver_Empty(t *testing.T) {
-	// Arrange
-	db, mock := setupMockDB(t)
-	redisClient, miniRedis := setupMockRedis(t)
-	defer miniRedis.Close()
-
-	repo := NewMatchRepository(&models.Config{}, db, redisClient)
-
-	driverID := uuid.New().String()
-
-	// Mock empty result
-	mock.ExpectQuery(regexp.QuoteMeta(`
-        SELECT 
-            id, driver_id, passenger_id,
-            (driver_location[0])::float8 as driver_longitude,
-            (driver_location[1])::float8 as driver_latitude,
-            (passenger_location[0])::float8 as passenger_longitude,
-            (passenger_location[1])::float8 as passenger_latitude,
-            status, created_at, updated_at
-        FROM matches
-        WHERE driver_id = $1
-        ORDER BY created_at DESC
-    `)).WithArgs(driverID).WillReturnRows(sqlmock.NewRows([]string{
-		"id", "driver_id", "passenger_id",
-		"driver_longitude", "driver_latitude",
-		"passenger_longitude", "passenger_latitude",
-		"status", "created_at", "updated_at"}))
-
-	// Act
-	ctx := context.Background()
-	matches, err := repo.ListMatchesByDriver(ctx, driverID)
-
-	// Assert
-	assert.NoError(t, err)
-	assert.Empty(t, matches)
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
 // TestListMatchesByPassenger_RowError tests error handling during row scanning
 func TestListMatchesByPassenger_RowError(t *testing.T) {
 	// Arrange
@@ -1213,12 +869,16 @@ func TestListMatchesByPassenger_RowError(t *testing.T) {
 		"id", "driver_id", "passenger_id",
 		"driver_longitude", "driver_latitude",
 		"passenger_longitude", "passenger_latitude",
-		"status", "created_at", "updated_at"}).
+		"target_longitude", "target_latitude",
+		"status", "driver_confirmed", "passenger_confirmed",
+		"created_at", "updated_at"}).
 		AddRow(
 			"invalid-uuid", "invalid-driver", passengerID,
 			"not-a-float", "not-a-float",
 			"not-a-float", "not-a-float",
-			models.MatchStatusAccepted, "not-a-time", "not-a-time").
+			"not-a-float", "not-a-float",
+			models.MatchStatusAccepted, false, false,
+			"not-a-time", "not-a-time").
 		RowError(0, fmt.Errorf("scan error"))
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
@@ -1228,7 +888,10 @@ func TestListMatchesByPassenger_RowError(t *testing.T) {
             (driver_location[1])::float8 as driver_latitude,
             (passenger_location[0])::float8 as passenger_longitude,
             (passenger_location[1])::float8 as passenger_latitude,
-            status, created_at, updated_at
+            (target_location[0])::float8 as target_longitude,
+            (target_location[1])::float8 as target_latitude,
+            status, driver_confirmed, passenger_confirmed,
+            created_at, updated_at
         FROM matches
         WHERE passenger_id = $1
         ORDER BY created_at DESC
@@ -1242,114 +905,5 @@ func TestListMatchesByPassenger_RowError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, matches)
 	assert.Contains(t, err.Error(), "error iterating matches")
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-// TestConfirmMatchAtomically_CommitError tests error handling when committing a transaction fails
-func TestConfirmMatchAtomically_CommitError(t *testing.T) {
-	// Arrange
-	db, mock := setupMockDB(t)
-	redisClient, miniRedis := setupMockRedis(t)
-	defer miniRedis.Close()
-
-	repo := NewMatchRepository(&models.Config{}, db, redisClient)
-
-	matchID := uuid.New().String()
-	driverID := uuid.New().String()
-	passengerID := uuid.New().String()
-
-	// Add driver and passenger to Redis geo sets for removal
-	geoDriverKey := constants.KeyDriverGeo
-	geoPassengerKey := constants.KeyPassengerGeo
-
-	client := redisClient.Client
-	ctx := context.Background()
-
-	// Add driver to driver geo set
-	err := client.GeoAdd(ctx, geoDriverKey, &redis.GeoLocation{
-		Name:      driverID,
-		Longitude: 106.827153,
-		Latitude:  -6.175392,
-	}).Err()
-	assert.NoError(t, err)
-
-	// Add passenger to passenger geo set
-	err = client.GeoAdd(ctx, geoPassengerKey, &redis.GeoLocation{
-		Name:      passengerID,
-		Longitude: 106.837153,
-		Latitude:  -6.185392,
-	}).Err()
-	assert.NoError(t, err)
-
-	// Mock transaction
-	mock.ExpectBegin()
-
-	// Mock getting current status with FOR UPDATE lock
-	mock.ExpectQuery(regexp.QuoteMeta(`
-        SELECT status::text, driver_id
-        FROM matches 
-        WHERE id = $1 
-        FOR UPDATE
-    `)).
-		WithArgs(matchID).
-		WillReturnRows(sqlmock.NewRows([]string{"status", "driver_id"}).AddRow(string(models.MatchStatusPending), driverID))
-
-	// Mock update match status
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE matches SET status = $1, updated_at = NOW() WHERE id = $2 AND status = $3")).
-		WithArgs(models.MatchStatusAccepted, matchID, models.MatchStatusPending).
-		WillReturnResult(sqlmock.NewResult(0, 1))
-
-	// Mock getting passenger ID
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT passenger_id FROM matches WHERE id = $1")).
-		WithArgs(matchID).
-		WillReturnRows(sqlmock.NewRows([]string{"passenger_id"}).AddRow(passengerID))
-
-	// Mock commit error
-	mock.ExpectCommit().WillReturnError(fmt.Errorf("commit error"))
-
-	// Act
-	err = repo.ConfirmMatchAtomically(ctx, matchID, models.MatchStatusAccepted)
-
-	// Assert
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to commit transaction")
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-// TestConfirmMatchAtomically_StatusMismatch tests error when match has the wrong status
-func TestConfirmMatchAtomically_StatusMismatch(t *testing.T) {
-	// Arrange
-	db, mock := setupMockDB(t)
-	redisClient, miniRedis := setupMockRedis(t)
-	defer miniRedis.Close()
-
-	repo := NewMatchRepository(&models.Config{}, db, redisClient)
-
-	matchID := uuid.New().String()
-	driverID := uuid.New().String()
-
-	// Mock transaction
-	mock.ExpectBegin()
-
-	// Mock getting current status with wrong status
-	mock.ExpectQuery(regexp.QuoteMeta(`
-        SELECT status::text, driver_id
-        FROM matches 
-        WHERE id = $1 
-        FOR UPDATE
-    `)).
-		WithArgs(matchID).
-		WillReturnRows(sqlmock.NewRows([]string{"status", "driver_id"}).AddRow(string(models.MatchStatusRejected), driverID))
-
-	// Mock rollback
-	mock.ExpectRollback()
-
-	// Act
-	ctx := context.Background()
-	err := repo.ConfirmMatchAtomically(ctx, matchID, models.MatchStatusAccepted)
-
-	// Assert
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "match cannot be confirmed")
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

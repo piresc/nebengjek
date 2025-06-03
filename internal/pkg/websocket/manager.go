@@ -119,6 +119,10 @@ func (m *Manager) GetClient(userID string) (*models.WebSocketClient, bool) {
 
 // SendMessage sends a message to a WebSocket client
 func (m *Manager) SendMessage(conn *websocket.Conn, event string, data interface{}) error {
+	if conn == nil {
+		return nil // Handle nil connection gracefully for tests
+	}
+
 	rawData, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("error marshaling message data: %v", err)

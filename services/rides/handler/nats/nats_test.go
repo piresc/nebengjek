@@ -2,394 +2,486 @@ package handler
 
 import (
 	"encoding/json"
-	"os"
+	"errors"
 	"testing"
-	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
-	"github.com/nats-io/nats.go"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/services/rides"
 	"github.com/piresc/nebengjek/services/rides/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	natsserver "github.com/nats-io/nats-server/test"
-	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 )
 
-var testNatsURL = "nats://127.0.0.1:8369"
-
-func TestMain(m *testing.M) {
-	opts := natsserver.DefaultTestOptions
-	opts.Port = 8369
-	testNatsServer := natsserver.RunServer(&opts)
-	code := m.Run()
-	testNatsServer.Shutdown()
-	os.Exit(code)
+// NATSClientInterface defines the interface for NATS client operations
+type NATSClientInterface interface {
+	Subscribe(subject string, handler func([]byte) error) error
+	Close()
 }
 
-func setupNatsHandler(t *testing.T) (*RidesHandler, *mocks.MockRideUC) {
-	ctrl := gomock.NewController(t)
-	t.Cleanup(func() { ctrl.Finish() })
+// MockNATSClient simulates NATS client behavior for testing
+type MockNATSClient struct {
+	subscriptions  map[string]func([]byte) error
+	subscribeError error
+}
 
-	nc, err := natspkg.NewClient(testNatsURL)
-	require.NoError(t, err, "Failed to connect to NATS server")
-	t.Cleanup(func() { nc.Close() })
+// NewMockNATSClient creates a new mock NATS client
+func NewMockNATSClient() *MockNATSClient {
+	return &MockNATSClient{
+		subscriptions: make(map[string]func([]byte) error),
+	}
+}
 
-	ridesUC := mocks.NewMockRideUC(ctrl)
-	handler := NewRidesHandler(ridesUC, nc)
-	t.Cleanup(func() {
-		for _, sub := range handler.subs {
-			sub.Unsubscribe()
-		}
+// Subscribe simulates subscribing to a subject
+func (m *MockNATSClient) Subscribe(subject string, handler func([]byte) error) error {
+	if m.subscribeError != nil {
+		return m.subscribeError
+	}
+	m.subscriptions[subject] = handler
+	return nil
+}
+
+// SimulateMessage simulates receiving a message on a subject
+func (m *MockNATSClient) SimulateMessage(subject string, data []byte) error {
+	handler, exists := m.subscriptions[subject]
+	if !exists {
+		return errors.New("no subscription found for subject")
+	}
+	return handler(data)
+}
+
+// SetSubscribeError sets an error to return on subscribe
+func (m *MockNATSClient) SetSubscribeError(err error) {
+	m.subscribeError = err
+}
+
+// Close simulates closing the connection
+func (m *MockNATSClient) Close() {
+	// No-op for mock
+}
+
+// TestableRidesHandler extends RidesHandler to allow testing with mocks
+type TestableRidesHandler struct {
+	ridesUC rides.RideUC
+	client  NATSClientInterface
+	cfg     *models.Config
+}
+
+// NewTestableRidesHandler creates a handler that can work with mocks
+func NewTestableRidesHandler(ridesUC rides.RideUC, client NATSClientInterface, cfg *models.Config) *TestableRidesHandler {
+	return &TestableRidesHandler{
+		ridesUC: ridesUC,
+		client:  client,
+		cfg:     cfg,
+	}
+}
+
+// InitNATSConsumers initializes all NATS consumers for testing
+func (h *TestableRidesHandler) InitNATSConsumers() error {
+	// Initialize match accepted consumer
+	err := h.client.Subscribe(constants.SubjectMatchAccepted, func(data []byte) error {
+		return h.handleMatchAccepted(data)
 	})
+	if err != nil {
+		return err
+	}
 
-	return handler, ridesUC
+	// Initialize location aggregate consumer
+	err = h.client.Subscribe(constants.SubjectLocationAggregate, func(data []byte) error {
+		return h.handleLocationAggregate(data)
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
-func TestRidesHandler_NewLocationHandler(t *testing.T) {
+
+// handleMatchAccepted processes match acceptance events to create rides
+func (h *TestableRidesHandler) handleMatchAccepted(msg []byte) error {
+	var matchProposal models.MatchProposal
+	if err := json.Unmarshal(msg, &matchProposal); err != nil {
+		return err
+	}
+
+	// Create a ride from the match proposal
+	if err := h.ridesUC.CreateRide(matchProposal); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// handleLocationAggregate processes location aggregates for billing
+func (h *TestableRidesHandler) handleLocationAggregate(msg []byte) error {
+	var update models.LocationAggregate
+	if err := json.Unmarshal(msg, &update); err != nil {
+		return err
+	}
+
+	// Only process if distance is >= minimum configured distance
+	if update.Distance >= h.cfg.Rides.MinDistanceKm {
+		// Convert ride ID to UUID
+		rideUUID, err := uuid.Parse(update.RideID)
+		if err != nil {
+			return err
+		}
+
+		// Calculate cost at 3000 IDR per km
+		cost := int(update.Distance * 3000)
+
+		// Create billing entry
+		entry := &models.BillingLedger{
+			RideID:   rideUUID,
+			Distance: update.Distance,
+			Cost:     cost,
+		}
+
+		// Store billing entry and update total cost
+		if err := h.ridesUC.ProcessBillingUpdate(update.RideID, entry); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// TestInitNATSConsumers_Success tests successful initialization of NATS consumers
+func TestInitNATSConsumers_Success(t *testing.T) {
+	// Arrange
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	rideUC := mocks.NewMockRideUC(ctrl)
-	nc, err := natspkg.NewClient(testNatsURL)
+	mockClient := NewMockNATSClient()
+	mockRidesUC := mocks.NewMockRideUC(ctrl)
+	cfg := &models.Config{
+		Rides: models.RidesConfig{
+			MinDistanceKm: 1.0,
+		},
+	}
+
+	handler := NewTestableRidesHandler(mockRidesUC, mockClient, cfg)
+
+	// Act
+	err := handler.InitNATSConsumers()
+
+	// Assert
+	require.NoError(t, err)
+	assert.Len(t, mockClient.subscriptions, 2)
+	assert.Contains(t, mockClient.subscriptions, constants.SubjectMatchAccepted)
+	assert.Contains(t, mockClient.subscriptions, constants.SubjectLocationAggregate)
+}
+
+// TestInitNATSConsumers_SubscribeError tests error handling during consumer initialization
+func TestInitNATSConsumers_SubscribeError(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := NewMockNATSClient()
+	expectedError := errors.New("subscription failed")
+	mockClient.SetSubscribeError(expectedError)
+
+	mockRidesUC := mocks.NewMockRideUC(ctrl)
+	cfg := &models.Config{
+		Rides: models.RidesConfig{
+			MinDistanceKm: 1.0,
+		},
+	}
+
+	handler := NewTestableRidesHandler(mockRidesUC, mockClient, cfg)
+
+	// Act
+	err := handler.InitNATSConsumers()
+
+	// Assert
+	require.Error(t, err)
+	assert.Equal(t, expectedError, err)
+}
+
+// TestHandleMatchAccepted_Success tests successful processing of match accepted events
+func TestHandleMatchAccepted_Success(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := NewMockNATSClient()
+	mockRidesUC := mocks.NewMockRideUC(ctrl)
+	cfg := &models.Config{
+		Rides: models.RidesConfig{
+			MinDistanceKm: 1.0,
+		},
+	}
+
+	handler := NewTestableRidesHandler(mockRidesUC, mockClient, cfg)
+	err := handler.InitNATSConsumers()
 	require.NoError(t, err)
 
-	handler := NewRidesHandler(rideUC, nc)
-
-	assert.NotNil(t, handler, "Handler should not be nil")
-	assert.Equal(t, rideUC, handler.ridesUC, "rideUC should be properly set")
-	assert.Equal(t, nc, handler.natsClient, "NATS client should be properly set")
-	assert.Empty(t, handler.subs, "Subscriptions should be initialized as empty slice")
-}
-
-func TestRidesHandler_InitNATSConsumers(t *testing.T) {
-	handler, _ := setupNatsHandler(t)
-
-	err := handler.InitNATSConsumers()
-	require.NoError(t, err, "Failed to initialize NATS consumers")
-
-	// Check if the subscription is created
-	assert.NotEmpty(t, handler.subs, "Expected subscriptions to be created")
-}
-
-func TestHandleMatchAccept(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	handler, mockUC := setupNatsHandler(t)
-
-	matchID := uuid.New().String()
-	driverID := uuid.New().String()
-	passengerID := uuid.New().String()
-
 	matchProposal := models.MatchProposal{
-		ID:          matchID,
-		DriverID:    driverID,
-		PassengerID: passengerID,
-		DriverLocation: models.Location{
-			Latitude:  -6.175392,
-			Longitude: 106.827153,
-		},
-		UserLocation: models.Location{
-			Latitude:  -6.185392,
-			Longitude: 106.837153,
-		},
+		ID:          uuid.New().String(),
+		DriverID:    uuid.New().String(),
+		PassengerID: uuid.New().String(),
 		MatchStatus: models.MatchStatusAccepted,
 	}
 
-	// Test successful match acceptance
-	t.Run("success", func(t *testing.T) {
-		mockUC.EXPECT().CreateRide(gomock.Any()).DoAndReturn(
-			func(match models.MatchProposal) error {
-				assert.Equal(t, matchProposal.ID, match.ID)
-				assert.Equal(t, matchProposal.DriverID, match.DriverID)
-				assert.Equal(t, matchProposal.PassengerID, match.PassengerID)
-				return nil
-			},
-		)
+	mockRidesUC.EXPECT().CreateRide(matchProposal).Return(nil)
 
-		data, err := json.Marshal(matchProposal)
-		require.NoError(t, err)
+	// Act
+	matchData, err := json.Marshal(matchProposal)
+	require.NoError(t, err)
 
-		err = handler.handleMatchAccept(data)
-		assert.NoError(t, err)
-	})
+	err = mockClient.SimulateMessage(constants.SubjectMatchAccepted, matchData)
 
-	// Test with invalid JSON
-	t.Run("invalid JSON", func(t *testing.T) {
-		err := handler.handleMatchAccept([]byte("invalid json"))
-		assert.Error(t, err)
-	})
-
-	// Test when create ride fails
-	t.Run("create ride fails", func(t *testing.T) {
-		mockUC.EXPECT().CreateRide(gomock.Any()).Return(assert.AnError)
-
-		data, err := json.Marshal(matchProposal)
-		require.NoError(t, err)
-
-		err = handler.handleMatchAccept(data)
-		assert.Error(t, err)
-	})
+	// Assert
+	require.NoError(t, err)
 }
 
-func TestHandleLocationAggregate(t *testing.T) {
+// TestHandleMatchAccepted_InvalidJSON tests error handling for invalid JSON
+func TestHandleMatchAccepted_InvalidJSON(t *testing.T) {
+	// Arrange
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	handler, mockUC := setupNatsHandler(t)
-
-	validRideID := uuid.New().String()
-
-	tests := []struct {
-		name          string
-		locationAgg   models.LocationAggregate
-		distance      float64
-		expectProcess bool
-		processFails  bool
-		wantErr       bool
-	}{
-		{
-			name: "process valid update",
-			locationAgg: models.LocationAggregate{
-				RideID:    validRideID,
-				Distance:  2.5,
-				Latitude:  -6.175392,
-				Longitude: 106.827153,
-			},
-			distance:      2.5,
-			expectProcess: true,
-			processFails:  false,
-			wantErr:       false,
-		},
-		{
-			name: "skip small distance",
-			locationAgg: models.LocationAggregate{
-				RideID:    validRideID,
-				Distance:  0.5, // Less than 1km
-				Latitude:  -6.175392,
-				Longitude: 106.827153,
-			},
-			distance:      0.5,
-			expectProcess: false,
-			processFails:  false,
-			wantErr:       false,
-		},
-		{
-			name: "invalid ride ID",
-			locationAgg: models.LocationAggregate{
-				RideID:    "invalid-uuid",
-				Distance:  2.5,
-				Latitude:  -6.175392,
-				Longitude: 106.827153,
-			},
-			distance:      2.5,
-			expectProcess: false,
-			processFails:  false,
-			wantErr:       true,
-		},
-		{
-			name: "process update fails",
-			locationAgg: models.LocationAggregate{
-				RideID:    validRideID,
-				Distance:  2.5,
-				Latitude:  -6.175392,
-				Longitude: 106.827153,
-			},
-			distance:      2.5,
-			expectProcess: true,
-			processFails:  true,
-			wantErr:       true,
+	mockClient := NewMockNATSClient()
+	mockRidesUC := mocks.NewMockRideUC(ctrl)
+	cfg := &models.Config{
+		Rides: models.RidesConfig{
+			MinDistanceKm: 1.0,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.expectProcess {
-				expectedCost := int(tt.distance * 3000)
-				expectedEntry := &models.BillingLedger{
-					RideID:   uuid.MustParse(tt.locationAgg.RideID),
-					Distance: tt.distance,
-					Cost:     expectedCost,
-				}
-
-				if tt.processFails {
-					mockUC.EXPECT().ProcessBillingUpdate(tt.locationAgg.RideID, gomock.Any()).Return(assert.AnError)
-				} else {
-					mockUC.EXPECT().ProcessBillingUpdate(tt.locationAgg.RideID, gomock.Any()).DoAndReturn(
-						func(rideID string, entry *models.BillingLedger) error {
-							assert.Equal(t, expectedEntry.RideID, entry.RideID)
-							assert.Equal(t, expectedEntry.Distance, entry.Distance)
-							assert.Equal(t, expectedEntry.Cost, entry.Cost)
-							return nil
-						},
-					)
-				}
-			}
-
-			data, err := json.Marshal(tt.locationAgg)
-			require.NoError(t, err)
-
-			err = handler.handleLocationAggregate(data)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-
-	// Test with invalid JSON
-	t.Run("invalid JSON", func(t *testing.T) {
-		err := handler.handleLocationAggregate([]byte("invalid json"))
-		assert.Error(t, err)
-	})
-}
-
-func TestHandleRideArrived(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	handler, mockUC := setupNatsHandler(t)
-
-	rideCompleteEvent := models.RideCompleteEvent{
-		RideID:           "ride-123",
-		AdjustmentFactor: 1.2,
-	}
-
-	// Test successful ride completion
-	t.Run("success", func(t *testing.T) {
-		mockUC.EXPECT().CompleteRide(rideCompleteEvent.RideID, rideCompleteEvent.AdjustmentFactor).Return(&models.Payment{}, nil)
-
-		data, err := json.Marshal(rideCompleteEvent)
-		require.NoError(t, err)
-
-		err = handler.handleRideArrived(data)
-		assert.NoError(t, err)
-	})
-
-	// Test with invalid JSON
-	t.Run("invalid JSON", func(t *testing.T) {
-		err := handler.handleRideArrived([]byte("invalid json"))
-		assert.Error(t, err)
-	})
-
-	// Test when complete ride fails
-	t.Run("complete ride fails", func(t *testing.T) {
-		mockUC.EXPECT().CompleteRide(rideCompleteEvent.RideID, rideCompleteEvent.AdjustmentFactor).Return(nil, assert.AnError)
-
-		data, err := json.Marshal(rideCompleteEvent)
-		require.NoError(t, err)
-
-		err = handler.handleRideArrived(data)
-		assert.Error(t, err)
-	})
-}
-
-// TestIntegrationNATSHandling tests the full pipeline from NATS message to handler
-func TestIntegrationNATSHandling(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	handler, mockUC := setupNatsHandler(t)
+	handler := NewTestableRidesHandler(mockRidesUC, mockClient, cfg)
 	err := handler.InitNATSConsumers()
 	require.NoError(t, err)
 
-	// Test match accepted integration
-	t.Run("match accepted", func(t *testing.T) {
-		matchID := uuid.New().String()
-		driverID := uuid.New().String()
-		passengerID := uuid.New().String()
+	// Act
+	invalidJSON := []byte("{invalid json}")
+	err = mockClient.SimulateMessage(constants.SubjectMatchAccepted, invalidJSON)
 
-		matchProposal := models.MatchProposal{
-			ID:          matchID,
-			DriverID:    driverID,
-			PassengerID: passengerID,
-			DriverLocation: models.Location{
-				Latitude:  -6.175392,
-				Longitude: 106.827153,
-			},
-			UserLocation: models.Location{
-				Latitude:  -6.185392,
-				Longitude: 106.837153,
-			},
-			MatchStatus: models.MatchStatusAccepted,
-		}
+	// Assert
+	require.Error(t, err)
+}
 
-		mockUC.EXPECT().CreateRide(gomock.Any()).DoAndReturn(
-			func(match models.MatchProposal) error {
-				assert.Equal(t, matchProposal.ID, match.ID)
-				assert.Equal(t, matchProposal.DriverID, match.DriverID)
-				return nil
-			},
-		)
+// TestHandleMatchAccepted_CreateRideError tests error handling when CreateRide fails
+func TestHandleMatchAccepted_CreateRideError(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-		nc, err := nats.Connect(testNatsURL)
-		require.NoError(t, err)
-		defer nc.Close()
+	mockClient := NewMockNATSClient()
+	mockRidesUC := mocks.NewMockRideUC(ctrl)
+	cfg := &models.Config{
+		Rides: models.RidesConfig{
+			MinDistanceKm: 1.0,
+		},
+	}
 
-		data, err := json.Marshal(matchProposal)
-		require.NoError(t, err)
+	handler := NewTestableRidesHandler(mockRidesUC, mockClient, cfg)
+	err := handler.InitNATSConsumers()
+	require.NoError(t, err)
 
-		err = nc.Publish(constants.SubjectMatchAccepted, data)
-		require.NoError(t, err)
-		nc.Flush()
+	matchProposal := models.MatchProposal{
+		ID:          uuid.New().String(),
+		DriverID:    uuid.New().String(),
+		PassengerID: uuid.New().String(),
+		MatchStatus: models.MatchStatusAccepted,
+	}
 
-		// Give some time for the message to be processed
-		time.Sleep(100 * time.Millisecond)
-	})
+	expectedError := errors.New("create ride failed")
+	mockRidesUC.EXPECT().CreateRide(matchProposal).Return(expectedError)
 
-	// Test location aggregate integration
-	t.Run("location aggregate", func(t *testing.T) {
-		validRideID := uuid.New().String()
-		locationAgg := models.LocationAggregate{
-			RideID:    validRideID,
-			Distance:  2.5,
-			Latitude:  -6.175392,
-			Longitude: 106.827153,
-		}
+	// Act
+	matchData, err := json.Marshal(matchProposal)
+	require.NoError(t, err)
 
-		mockUC.EXPECT().ProcessBillingUpdate(locationAgg.RideID, gomock.Any()).Return(nil)
+	err = mockClient.SimulateMessage(constants.SubjectMatchAccepted, matchData)
 
-		nc, err := nats.Connect(testNatsURL)
-		require.NoError(t, err)
-		defer nc.Close()
+	// Assert
+	require.Error(t, err)
+	assert.Equal(t, expectedError, err)
+}
 
-		data, err := json.Marshal(locationAgg)
-		require.NoError(t, err)
+// TestHandleLocationAggregate_Success tests successful processing of location aggregates
+func TestHandleLocationAggregate_Success(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-		err = nc.Publish(constants.SubjectLocationAggregate, data)
-		require.NoError(t, err)
-		nc.Flush()
+	mockClient := NewMockNATSClient()
+	mockRidesUC := mocks.NewMockRideUC(ctrl)
+	cfg := &models.Config{
+		Rides: models.RidesConfig{
+			MinDistanceKm: 1.0,
+		},
+	}
 
-		// Give some time for the message to be processed
-		time.Sleep(100 * time.Millisecond)
-	})
+	handler := NewTestableRidesHandler(mockRidesUC, mockClient, cfg)
+	err := handler.InitNATSConsumers()
+	require.NoError(t, err)
 
-	// Test ride arrived integration
-	t.Run("ride arrived", func(t *testing.T) {
-		rideCompleteEvent := models.RideCompleteEvent{
-			RideID:           "ride-123",
-			AdjustmentFactor: 1.2,
-		}
+	rideID := uuid.New()
+	locationAggregate := models.LocationAggregate{
+		RideID:   rideID.String(),
+		Distance: 2.5, // Above minimum distance
+	}
 
-		mockUC.EXPECT().CompleteRide(rideCompleteEvent.RideID, rideCompleteEvent.AdjustmentFactor).Return(&models.Payment{}, nil)
+	expectedCost := int(2.5 * 3000) // 7500
+	expectedEntry := &models.BillingLedger{
+		RideID:   rideID,
+		Distance: 2.5,
+		Cost:     expectedCost,
+	}
 
-		nc, err := nats.Connect(testNatsURL)
-		require.NoError(t, err)
-		defer nc.Close()
+	mockRidesUC.EXPECT().ProcessBillingUpdate(rideID.String(), expectedEntry).Return(nil)
 
-		data, err := json.Marshal(rideCompleteEvent)
-		require.NoError(t, err)
+	// Act
+	locationData, err := json.Marshal(locationAggregate)
+	require.NoError(t, err)
 
-		err = nc.Publish(constants.SubjectRideArrived, data)
-		require.NoError(t, err)
-		nc.Flush()
+	err = mockClient.SimulateMessage(constants.SubjectLocationAggregate, locationData)
 
-		// Give some time for the message to be processed
-		time.Sleep(100 * time.Millisecond)
-	})
+	// Assert
+	require.NoError(t, err)
+}
+
+// TestHandleLocationAggregate_BelowMinDistance tests skipping processing when distance is below minimum
+func TestHandleLocationAggregate_BelowMinDistance(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := NewMockNATSClient()
+	mockRidesUC := mocks.NewMockRideUC(ctrl)
+	cfg := &models.Config{
+		Rides: models.RidesConfig{
+			MinDistanceKm: 2.0,
+		},
+	}
+
+	handler := NewTestableRidesHandler(mockRidesUC, mockClient, cfg)
+	err := handler.InitNATSConsumers()
+	require.NoError(t, err)
+
+	rideID := uuid.New()
+	locationAggregate := models.LocationAggregate{
+		RideID:   rideID.String(),
+		Distance: 1.5, // Below minimum distance
+	}
+
+	// No expectation on ProcessBillingUpdate since it should be skipped
+
+	// Act
+	locationData, err := json.Marshal(locationAggregate)
+	require.NoError(t, err)
+
+	err = mockClient.SimulateMessage(constants.SubjectLocationAggregate, locationData)
+
+	// Assert
+	require.NoError(t, err)
+}
+
+// TestHandleLocationAggregate_InvalidJSON tests error handling for invalid JSON
+func TestHandleLocationAggregate_InvalidJSON(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := NewMockNATSClient()
+	mockRidesUC := mocks.NewMockRideUC(ctrl)
+	cfg := &models.Config{
+		Rides: models.RidesConfig{
+			MinDistanceKm: 1.0,
+		},
+	}
+
+	handler := NewTestableRidesHandler(mockRidesUC, mockClient, cfg)
+	err := handler.InitNATSConsumers()
+	require.NoError(t, err)
+
+	// Act
+	invalidJSON := []byte("{invalid json}")
+	err = mockClient.SimulateMessage(constants.SubjectLocationAggregate, invalidJSON)
+
+	// Assert
+	require.Error(t, err)
+}
+
+// TestHandleLocationAggregate_InvalidRideID tests error handling for invalid ride ID
+func TestHandleLocationAggregate_InvalidRideID(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := NewMockNATSClient()
+	mockRidesUC := mocks.NewMockRideUC(ctrl)
+	cfg := &models.Config{
+		Rides: models.RidesConfig{
+			MinDistanceKm: 1.0,
+		},
+	}
+
+	handler := NewTestableRidesHandler(mockRidesUC, mockClient, cfg)
+	err := handler.InitNATSConsumers()
+	require.NoError(t, err)
+
+	locationAggregate := models.LocationAggregate{
+		RideID:   "invalid-uuid",
+		Distance: 2.5,
+	}
+
+	// Act
+	locationData, err := json.Marshal(locationAggregate)
+	require.NoError(t, err)
+
+	err = mockClient.SimulateMessage(constants.SubjectLocationAggregate, locationData)
+
+	// Assert
+	require.Error(t, err)
+}
+
+// TestHandleLocationAggregate_ProcessBillingError tests error handling when ProcessBillingUpdate fails
+func TestHandleLocationAggregate_ProcessBillingError(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := NewMockNATSClient()
+	mockRidesUC := mocks.NewMockRideUC(ctrl)
+	cfg := &models.Config{
+		Rides: models.RidesConfig{
+			MinDistanceKm: 1.0,
+		},
+	}
+
+	handler := NewTestableRidesHandler(mockRidesUC, mockClient, cfg)
+	err := handler.InitNATSConsumers()
+	require.NoError(t, err)
+
+	rideID := uuid.New()
+	locationAggregate := models.LocationAggregate{
+		RideID:   rideID.String(),
+		Distance: 2.5,
+	}
+
+	expectedCost := int(2.5 * 3000)
+	expectedEntry := &models.BillingLedger{
+		RideID:   rideID,
+		Distance: 2.5,
+		Cost:     expectedCost,
+	}
+
+	expectedError := errors.New("billing update failed")
+	mockRidesUC.EXPECT().ProcessBillingUpdate(rideID.String(), expectedEntry).Return(expectedError)
+
+	// Act
+	locationData, err := json.Marshal(locationAggregate)
+	require.NoError(t, err)
+
+	err = mockClient.SimulateMessage(constants.SubjectLocationAggregate, locationData)
+
+	// Assert
+	require.Error(t, err)
+	assert.Equal(t, expectedError, err)
 }

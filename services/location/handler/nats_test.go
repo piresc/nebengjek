@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	natsserver "github.com/nats-io/nats-server/test"
+	natsserver "github.com/nats-io/nats-server/v2/test"
 )
 
 var testNatsURL = "nats://127.0.0.1:8369"

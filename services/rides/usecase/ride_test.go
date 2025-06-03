@@ -56,7 +56,7 @@ func TestCreateRide_Success(t *testing.T) {
 		})
 
 	mockGW.EXPECT().
-		PublishRideStarted(gomock.Any(), gomock.Any()).
+		PublishRidePickup(gomock.Any(), gomock.Any()).
 		Return(nil)
 
 	// Act
@@ -136,7 +136,7 @@ func TestCreateRide_PublishError(t *testing.T) {
 		})
 
 	mockGW.EXPECT().
-		PublishRideStarted(gomock.Any(), gomock.Any()).
+		PublishRidePickup(gomock.Any(), gomock.Any()).
 		Return(expectedError)
 
 	// Act
@@ -270,7 +270,7 @@ func TestProcessBillingUpdate_InvalidRideStatus(t *testing.T) {
 	assert.Contains(t, err.Error(), "cannot update billing for non-active ride")
 }
 
-func TestCompleteRide_Success(t *testing.T) {
+func TestStartRide_Success(t *testing.T) {
 	// Arrange
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -284,14 +284,161 @@ func TestCompleteRide_Success(t *testing.T) {
 
 	rideID := uuid.New().String()
 	rideUUID := uuid.MustParse(rideID)
-	adjustmentFactor := 0.8 // 80% of original price
 
-	totalCost := 10000
+	req := models.RideStartRequest{
+		RideID: rideID,
+		DriverLocation: &models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+		},
+		PassengerLocation: &models.Location{
+			Latitude:  -6.175400, // Very close to driver
+			Longitude: 106.827160,
+		},
+	}
 
 	ride := &models.Ride{
-		RideID:    rideUUID,
-		Status:    models.RideStatusOngoing,
-		TotalCost: totalCost,
+		RideID: rideUUID,
+		Status: models.RideStatusDriverPickup,
+	}
+
+	// Set up expectations
+	mockRepo.EXPECT().
+		GetRide(gomock.Any(), rideID).
+		Return(ride, nil)
+
+	mockRepo.EXPECT().
+		UpdateRideStatus(gomock.Any(), rideID, models.RideStatusOngoing).
+		Return(nil)
+
+	// Act
+	result, err := uc.StartRide(context.Background(), req)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, models.RideStatusOngoing, result.Status)
+}
+
+func TestStartRide_DriverTooFar(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockRideRepo(ctrl)
+	mockGW := mocks.NewMockRideGW(ctrl)
+
+	cfg := &models.Config{}
+	uc, err := NewRideUC(cfg, mockRepo, mockGW)
+	require.NoError(t, err)
+
+	rideID := uuid.New().String()
+	rideUUID := uuid.MustParse(rideID)
+
+	req := models.RideStartRequest{
+		RideID: rideID,
+		DriverLocation: &models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+		},
+		PassengerLocation: &models.Location{
+			Latitude:  -6.185392, // Too far from driver
+			Longitude: 106.837153,
+		},
+	}
+
+	ride := &models.Ride{
+		RideID: rideUUID,
+		Status: models.RideStatusDriverPickup,
+	}
+
+	// Set up expectations
+	mockRepo.EXPECT().
+		GetRide(gomock.Any(), rideID).
+		Return(ride, nil)
+
+	// Act
+	result, err := uc.StartRide(context.Background(), req)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "driver is too far from passenger")
+	assert.Equal(t, models.Ride{}, *result)
+}
+
+func TestStartRide_InvalidStatus(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockRideRepo(ctrl)
+	mockGW := mocks.NewMockRideGW(ctrl)
+
+	cfg := &models.Config{}
+	uc, err := NewRideUC(cfg, mockRepo, mockGW)
+	require.NoError(t, err)
+
+	rideID := uuid.New().String()
+	rideUUID := uuid.MustParse(rideID)
+
+	req := models.RideStartRequest{
+		RideID: rideID,
+		DriverLocation: &models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+		},
+		PassengerLocation: &models.Location{
+			Latitude:  -6.175400,
+			Longitude: 106.827160,
+		},
+	}
+
+	ride := &models.Ride{
+		RideID: rideUUID,
+		Status: models.RideStatusOngoing, // Wrong status
+	}
+
+	// Set up expectations
+	mockRepo.EXPECT().
+		GetRide(gomock.Any(), rideID).
+		Return(ride, nil)
+
+	// Act
+	result, err := uc.StartRide(context.Background(), req)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot start trip for ride not in driver_pickup state")
+	assert.Equal(t, models.Ride{}, *result)
+}
+
+func TestRideArrived_Success(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockRideRepo(ctrl)
+	mockGW := mocks.NewMockRideGW(ctrl)
+
+	cfg := &models.Config{}
+	uc, err := NewRideUC(cfg, mockRepo, mockGW)
+	require.NoError(t, err)
+
+	rideID := uuid.New().String()
+	rideUUID := uuid.MustParse(rideID)
+	passengerID := uuid.New()
+	adjustmentFactor := 0.8
+	totalCost := 10000
+
+	req := models.RideArrivalReq{
+		RideID:           rideID,
+		AdjustmentFactor: adjustmentFactor,
+	}
+
+	ride := &models.Ride{
+		RideID:      rideUUID,
+		PassengerID: passengerID,
+		Status:      models.RideStatusOngoing,
 	}
 
 	// Expected values
@@ -315,34 +462,22 @@ func TestCompleteRide_Success(t *testing.T) {
 			assert.Equal(t, adjustedCost, payment.AdjustedCost)
 			assert.Equal(t, adminFee, payment.AdminFee)
 			assert.Equal(t, driverPayout, payment.DriverPayout)
+			assert.Equal(t, models.PaymentStatusPending, payment.Status)
 			return nil
 		})
-
-	mockRepo.EXPECT().
-		CompleteRide(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, updatedRide *models.Ride) error {
-			assert.Equal(t, rideUUID, updatedRide.RideID)
-			assert.Equal(t, models.RideStatusCompleted, updatedRide.Status)
-			return nil
-		})
-
-	mockGW.EXPECT().
-		PublishRideCompleted(gomock.Any(), gomock.Any()).
-		Return(nil)
 
 	// Act
-	payment, err := uc.CompleteRide(rideID, adjustmentFactor)
+	paymentRequest, err := uc.RideArrived(context.Background(), req)
 
 	// Assert
 	assert.NoError(t, err)
-	assert.NotNil(t, payment)
-	assert.Equal(t, rideUUID, payment.RideID)
-	assert.Equal(t, adjustedCost, payment.AdjustedCost)
-	assert.Equal(t, adminFee, payment.AdminFee)
-	assert.Equal(t, driverPayout, payment.DriverPayout)
+	assert.NotNil(t, paymentRequest)
+	assert.Equal(t, rideID, paymentRequest.RideID)
+	assert.Equal(t, passengerID.String(), paymentRequest.PassengerID)
+	assert.Equal(t, adjustedCost, paymentRequest.TotalCost)
 }
 
-func TestCompleteRide_InvalidAdjustmentFactor(t *testing.T) {
+func TestRideArrived_InvalidStatus(t *testing.T) {
 	// Arrange
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -356,17 +491,180 @@ func TestCompleteRide_InvalidAdjustmentFactor(t *testing.T) {
 
 	rideID := uuid.New().String()
 	rideUUID := uuid.MustParse(rideID)
-	invalidAdjustmentFactor := 1.5 // Should be reset to 1.0
 
-	totalCost := 10000
-
-	ride := &models.Ride{
-		RideID:    rideUUID,
-		Status:    models.RideStatusOngoing,
-		TotalCost: totalCost,
+	req := models.RideArrivalReq{
+		RideID:           rideID,
+		AdjustmentFactor: 0.8,
 	}
 
-	// Expected values with adjustment factor of 1.0
+	ride := &models.Ride{
+		RideID: rideUUID,
+		Status: models.RideStatusCompleted, // Wrong status
+	}
+
+	// Set up expectations
+	mockRepo.EXPECT().
+		GetRide(gomock.Any(), rideID).
+		Return(ride, nil)
+
+	// Act
+	paymentRequest, err := uc.RideArrived(context.Background(), req)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot process arrival for ride that is not ongoing")
+	assert.Nil(t, paymentRequest)
+}
+
+func TestProcessPayment_Success(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockRideRepo(ctrl)
+	mockGW := mocks.NewMockRideGW(ctrl)
+
+	cfg := &models.Config{}
+	uc, err := NewRideUC(cfg, mockRepo, mockGW)
+	require.NoError(t, err)
+
+	rideID := uuid.New().String()
+	rideUUID := uuid.MustParse(rideID)
+	paymentID := uuid.New()
+	totalCost := 8000
+
+	req := models.PaymentProccessRequest{
+		RideID:    rideID,
+		TotalCost: totalCost,
+		Status:    models.PaymentStatusAccepted,
+	}
+
+	ride := &models.Ride{
+		RideID: rideUUID,
+		Status: models.RideStatusOngoing,
+	}
+
+	payment := &models.Payment{
+		PaymentID:    paymentID,
+		RideID:       rideUUID,
+		AdjustedCost: totalCost,
+		Status:       models.PaymentStatusPending,
+	}
+
+	// Set up expectations
+	mockRepo.EXPECT().
+		GetRide(gomock.Any(), rideID).
+		Return(ride, nil)
+
+	mockRepo.EXPECT().
+		GetPaymentByRideID(gomock.Any(), rideID).
+		Return(payment, nil)
+
+	mockRepo.EXPECT().
+		UpdatePaymentStatus(gomock.Any(), paymentID.String(), models.PaymentStatusAccepted).
+		Return(nil)
+
+	mockRepo.EXPECT().
+		CompleteRide(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, updatedRide *models.Ride) error {
+			assert.Equal(t, models.RideStatusCompleted, updatedRide.Status)
+			return nil
+		})
+
+	mockGW.EXPECT().
+		PublishRideCompleted(gomock.Any(), gomock.Any()).
+		Return(nil)
+
+	// Act
+	result, err := uc.ProcessPayment(context.Background(), req)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, models.PaymentStatusAccepted, result.Status)
+}
+
+func TestProcessPayment_TotalCostMismatch(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockRideRepo(ctrl)
+	mockGW := mocks.NewMockRideGW(ctrl)
+
+	cfg := &models.Config{}
+	uc, err := NewRideUC(cfg, mockRepo, mockGW)
+	require.NoError(t, err)
+
+	rideID := uuid.New().String()
+	rideUUID := uuid.MustParse(rideID)
+	paymentID := uuid.New()
+
+	req := models.PaymentProccessRequest{
+		RideID:    rideID,
+		TotalCost: 5000, // Different from payment record
+		Status:    models.PaymentStatusAccepted,
+	}
+
+	ride := &models.Ride{
+		RideID: rideUUID,
+		Status: models.RideStatusOngoing,
+	}
+
+	payment := &models.Payment{
+		PaymentID:    paymentID,
+		RideID:       rideUUID,
+		AdjustedCost: 8000, // Different from request
+		Status:       models.PaymentStatusPending,
+	}
+
+	// Set up expectations
+	mockRepo.EXPECT().
+		GetRide(gomock.Any(), rideID).
+		Return(ride, nil)
+
+	mockRepo.EXPECT().
+		GetPaymentByRideID(gomock.Any(), rideID).
+		Return(payment, nil)
+
+	// Act
+	result, err := uc.ProcessPayment(context.Background(), req)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "total cost mismatch")
+	assert.Nil(t, result)
+}
+
+func TestRideArrived_InvalidAdjustmentFactor(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockRideRepo(ctrl)
+	mockGW := mocks.NewMockRideGW(ctrl)
+
+	cfg := &models.Config{}
+	uc, err := NewRideUC(cfg, mockRepo, mockGW)
+	require.NoError(t, err)
+
+	rideID := uuid.New().String()
+	rideUUID := uuid.MustParse(rideID)
+	passengerID := uuid.New()
+	totalCost := 10000
+
+	req := models.RideArrivalReq{
+		RideID:           rideID,
+		AdjustmentFactor: 1.5, // Invalid - should be reset to 1.0
+	}
+
+	ride := &models.Ride{
+		RideID:      rideUUID,
+		PassengerID: passengerID,
+		Status:      models.RideStatusOngoing,
+	}
+
+	// Expected values with adjustment factor reset to 1.0
 	adjustedCost := totalCost
 	adminFee := int(float64(adjustedCost) * 0.05)
 	driverPayout := adjustedCost - adminFee
@@ -390,24 +688,16 @@ func TestCompleteRide_InvalidAdjustmentFactor(t *testing.T) {
 			return nil
 		})
 
-	mockRepo.EXPECT().
-		CompleteRide(gomock.Any(), gomock.Any()).
-		Return(nil)
-
-	mockGW.EXPECT().
-		PublishRideCompleted(gomock.Any(), gomock.Any()).
-		Return(nil)
-
 	// Act
-	payment, err := uc.CompleteRide(rideID, invalidAdjustmentFactor)
+	paymentRequest, err := uc.RideArrived(context.Background(), req)
 
 	// Assert
 	assert.NoError(t, err)
-	assert.NotNil(t, payment)
-	assert.Equal(t, totalCost, payment.AdjustedCost) // Should be reset to full cost
+	assert.NotNil(t, paymentRequest)
+	assert.Equal(t, totalCost, paymentRequest.TotalCost) // Should be reset to full cost
 }
 
-func TestCompleteRide_PublishError(t *testing.T) {
+func TestProcessPayment_InvalidStatus(t *testing.T) {
 	// Arrange
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -421,17 +711,65 @@ func TestCompleteRide_PublishError(t *testing.T) {
 
 	rideID := uuid.New().String()
 	rideUUID := uuid.MustParse(rideID)
-	adjustmentFactor := 0.8
 
-	totalCost := 10000
-
-	ride := &models.Ride{
-		RideID:    rideUUID,
-		Status:    models.RideStatusOngoing,
-		TotalCost: totalCost,
+	req := models.PaymentProccessRequest{
+		RideID:    rideID,
+		TotalCost: 8000,
+		Status:    models.PaymentStatusAccepted,
 	}
 
-	expectedError := errors.New("publish error")
+	ride := &models.Ride{
+		RideID: rideUUID,
+		Status: models.RideStatusCompleted, // Wrong status
+	}
+
+	// Set up expectations
+	mockRepo.EXPECT().
+		GetRide(gomock.Any(), rideID).
+		Return(ride, nil)
+
+	// Act
+	result, err := uc.ProcessPayment(context.Background(), req)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot process payment for ride that is not ongoing")
+	assert.Nil(t, result)
+}
+
+func TestProcessPayment_PaymentAlreadyProcessed(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockRideRepo(ctrl)
+	mockGW := mocks.NewMockRideGW(ctrl)
+
+	cfg := &models.Config{}
+	uc, err := NewRideUC(cfg, mockRepo, mockGW)
+	require.NoError(t, err)
+
+	rideID := uuid.New().String()
+	rideUUID := uuid.MustParse(rideID)
+	paymentID := uuid.New()
+
+	req := models.PaymentProccessRequest{
+		RideID:    rideID,
+		TotalCost: 8000,
+		Status:    models.PaymentStatusAccepted,
+	}
+
+	ride := &models.Ride{
+		RideID: rideUUID,
+		Status: models.RideStatusOngoing,
+	}
+
+	payment := &models.Payment{
+		PaymentID:    paymentID,
+		RideID:       rideUUID,
+		AdjustedCost: 8000,
+		Status:       models.PaymentStatusAccepted, // Already processed
+	}
 
 	// Set up expectations
 	mockRepo.EXPECT().
@@ -439,28 +777,73 @@ func TestCompleteRide_PublishError(t *testing.T) {
 		Return(ride, nil)
 
 	mockRepo.EXPECT().
-		GetBillingLedgerSum(gomock.Any(), rideID).
-		Return(totalCost, nil)
-
-	mockRepo.EXPECT().
-		CreatePayment(gomock.Any(), gomock.Any()).
-		Return(nil)
-
-	mockRepo.EXPECT().
-		CompleteRide(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, updatedRide *models.Ride) error {
-			updatedRide.Status = models.RideStatusCompleted
-			return nil
-		})
-
-	mockGW.EXPECT().
-		PublishRideCompleted(gomock.Any(), gomock.Any()).
-		Return(expectedError)
+		GetPaymentByRideID(gomock.Any(), rideID).
+		Return(payment, nil)
 
 	// Act
-	payment, err := uc.CompleteRide(rideID, adjustmentFactor)
+	result, err := uc.ProcessPayment(context.Background(), req)
 
 	// Assert
-	assert.NoError(t, err) // Should not fail the operation
-	assert.NotNil(t, payment)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot process payment with status")
+	assert.Nil(t, result)
+}
+
+func TestProcessPayment_RejectedPayment(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockRideRepo(ctrl)
+	mockGW := mocks.NewMockRideGW(ctrl)
+
+	cfg := &models.Config{}
+	uc, err := NewRideUC(cfg, mockRepo, mockGW)
+	require.NoError(t, err)
+
+	rideID := uuid.New().String()
+	rideUUID := uuid.MustParse(rideID)
+	paymentID := uuid.New()
+	totalCost := 8000
+
+	req := models.PaymentProccessRequest{
+		RideID:    rideID,
+		TotalCost: totalCost,
+		Status:    models.PaymentStatusRejected, // Rejected payment
+	}
+
+	ride := &models.Ride{
+		RideID: rideUUID,
+		Status: models.RideStatusOngoing,
+	}
+
+	payment := &models.Payment{
+		PaymentID:    paymentID,
+		RideID:       rideUUID,
+		AdjustedCost: totalCost,
+		Status:       models.PaymentStatusPending,
+	}
+
+	// Set up expectations
+	mockRepo.EXPECT().
+		GetRide(gomock.Any(), rideID).
+		Return(ride, nil)
+
+	mockRepo.EXPECT().
+		GetPaymentByRideID(gomock.Any(), rideID).
+		Return(payment, nil)
+
+	mockRepo.EXPECT().
+		UpdatePaymentStatus(gomock.Any(), paymentID.String(), models.PaymentStatusRejected).
+		Return(nil)
+
+	// Note: No CompleteRide or PublishRideCompleted calls for rejected payment
+
+	// Act
+	result, err := uc.ProcessPayment(context.Background(), req)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, models.PaymentStatusRejected, result.Status)
 }

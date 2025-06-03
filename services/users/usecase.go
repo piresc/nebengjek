@@ -6,6 +6,8 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
+//go:generate mockgen -destination=mocks/mock_usecase.go -package=mocks github.com/piresc/nebengjek/services/users UserUC
+
 // UserUsecase represents the user usecase interface
 type UserUC interface {
 	RegisterUser(ctx context.Context, user *models.User) error

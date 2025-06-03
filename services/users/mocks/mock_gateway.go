@@ -35,34 +35,34 @@ func (m *MockUserGW) EXPECT() *MockUserGWMockRecorder {
 	return m.recorder
 }
 
-// MatchAccept mocks base method.
-func (m *MockUserGW) MatchAccept(arg0 *models.MatchProposal, arg1 string, arg2 bool) (*models.MatchProposal, error) {
+// MatchConfirm mocks base method.
+func (m *MockUserGW) MatchConfirm(arg0 *models.MatchConfirmRequest) (*models.MatchProposal, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MatchAccept", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "MatchConfirm", arg0)
 	ret0, _ := ret[0].(*models.MatchProposal)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// MatchAccept indicates an expected call of MatchAccept.
-func (mr *MockUserGWMockRecorder) MatchAccept(arg0, arg1, arg2 interface{}) *gomock.Call {
+// MatchConfirm indicates an expected call of MatchConfirm.
+func (mr *MockUserGWMockRecorder) MatchConfirm(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MatchAccept", reflect.TypeOf((*MockUserGW)(nil).MatchAccept), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MatchConfirm", reflect.TypeOf((*MockUserGW)(nil).MatchConfirm), arg0)
 }
 
-// MatchReject mocks base method.
-func (m *MockUserGW) MatchReject(arg0 *models.MatchProposal, arg1 string, arg2 bool) (*models.MatchProposal, error) {
+// ProcessPayment mocks base method.
+func (m *MockUserGW) ProcessPayment(arg0 *models.PaymentProccessRequest) (*models.Payment, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MatchReject", arg0, arg1, arg2)
-	ret0, _ := ret[0].(*models.MatchProposal)
+	ret := m.ctrl.Call(m, "ProcessPayment", arg0)
+	ret0, _ := ret[0].(*models.Payment)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// MatchReject indicates an expected call of MatchReject.
-func (mr *MockUserGWMockRecorder) MatchReject(arg0, arg1, arg2 interface{}) *gomock.Call {
+// ProcessPayment indicates an expected call of ProcessPayment.
+func (mr *MockUserGWMockRecorder) ProcessPayment(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MatchReject", reflect.TypeOf((*MockUserGW)(nil).MatchReject), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessPayment", reflect.TypeOf((*MockUserGW)(nil).ProcessPayment), arg0)
 }
 
 // PublishBeaconEvent mocks base method.
@@ -79,6 +79,20 @@ func (mr *MockUserGWMockRecorder) PublishBeaconEvent(arg0, arg1 interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishBeaconEvent", reflect.TypeOf((*MockUserGW)(nil).PublishBeaconEvent), arg0, arg1)
 }
 
+// PublishFinderEvent mocks base method.
+func (m *MockUserGW) PublishFinderEvent(arg0 context.Context, arg1 *models.FinderEvent) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PublishFinderEvent", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PublishFinderEvent indicates an expected call of PublishFinderEvent.
+func (mr *MockUserGWMockRecorder) PublishFinderEvent(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishFinderEvent", reflect.TypeOf((*MockUserGW)(nil).PublishFinderEvent), arg0, arg1)
+}
+
 // PublishLocationUpdate mocks base method.
 func (m *MockUserGW) PublishLocationUpdate(arg0 context.Context, arg1 *models.LocationUpdate) error {
 	m.ctrl.T.Helper()
@@ -93,16 +107,46 @@ func (mr *MockUserGWMockRecorder) PublishLocationUpdate(arg0, arg1 interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishLocationUpdate", reflect.TypeOf((*MockUserGW)(nil).PublishLocationUpdate), arg0, arg1)
 }
 
-// PublishRideArrived mocks base method.
-func (m *MockUserGW) PublishRideArrived(arg0 context.Context, arg1 *models.RideCompleteEvent) error {
+// PublishRideStart mocks base method.
+func (m *MockUserGW) PublishRideStart(arg0 context.Context, arg1 *models.RideStartTripEvent) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PublishRideArrived", arg0, arg1)
+	ret := m.ctrl.Call(m, "PublishRideStart", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// PublishRideArrived indicates an expected call of PublishRideArrived.
-func (mr *MockUserGWMockRecorder) PublishRideArrived(arg0, arg1 interface{}) *gomock.Call {
+// PublishRideStart indicates an expected call of PublishRideStart.
+func (mr *MockUserGWMockRecorder) PublishRideStart(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishRideArrived", reflect.TypeOf((*MockUserGW)(nil).PublishRideArrived), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishRideStart", reflect.TypeOf((*MockUserGW)(nil).PublishRideStart), arg0, arg1)
+}
+
+// RideArrived mocks base method.
+func (m *MockUserGW) RideArrived(arg0 context.Context, arg1 *models.RideArrivalReq) (*models.PaymentRequest, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RideArrived", arg0, arg1)
+	ret0, _ := ret[0].(*models.PaymentRequest)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RideArrived indicates an expected call of RideArrived.
+func (mr *MockUserGWMockRecorder) RideArrived(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RideArrived", reflect.TypeOf((*MockUserGW)(nil).RideArrived), arg0, arg1)
+}
+
+// StartRide mocks base method.
+func (m *MockUserGW) StartRide(arg0 *models.RideStartRequest) (*models.Ride, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StartRide", arg0)
+	ret0, _ := ret[0].(*models.Ride)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// StartRide indicates an expected call of StartRide.
+func (mr *MockUserGWMockRecorder) StartRide(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartRide", reflect.TypeOf((*MockUserGW)(nil).StartRide), arg0)
 }

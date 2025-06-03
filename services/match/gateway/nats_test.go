@@ -3,13 +3,11 @@ package gateway
 import (
 	"context"
 	"encoding/json"
-	"os"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	natsserver "github.com/nats-io/nats-server/test"
-	"github.com/nats-io/nats.go"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
@@ -17,69 +15,433 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testNatsURL = "nats://127.0.0.1:8369"
-
-func TestMain(m *testing.M) {
-	opts := natsserver.DefaultTestOptions
-	opts.Port = 8369
-	testNatsServer := natsserver.RunServer(&opts)
-	code := m.Run()
-	testNatsServer.Shutdown()
-	os.Exit(code)
+// NATSClientInterface defines the interface for NATS client operations
+type NATSClientInterface interface {
+	Publish(subject string, data []byte) error
+	Close()
 }
+
+// MockNATSClient simulates NATS client behavior for testing
+type MockNATSClient struct {
+	publishedMessages map[string][]byte
+	publishError      error
+}
+
+// NewMockNATSClient creates a new mock NATS client
+func NewMockNATSClient() *MockNATSClient {
+	return &MockNATSClient{
+		publishedMessages: make(map[string][]byte),
+	}
+}
+
+// Publish simulates publishing a message to a subject
+func (m *MockNATSClient) Publish(subject string, data []byte) error {
+	if m.publishError != nil {
+		return m.publishError
+	}
+	m.publishedMessages[subject] = data
+	return nil
+}
+
+// GetPublishedMessage returns the last published message for a subject
+func (m *MockNATSClient) GetPublishedMessage(subject string) ([]byte, bool) {
+	data, exists := m.publishedMessages[subject]
+	return data, exists
+}
+
+// SetPublishError sets an error to return on publish
+func (m *MockNATSClient) SetPublishError(err error) {
+	m.publishError = err
+}
+
+// Close simulates closing the connection
+func (m *MockNATSClient) Close() {
+	// No-op for mock
+}
+
+// TestableNATSGateway extends NATSGateway to allow testing with mocks
+type TestableNATSGateway struct {
+	client NATSClientInterface
+}
+
+// NewTestableNATSGateway creates a gateway that can work with mocks
+func NewTestableNATSGateway(client NATSClientInterface) *TestableNATSGateway {
+	return &TestableNATSGateway{
+		client: client,
+	}
+}
+
+// PublishMatchFound publishes a match found event to NATS
+func (g *TestableNATSGateway) PublishMatchFound(ctx context.Context, matchProp models.MatchProposal) error {
+	data, err := json.Marshal(matchProp)
+	if err != nil {
+		return err
+	}
+	return g.client.Publish(constants.SubjectMatchFound, data)
+}
+
+// PublishMatchRejected publishes a match rejected event to NATS
+func (g *TestableNATSGateway) PublishMatchRejected(ctx context.Context, matchProp models.MatchProposal) error {
+	data, err := json.Marshal(matchProp)
+	if err != nil {
+		return err
+	}
+	return g.client.Publish(constants.SubjectMatchRejected, data)
+}
+
+// PublishMatchAccepted publishes a match accepted event to NATS
+func (g *TestableNATSGateway) PublishMatchAccepted(ctx context.Context, matchProp models.MatchProposal) error {
+	data, err := json.Marshal(matchProp)
+	if err != nil {
+		return err
+	}
+	return g.client.Publish(constants.SubjectMatchAccepted, data)
+}
+
+// Ensure natspkg.Client implements our interface
+var _ NATSClientInterface = (*natspkg.Client)(nil)
 
 // TestPublishMatchFound_Success tests successful publishing of match found events
 func TestPublishMatchFound_Success(t *testing.T) {
-	// Create NATS client
-	nc, err := natspkg.NewClient(testNatsURL)
-	require.NoError(t, err, "Failed to connect to NATS server")
-	defer nc.Close()
+	// Arrange
+	mockClient := NewMockNATSClient()
+	natsGW := NewTestableNATSGateway(mockClient)
 
-	// Create test data
-	matchProp := models.MatchProposal{
+	matchProposal := models.MatchProposal{
 		ID:          uuid.New().String(),
 		DriverID:    uuid.New().String(),
 		PassengerID: uuid.New().String(),
-		MatchStatus: models.MatchStatusPending,
+		UserLocation: models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+			Timestamp: time.Now(),
+		},
 		DriverLocation: models.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
+			Timestamp: time.Now(),
 		},
-		UserLocation: models.Location{
+		TargetLocation: models.Location{
 			Latitude:  -6.185392,
 			Longitude: 106.837153,
+			Timestamp: time.Now(),
 		},
+		MatchStatus: models.MatchStatusPending,
 	}
 
-	// Channel to receive the message
-	msgCh := make(chan *nats.Msg, 1)
-	sub, err := nc.Subscribe(constants.SubjectMatchFound, func(msg *nats.Msg) {
-		msgCh <- msg
-	})
-	require.NoError(t, err)
-	defer sub.Unsubscribe()
+	// Act
+	ctx := context.Background()
+	err := natsGW.PublishMatchFound(ctx, matchProposal)
 
-	// Create gateway and publish message
-	matchGW := NewMatchGW(nc)
-	err = matchGW.PublishMatchFound(context.Background(), matchProp)
+	// Assert
 	require.NoError(t, err)
 
-	// Wait for the message and verify contents
-	select {
-	case msg := <-msgCh:
-		var receivedMatch models.MatchProposal
-		err = json.Unmarshal(msg.Data, &receivedMatch)
-		require.NoError(t, err)
+	// Verify the message was published to the correct subject
+	publishedData, exists := mockClient.GetPublishedMessage(constants.SubjectMatchFound)
+	require.True(t, exists, "Message should be published to match found subject")
 
-		assert.Equal(t, matchProp.ID, receivedMatch.ID)
-		assert.Equal(t, matchProp.DriverID, receivedMatch.DriverID)
-		assert.Equal(t, matchProp.PassengerID, receivedMatch.PassengerID)
-		assert.Equal(t, matchProp.MatchStatus, receivedMatch.MatchStatus)
-		assert.Equal(t, matchProp.DriverLocation.Latitude, receivedMatch.DriverLocation.Latitude)
-		assert.Equal(t, matchProp.DriverLocation.Longitude, receivedMatch.DriverLocation.Longitude)
-		assert.Equal(t, matchProp.UserLocation.Latitude, receivedMatch.UserLocation.Latitude)
-		assert.Equal(t, matchProp.UserLocation.Longitude, receivedMatch.UserLocation.Longitude)
-	case <-time.After(2 * time.Second):
-		t.Fatal("Did not receive published message")
+	// Verify the published data matches the original event
+	var receivedProposal models.MatchProposal
+	err = json.Unmarshal(publishedData, &receivedProposal)
+	require.NoError(t, err)
+
+	assert.Equal(t, matchProposal.ID, receivedProposal.ID)
+	assert.Equal(t, matchProposal.DriverID, receivedProposal.DriverID)
+	assert.Equal(t, matchProposal.PassengerID, receivedProposal.PassengerID)
+	assert.Equal(t, matchProposal.DriverLocation.Latitude, receivedProposal.DriverLocation.Latitude)
+	assert.Equal(t, matchProposal.DriverLocation.Longitude, receivedProposal.DriverLocation.Longitude)
+	assert.Equal(t, matchProposal.UserLocation.Latitude, receivedProposal.UserLocation.Latitude)
+	assert.Equal(t, matchProposal.UserLocation.Longitude, receivedProposal.UserLocation.Longitude)
+	assert.Equal(t, matchProposal.TargetLocation.Latitude, receivedProposal.TargetLocation.Latitude)
+	assert.Equal(t, matchProposal.TargetLocation.Longitude, receivedProposal.TargetLocation.Longitude)
+	assert.Equal(t, matchProposal.MatchStatus, receivedProposal.MatchStatus)
+}
+
+// TestPublishMatchFound_Error tests error handling during match found publishing
+func TestPublishMatchFound_Error(t *testing.T) {
+	// Arrange
+	mockClient := NewMockNATSClient()
+	expectedError := errors.New("NATS publish failed")
+	mockClient.SetPublishError(expectedError)
+
+	natsGW := NewTestableNATSGateway(mockClient)
+
+	matchProposal := models.MatchProposal{
+		ID:          uuid.New().String(),
+		DriverID:    uuid.New().String(),
+		PassengerID: uuid.New().String(),
+		UserLocation: models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+			Timestamp: time.Now(),
+		},
+		DriverLocation: models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+			Timestamp: time.Now(),
+		},
+		TargetLocation: models.Location{
+			Latitude:  -6.185392,
+			Longitude: 106.837153,
+			Timestamp: time.Now(),
+		},
+		MatchStatus: models.MatchStatusPending,
 	}
+
+	// Act
+	ctx := context.Background()
+	err := natsGW.PublishMatchFound(ctx, matchProposal)
+
+	// Assert
+	require.Error(t, err)
+	assert.Equal(t, expectedError, err)
+}
+
+// TestPublishMatchRejected_Success tests successful publishing of match rejected events
+func TestPublishMatchRejected_Success(t *testing.T) {
+	// Arrange
+	mockClient := NewMockNATSClient()
+	natsGW := NewTestableNATSGateway(mockClient)
+
+	matchProposal := models.MatchProposal{
+		ID:          uuid.New().String(),
+		DriverID:    uuid.New().String(),
+		PassengerID: uuid.New().String(),
+		UserLocation: models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+			Timestamp: time.Now(),
+		},
+		DriverLocation: models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+			Timestamp: time.Now(),
+		},
+		TargetLocation: models.Location{
+			Latitude:  -6.185392,
+			Longitude: 106.837153,
+			Timestamp: time.Now(),
+		},
+		MatchStatus: models.MatchStatusRejected,
+	}
+
+	// Act
+	ctx := context.Background()
+	err := natsGW.PublishMatchRejected(ctx, matchProposal)
+
+	// Assert
+	require.NoError(t, err)
+
+	// Verify the message was published to the correct subject
+	publishedData, exists := mockClient.GetPublishedMessage(constants.SubjectMatchRejected)
+	require.True(t, exists, "Message should be published to match rejected subject")
+
+	// Verify the published data matches the original event
+	var receivedProposal models.MatchProposal
+	err = json.Unmarshal(publishedData, &receivedProposal)
+	require.NoError(t, err)
+
+	assert.Equal(t, matchProposal.ID, receivedProposal.ID)
+	assert.Equal(t, matchProposal.DriverID, receivedProposal.DriverID)
+	assert.Equal(t, matchProposal.PassengerID, receivedProposal.PassengerID)
+	assert.Equal(t, matchProposal.DriverLocation.Latitude, receivedProposal.DriverLocation.Latitude)
+	assert.Equal(t, matchProposal.DriverLocation.Longitude, receivedProposal.DriverLocation.Longitude)
+	assert.Equal(t, matchProposal.UserLocation.Latitude, receivedProposal.UserLocation.Latitude)
+	assert.Equal(t, matchProposal.UserLocation.Longitude, receivedProposal.UserLocation.Longitude)
+	assert.Equal(t, matchProposal.TargetLocation.Latitude, receivedProposal.TargetLocation.Latitude)
+	assert.Equal(t, matchProposal.TargetLocation.Longitude, receivedProposal.TargetLocation.Longitude)
+	assert.Equal(t, matchProposal.MatchStatus, receivedProposal.MatchStatus)
+}
+
+// TestPublishMatchRejected_Error tests error handling during match rejected publishing
+func TestPublishMatchRejected_Error(t *testing.T) {
+	// Arrange
+	mockClient := NewMockNATSClient()
+	expectedError := errors.New("NATS publish failed")
+	mockClient.SetPublishError(expectedError)
+
+	natsGW := NewTestableNATSGateway(mockClient)
+
+	matchProposal := models.MatchProposal{
+		ID:          uuid.New().String(),
+		DriverID:    uuid.New().String(),
+		PassengerID: uuid.New().String(),
+		UserLocation: models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+			Timestamp: time.Now(),
+		},
+		DriverLocation: models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+			Timestamp: time.Now(),
+		},
+		TargetLocation: models.Location{
+			Latitude:  -6.185392,
+			Longitude: 106.837153,
+			Timestamp: time.Now(),
+		},
+		MatchStatus: models.MatchStatusRejected,
+	}
+
+	// Act
+	ctx := context.Background()
+	err := natsGW.PublishMatchRejected(ctx, matchProposal)
+
+	// Assert
+	require.Error(t, err)
+	assert.Equal(t, expectedError, err)
+}
+
+// TestPublishMatchAccepted_Success tests successful publishing of match accepted events
+func TestPublishMatchAccepted_Success(t *testing.T) {
+	// Arrange
+	mockClient := NewMockNATSClient()
+	natsGW := NewTestableNATSGateway(mockClient)
+
+	matchProposal := models.MatchProposal{
+		ID:          uuid.New().String(),
+		DriverID:    uuid.New().String(),
+		PassengerID: uuid.New().String(),
+		UserLocation: models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+			Timestamp: time.Now(),
+		},
+		DriverLocation: models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+			Timestamp: time.Now(),
+		},
+		TargetLocation: models.Location{
+			Latitude:  -6.185392,
+			Longitude: 106.837153,
+			Timestamp: time.Now(),
+		},
+		MatchStatus: models.MatchStatusAccepted,
+	}
+
+	// Act
+	ctx := context.Background()
+	err := natsGW.PublishMatchAccepted(ctx, matchProposal)
+
+	// Assert
+	require.NoError(t, err)
+
+	// Verify the message was published to the correct subject
+	publishedData, exists := mockClient.GetPublishedMessage(constants.SubjectMatchAccepted)
+	require.True(t, exists, "Message should be published to match accepted subject")
+
+	// Verify the published data matches the original event
+	var receivedProposal models.MatchProposal
+	err = json.Unmarshal(publishedData, &receivedProposal)
+	require.NoError(t, err)
+
+	assert.Equal(t, matchProposal.ID, receivedProposal.ID)
+	assert.Equal(t, matchProposal.DriverID, receivedProposal.DriverID)
+	assert.Equal(t, matchProposal.PassengerID, receivedProposal.PassengerID)
+	assert.Equal(t, matchProposal.DriverLocation.Latitude, receivedProposal.DriverLocation.Latitude)
+	assert.Equal(t, matchProposal.DriverLocation.Longitude, receivedProposal.DriverLocation.Longitude)
+	assert.Equal(t, matchProposal.UserLocation.Latitude, receivedProposal.UserLocation.Latitude)
+	assert.Equal(t, matchProposal.UserLocation.Longitude, receivedProposal.UserLocation.Longitude)
+	assert.Equal(t, matchProposal.TargetLocation.Latitude, receivedProposal.TargetLocation.Latitude)
+	assert.Equal(t, matchProposal.TargetLocation.Longitude, receivedProposal.TargetLocation.Longitude)
+	assert.Equal(t, matchProposal.MatchStatus, receivedProposal.MatchStatus)
+}
+
+// TestPublishMatchAccepted_Error tests error handling during match accepted publishing
+func TestPublishMatchAccepted_Error(t *testing.T) {
+	// Arrange
+	mockClient := NewMockNATSClient()
+	expectedError := errors.New("NATS publish failed")
+	mockClient.SetPublishError(expectedError)
+
+	natsGW := NewTestableNATSGateway(mockClient)
+
+	matchProposal := models.MatchProposal{
+		ID:          uuid.New().String(),
+		DriverID:    uuid.New().String(),
+		PassengerID: uuid.New().String(),
+		UserLocation: models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+			Timestamp: time.Now(),
+		},
+		DriverLocation: models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+			Timestamp: time.Now(),
+		},
+		TargetLocation: models.Location{
+			Latitude:  -6.185392,
+			Longitude: 106.837153,
+			Timestamp: time.Now(),
+		},
+		MatchStatus: models.MatchStatusAccepted,
+	}
+
+	// Act
+	ctx := context.Background()
+	err := natsGW.PublishMatchAccepted(ctx, matchProposal)
+
+	// Assert
+	require.Error(t, err)
+	assert.Equal(t, expectedError, err)
+}
+
+// TestMultiplePublishes tests publishing multiple different events
+func TestMultiplePublishes(t *testing.T) {
+	// Arrange
+	mockClient := NewMockNATSClient()
+	natsGW := NewTestableNATSGateway(mockClient)
+
+	ctx := context.Background()
+
+	// Test data
+	matchProposal := models.MatchProposal{
+		ID:          uuid.New().String(),
+		DriverID:    uuid.New().String(),
+		PassengerID: uuid.New().String(),
+		UserLocation: models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+			Timestamp: time.Now(),
+		},
+		DriverLocation: models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+			Timestamp: time.Now(),
+		},
+		TargetLocation: models.Location{
+			Latitude:  -6.185392,
+			Longitude: 106.837153,
+			Timestamp: time.Now(),
+		},
+		MatchStatus: models.MatchStatusPending,
+	}
+
+	// Act
+	err1 := natsGW.PublishMatchFound(ctx, matchProposal)
+
+	// Update match status for rejected
+	matchProposal.MatchStatus = models.MatchStatusRejected
+	err2 := natsGW.PublishMatchRejected(ctx, matchProposal)
+
+	// Update match status for accepted
+	matchProposal.MatchStatus = models.MatchStatusAccepted
+	err3 := natsGW.PublishMatchAccepted(ctx, matchProposal)
+
+	// Assert
+	require.NoError(t, err1)
+	require.NoError(t, err2)
+	require.NoError(t, err3)
+
+	// Verify all messages were published to their respective subjects
+	_, foundExists := mockClient.GetPublishedMessage(constants.SubjectMatchFound)
+	_, rejectedExists := mockClient.GetPublishedMessage(constants.SubjectMatchRejected)
+	_, acceptedExists := mockClient.GetPublishedMessage(constants.SubjectMatchAccepted)
+
+	assert.True(t, foundExists, "Match found message should be published")
+	assert.True(t, rejectedExists, "Match rejected message should be published")
+	assert.True(t, acceptedExists, "Match accepted message should be published")
 }

@@ -7,7 +7,8 @@ import (
 )
 
 // RideRepo defines the interface for ride data access operations
-// go:generate mockgen -destination=../mocks/mock_repository.go -package=mocks github.com/piresc/nebengjek/services/rides RideRepo
+//
+//go:generate mockgen -destination=mocks/mock_repository.go -package=mocks github.com/piresc/nebengjek/services/rides RideRepo
 type RideRepo interface {
 	CreateRide(ride *models.Ride) (*models.Ride, error)
 	AddBillingEntry(ctx context.Context, entry *models.BillingLedger) error

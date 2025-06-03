@@ -76,3 +76,17 @@ func (mr *MockMatchGWMockRecorder) PublishMatchRejected(ctx, matchProp interface
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishMatchRejected", reflect.TypeOf((*MockMatchGW)(nil).PublishMatchRejected), ctx, matchProp)
 }
+
+// PublishMatchAccepted mocks base method.
+func (m *MockMatchGW) PublishMatchAccepted(ctx context.Context, matchProp models.MatchProposal) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PublishMatchAccepted", ctx, matchProp)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PublishMatchAccepted indicates an expected call of PublishMatchAccepted.
+func (mr *MockMatchGWMockRecorder) PublishMatchAccepted(ctx, matchProp interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishMatchAccepted", reflect.TypeOf((*MockMatchGW)(nil).PublishMatchAccepted), ctx, matchProp)
+}

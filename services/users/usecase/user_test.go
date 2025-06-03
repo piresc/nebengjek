@@ -616,18 +616,25 @@ func TestRideArrived_Success(t *testing.T) {
 
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
-	event := &models.RideCompleteEvent{
+	event := &models.RideArrivalReq{
 		RideID:           uuid.New().String(),
 		AdjustmentFactor: 1.0,
 	}
 
-	mockGW.EXPECT().PublishRideArrived(gomock.Any(), event).Return(nil)
+	expectedPayment := &models.PaymentRequest{
+		RideID:      event.RideID,
+		PassengerID: "passenger-123",
+		TotalCost:   50000,
+	}
+
+	mockGW.EXPECT().RideArrived(gomock.Any(), event).Return(expectedPayment, nil)
 
 	// Act
-	err := uc.RideArrived(context.Background(), event)
+	paymentReq, err := uc.RideArrived(context.Background(), event)
 
 	// Assert
 	assert.NoError(t, err)
+	assert.Equal(t, expectedPayment, paymentReq)
 }
 
 func TestRideArrived_GatewayError(t *testing.T) {
@@ -648,18 +655,181 @@ func TestRideArrived_GatewayError(t *testing.T) {
 
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
-	event := &models.RideCompleteEvent{
+	event := &models.RideArrivalReq{
 		RideID:           uuid.New().String(),
 		AdjustmentFactor: 1.0,
 	}
 
 	expectedError := errors.New("gateway error")
-	mockGW.EXPECT().PublishRideArrived(gomock.Any(), event).Return(expectedError)
+	mockGW.EXPECT().RideArrived(gomock.Any(), event).Return(nil, expectedError)
 
 	// Act
-	err := uc.RideArrived(context.Background(), event)
+	paymentReq, err := uc.RideArrived(context.Background(), event)
 
 	// Assert
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to publish ride arrived event")
+	assert.Nil(t, paymentReq)
+	assert.Contains(t, err.Error(), "failed to notify ride service of arrival via HTTP")
+}
+
+// Additional tests for ride operations
+
+func TestRideStart_Success(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockUserRepo(ctrl)
+	mockGW := mocks.NewMockUserGW(ctrl)
+
+	cfg := &models.Config{
+		JWT: models.JWTConfig{
+			Secret:     "test-secret",
+			Expiration: 60,
+			Issuer:     "test-issuer",
+		},
+	}
+
+	uc := NewUserUC(mockRepo, mockGW, cfg)
+
+	request := &models.RideStartRequest{
+		RideID:            uuid.New().String(),
+		DriverLocation:    &models.Location{Latitude: -6.2088, Longitude: 106.8456},
+		PassengerLocation: &models.Location{Latitude: -6.2000, Longitude: 106.8500},
+	}
+
+	expectedRide := &models.Ride{
+		RideID:      uuid.New(),
+		Status:      models.RideStatusOngoing,
+		DriverID:    uuid.New(),
+		PassengerID: uuid.New(),
+		TotalCost:   0,
+	}
+
+	mockGW.EXPECT().StartRide(request).Return(expectedRide, nil)
+
+	// Act
+	ride, err := uc.RideStart(context.Background(), request)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Equal(t, expectedRide, ride)
+	assert.Equal(t, models.RideStatusOngoing, ride.Status)
+}
+
+func TestRideStart_GatewayError(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockUserRepo(ctrl)
+	mockGW := mocks.NewMockUserGW(ctrl)
+
+	cfg := &models.Config{
+		JWT: models.JWTConfig{
+			Secret:     "test-secret",
+			Expiration: 60,
+			Issuer:     "test-issuer",
+		},
+	}
+
+	uc := NewUserUC(mockRepo, mockGW, cfg)
+
+	request := &models.RideStartRequest{
+		RideID:            uuid.New().String(),
+		DriverLocation:    &models.Location{Latitude: -6.2088, Longitude: 106.8456},
+		PassengerLocation: &models.Location{Latitude: -6.2000, Longitude: 106.8500},
+	}
+
+	expectedError := errors.New("gateway error")
+	mockGW.EXPECT().StartRide(request).Return(nil, expectedError)
+
+	// Act
+	ride, err := uc.RideStart(context.Background(), request)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Nil(t, ride)
+	assert.Contains(t, err.Error(), "failed to start ride via HTTP")
+}
+
+func TestProcessPayment_Success(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockUserRepo(ctrl)
+	mockGW := mocks.NewMockUserGW(ctrl)
+
+	cfg := &models.Config{
+		JWT: models.JWTConfig{
+			Secret:     "test-secret",
+			Expiration: 60,
+			Issuer:     "test-issuer",
+		},
+	}
+
+	uc := NewUserUC(mockRepo, mockGW, cfg)
+
+	rideUUID := uuid.New()
+	paymentReq := &models.PaymentProccessRequest{
+		RideID:    rideUUID.String(),
+		TotalCost: 50000,
+		Status:    models.PaymentStatusAccepted,
+	}
+
+	expectedPayment := &models.Payment{
+		PaymentID:    uuid.New(),
+		RideID:       rideUUID,
+		AdjustedCost: paymentReq.TotalCost,
+		AdminFee:     2500,
+		DriverPayout: 47500,
+		Status:       models.PaymentStatusAccepted,
+	}
+
+	mockGW.EXPECT().ProcessPayment(paymentReq).Return(expectedPayment, nil)
+
+	// Act
+	payment, err := uc.ProcessPayment(context.Background(), paymentReq)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Equal(t, expectedPayment, payment)
+	assert.Equal(t, models.PaymentStatusAccepted, payment.Status)
+}
+
+func TestProcessPayment_GatewayError(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockUserRepo(ctrl)
+	mockGW := mocks.NewMockUserGW(ctrl)
+
+	cfg := &models.Config{
+		JWT: models.JWTConfig{
+			Secret:     "test-secret",
+			Expiration: 60,
+			Issuer:     "test-issuer",
+		},
+	}
+
+	uc := NewUserUC(mockRepo, mockGW, cfg)
+
+	paymentReq := &models.PaymentProccessRequest{
+		RideID:    uuid.New().String(),
+		TotalCost: 50000,
+		Status:    models.PaymentStatusAccepted,
+	}
+
+	expectedError := errors.New("payment gateway error")
+	mockGW.EXPECT().ProcessPayment(paymentReq).Return(nil, expectedError)
+
+	// Act
+	payment, err := uc.ProcessPayment(context.Background(), paymentReq)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Nil(t, payment)
+	assert.Contains(t, err.Error(), "failed to process payment")
 }

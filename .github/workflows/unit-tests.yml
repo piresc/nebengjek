@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     
     services:
-      # Setup Redis service container for location and match service tests
+      # Setup Redis service container for tests that require Redis
       redis:
         image: redis
         ports:
@@ -27,12 +27,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-          
-      # Setup NATS service container for messaging tests
-      nats:
-        image: nats:2.9.15
-        ports:
-          - 4222:4222
 
     steps:
       - name: Checkout code
@@ -48,33 +42,9 @@ jobs:
 
       - name: Install dependencies
         run: go mod download
-          
-      # Create a test wrapper that modifies the NATS URLs and handles embedded test server conflicts
-      - name: Create test wrapper for PR branch
-        run: |
-          cat > test_wrapper.sh << 'EOF'
-          #!/bin/bash
-          set -e
-
-          # Replace hardcoded NATS URLs in test files
-          find . -name "*_test.go" -type f -exec grep -l "testNatsURL" {} \; | while read file; do
-            sed -i 's|var testNatsURL = "nats://127.0.0.1:8369"|var testNatsURL = "nats://localhost:4222"|g' "$file"
-          done
-
-          # Temporarily disable embedded NATS servers in TestMain functions to use external NATS container
-          find . -name "*_test.go" -type f -exec grep -l "nats-server/test" {} \; | while read file; do
-            sed -i 's|testNatsServer := natsserver.RunServer(&opts)|// Disabled embedded NATS server to avoid port conflicts in CI\n\t// testNatsServer := natsserver.RunServer(&opts)|g' "$file"
-            sed -i 's|testNatsServer.Shutdown()|// testNatsServer.Shutdown()|g' "$file"
-          done
-
-          # Run the tests with coverage
-          go test ./... -race -coverprofile=coverage.txt -covermode=atomic
-          EOF
-          
-          chmod +x test_wrapper.sh
 
       - name: Run tests with coverage
-        run: ./test_wrapper.sh
+        run: go test ./... -race -coverprofile=coverage.txt -covermode=atomic
 
       # Get current branch coverage
       - name: Generate coverage report for current branch
@@ -86,7 +56,7 @@ jobs:
           
           # Save PR branch files for later comparison
           mkdir -p /tmp/pr_branch
-          cp coverage.txt coverage_report.txt test_wrapper.sh /tmp/pr_branch/
+          cp coverage.txt coverage_report.txt /tmp/pr_branch/
       
       # Only run the following steps for PR events
       - name: Checkout master branch for coverage comparison
@@ -109,12 +79,8 @@ jobs:
           # Re-install dependencies in clean workspace
           go mod download
           
-          # Copy the test wrapper script back from the saved location
-          cp /tmp/pr_branch/test_wrapper.sh .
-          chmod +x test_wrapper.sh
-          
-          # Use the test wrapper to fix NATS URLs and TestMain conflicts
-          ./test_wrapper.sh
+          # Run tests with coverage
+          go test ./... -race -coverprofile=coverage.txt -covermode=atomic
           
           # Generate coverage report for master
           go tool cover -func=coverage.txt > master_coverage_report.txt

@@ -161,8 +161,40 @@ func (r *MatchRepo) GetMatch(ctx context.Context, matchID string) (*models.Match
 
 // UpdateMatchStatus updates the status of a match
 func (r *MatchRepo) UpdateMatchStatus(ctx context.Context, matchID string, status models.MatchStatus) error {
-	query := `UPDATE matches SET status = $1, updated_at = $2 WHERE id = $3`
-	result, err := r.db.ExecContext(ctx, query, status, time.Now(), matchID)
+	// First, verify the match exists
+	selectQuery := `
+		SELECT 
+			id, driver_id, passenger_id,
+			(driver_location[0])::float8 as driver_longitude,
+			(driver_location[1])::float8 as driver_latitude,
+			(passenger_location[0])::float8 as passenger_longitude,
+			(passenger_location[1])::float8 as passenger_latitude,
+			status, created_at, updated_at
+		FROM matches
+		WHERE id = $1
+	`
+
+	var dto models.MatchDTO
+	err := r.db.QueryRowContext(ctx, selectQuery, matchID).Scan(
+		&dto.ID, &dto.DriverID, &dto.PassengerID,
+		&dto.DriverLongitude, &dto.DriverLatitude,
+		&dto.PassengerLongitude, &dto.PassengerLatitude,
+		&dto.Status, &dto.CreatedAt, &dto.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to get match: %w", err)
+	}
+
+	// Begin transaction
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Update the match status
+	updateQuery := `UPDATE matches SET status = $1, updated_at = $2 WHERE id = $3`
+	result, err := tx.ExecContext(ctx, updateQuery, status, time.Now(), matchID)
 	if err != nil {
 		return fmt.Errorf("failed to update match status: %w", err)
 	}
@@ -174,6 +206,11 @@ func (r *MatchRepo) UpdateMatchStatus(ctx context.Context, matchID string, statu
 
 	if rowsAffected == 0 {
 		return fmt.Errorf("match not found")
+	}
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil

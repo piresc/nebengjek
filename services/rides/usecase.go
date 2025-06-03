@@ -7,7 +7,8 @@ import (
 )
 
 // RideUC defines the interface for ride business logic
-// go:generate mockgen -destination=../mocks/mock_usecase.go -package=mocks github.com/piresc/nebengjek/services/rides RideUC
+//
+//go:generate mockgen -destination=mocks/mock_usecase.go -package=mocks github.com/piresc/nebengjek/services/rides RideUC
 type RideUC interface {
 	CreateRide(mp models.MatchProposal) error
 	ProcessBillingUpdate(rideID string, entry *models.BillingLedger) error
