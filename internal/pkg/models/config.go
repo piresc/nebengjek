@@ -12,6 +12,8 @@ type Config struct {
 	Services ServicesConfig
 	Match    MatchConfig
 	Rides    RidesConfig
+	NewRelic NewRelicConfig
+	Logger   LoggerConfig
 }
 
 // ServicesConfig contains URLs for other microservices
@@ -90,4 +92,26 @@ type MatchConfig struct {
 // RidesConfig contains rides service specific configuration
 type RidesConfig struct {
 	MinDistanceKm float64 `json:"min_distance_km"` // Minimum distance in kilometers for billing
+}
+
+// NewRelicConfig contains New Relic monitoring configuration
+type NewRelicConfig struct {
+	LicenseKey   string `json:"license_key"`
+	AppName      string `json:"app_name"`
+	Enabled      bool   `json:"enabled"`
+	LogsEnabled  bool   `json:"logs_enabled"`
+	LogsEndpoint string `json:"logs_endpoint"`
+	LogsAPIKey   string `json:"logs_api_key"`
+	ForwardLogs  bool   `json:"forward_logs"`
+}
+
+// LoggerConfig contains logging configuration
+type LoggerConfig struct {
+	Level      string `json:"level" mapstructure:"level"`
+	FilePath   string `json:"file_path" mapstructure:"file_path"`
+	MaxSize    int64  `json:"max_size" mapstructure:"max_size"`       // Max size in MB before rotation
+	MaxAge     int    `json:"max_age" mapstructure:"max_age"`         // Max age in days
+	MaxBackups int    `json:"max_backups" mapstructure:"max_backups"` // Max number of backup files
+	Compress   bool   `json:"compress" mapstructure:"compress"`       // Compress rotated files
+	Type       string `json:"type" mapstructure:"type"`               // logger type: file, console, hybrid, newrelic
 }

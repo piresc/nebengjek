@@ -9,6 +9,8 @@ services:
       - VERSION=${VERSION:-latest}
       - GIT_COMMIT=${GIT_COMMIT:-unknown}
       - BUILD_TIME=${BUILD_TIME:-unknown}
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
+      - NEW_RELIC_APP_NAME=NebengJek-Users
     env_file:
       - ./cmd/users/.env
     volumes:
@@ -40,6 +42,8 @@ services:
       - VERSION=${VERSION:-latest}
       - GIT_COMMIT=${GIT_COMMIT:-unknown}
       - BUILD_TIME=${BUILD_TIME:-unknown}
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
+      - NEW_RELIC_APP_NAME=NebengJek-Location
     env_file:
       - ./cmd/location/.env
     volumes:
@@ -71,6 +75,8 @@ services:
       - VERSION=${VERSION:-latest}
       - GIT_COMMIT=${GIT_COMMIT:-unknown}
       - BUILD_TIME=${BUILD_TIME:-unknown}
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
+      - NEW_RELIC_APP_NAME=NebengJek-Match
     env_file:
       - ./cmd/match/.env
     volumes:
@@ -102,6 +108,8 @@ services:
       - VERSION=${VERSION:-latest}
       - GIT_COMMIT=${GIT_COMMIT:-unknown}
       - BUILD_TIME=${BUILD_TIME:-unknown}
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
+      - NEW_RELIC_APP_NAME=NebengJek-Rides
     env_file:
       - ./cmd/rides/.env
     volumes:

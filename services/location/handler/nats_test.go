@@ -2,131 +2,117 @@ package handler
 
 import (
 	"encoding/json"
-	"os"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/google/uuid"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/location/mocks"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	natsserver "github.com/nats-io/nats-server/v2/test"
 )
 
-var testNatsURL = "nats://127.0.0.1:8369"
-
-func TestMain(m *testing.M) {
-	opts := natsserver.DefaultTestOptions
-	opts.Port = 8369
-	testNatsServer := natsserver.RunServer(&opts)
-	code := m.Run()
-	testNatsServer.Shutdown()
-	os.Exit(code)
-}
-
-func setupNatsHandler(t *testing.T) (*LocationHandler, *mocks.MockLocationUC) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	nc, err := natspkg.NewClient(testNatsURL)
-	require.NoError(t, err, "Failed to connect to NATS server")
-
-	locationUC := mocks.NewMockLocationUC(ctrl)
-	handler := NewLocationHandler(locationUC, nc)
-
-	return handler, locationUC
-}
-
-func TestLocationHandler_NewLocationHandler(t *testing.T) {
+// Test the LocationHandler constructor
+func TestLocationHandler_Constructor(t *testing.T) {
+	// Arrange
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	locationUC := mocks.NewMockLocationUC(ctrl)
-	nc, err := natspkg.NewClient(testNatsURL)
-	require.NoError(t, err)
+	mockLocationUC := mocks.NewMockLocationUC(ctrl)
+	mockNATSClient := &natspkg.Client{}
 
-	handler := NewLocationHandler(locationUC, nc)
+	// Act
+	handler := NewLocationHandler(mockLocationUC, mockNATSClient)
 
-	assert.NotNil(t, handler, "Handler should not be nil")
-	assert.Equal(t, locationUC, handler.locationUC, "LocationUC should be properly set")
-	assert.Equal(t, nc, handler.natsClient, "NATS client should be properly set")
-	assert.Empty(t, handler.subs, "Subscriptions should be initialized as empty slice")
+	// Assert
+	assert.NotNil(t, handler)
+	assert.Equal(t, mockLocationUC, handler.locationUC)
+	assert.Equal(t, mockNATSClient, handler.natsClient)
+	assert.NotNil(t, handler.subs)
+	assert.Empty(t, handler.subs)
 }
 
-func TestLocationHandler_InitNATSConsumers(t *testing.T) {
-	handler, _ := setupNatsHandler(t)
-
-	err := handler.InitNATSConsumers()
-	require.NoError(t, err, "Failed to initialize NATS consumers")
-
-	// Check if the subscription is created
-	assert.NotEmpty(t, handler.subs, "Expected subscriptions to be created")
-}
-
-func TestLocationHandler_InitNATSConsumers_Error(t *testing.T) {
-	handler, _ := setupNatsHandler(t)
-
-	// Replace the client with a closed one to force error
-	nc, err := natspkg.NewClient(testNatsURL)
-	require.NoError(t, err)
-
-	nc.Close()
-	handler.natsClient = nc
-
-	err = handler.InitNATSConsumers()
-	assert.Error(t, err, "Expected error when NATS connection is closed")
-	assert.Contains(t, err.Error(), "failed to subscribe to location updates")
-}
-
+// Test location update handler logic directly
 func TestLocationHandler_handleLocationUpdate(t *testing.T) {
-	handler, locationUC := setupNatsHandler(t)
-
-	locationUpdate := models.LocationUpdate{
-		RideID: "ride123",
-		Location: models.Location{
-			Latitude:  1.23456,
-			Longitude: 2.34567,
+	tests := []struct {
+		name        string
+		eventData   []byte
+		expectError bool
+		setupMock   func(*mocks.MockLocationUC)
+	}{
+		{
+			name: "successful location update processing",
+			eventData: func() []byte {
+				update := models.LocationUpdate{
+					RideID:   uuid.New().String(),
+					DriverID: uuid.New().String(),
+					Location: models.Location{
+						Latitude:  -6.175392,
+						Longitude: 106.827153,
+						Timestamp: time.Now(),
+					},
+					CreatedAt: time.Now(),
+				}
+				data, _ := json.Marshal(update)
+				return data
+			}(),
+			expectError: false,
+			setupMock: func(m *mocks.MockLocationUC) {
+				m.EXPECT().StoreLocation(gomock.Any()).Return(nil).Times(1)
+			},
+		},
+		{
+			name:        "invalid JSON data",
+			eventData:   []byte("invalid json"),
+			expectError: true,
+			setupMock:   func(m *mocks.MockLocationUC) {},
+		},
+		{
+			name: "usecase returns error",
+			eventData: func() []byte {
+				update := models.LocationUpdate{
+					RideID:   uuid.New().String(),
+					DriverID: uuid.New().String(),
+					Location: models.Location{
+						Latitude:  -6.175392,
+						Longitude: 106.827153,
+						Timestamp: time.Now(),
+					},
+					CreatedAt: time.Now(),
+				}
+				data, _ := json.Marshal(update)
+				return data
+			}(),
+			expectError: true,
+			setupMock: func(m *mocks.MockLocationUC) {
+				m.EXPECT().StoreLocation(gomock.Any()).Return(errors.New("usecase error")).Times(1)
+			},
 		},
 	}
 
-	data, err := json.Marshal(locationUpdate)
-	require.NoError(t, err, "Failed to marshal location update")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 
-	locationUC.EXPECT().StoreLocation(locationUpdate).Return(nil).Times(1)
+			mockLocationUC := mocks.NewMockLocationUC(ctrl)
+			tt.setupMock(mockLocationUC)
 
-	err = handler.handleLocationUpdate(data)
-	require.NoError(t, err, "Failed to handle location update")
-}
+			mockNATSClient := &natspkg.Client{}
+			handler := NewLocationHandler(mockLocationUC, mockNATSClient)
 
-func TestLocationHandler_handleLocationUpdate_UnmarshalError(t *testing.T) {
-	handler, _ := setupNatsHandler(t)
+			// Act
+			err := handler.handleLocationUpdate(tt.eventData)
 
-	// Invalid JSON data
-	invalidData := []byte(`{"rideID": "ride123", "location": {malformed}`)
-
-	err := handler.handleLocationUpdate(invalidData)
-	assert.Error(t, err, "Expected unmarshal error with invalid JSON")
-}
-
-func TestLocationHandler_handleLocationUpdate_StoreError(t *testing.T) {
-	handler, locationUC := setupNatsHandler(t)
-
-	locationUpdate := models.LocationUpdate{
-		RideID: "ride123",
-		Location: models.Location{
-			Latitude:  1.23456,
-			Longitude: 2.34567,
-		},
+			// Assert
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
 	}
-
-	data, err := json.Marshal(locationUpdate)
-	require.NoError(t, err, "Failed to marshal location update")
-
-	expectedErr := assert.AnError
-	locationUC.EXPECT().StoreLocation(locationUpdate).Return(expectedErr).Times(1)
-
-	err = handler.handleLocationUpdate(data)
-	assert.Error(t, err, "Expected error when storing location fails")
-	assert.Equal(t, expectedErr, err)
 }

@@ -41,7 +41,13 @@ func TestHandleBeaconEvent_Success_Driver(t *testing.T) {
 		Timestamp: time.Now(),
 	}
 
-	// The implementation calls FindNearbyPassengers
+	// Mock active ride check - driver has no active ride
+	mockRepo.EXPECT().
+		GetActiveRideByDriver(gomock.Any(), userID).
+		Return("", nil).
+		Times(1)
+
+	// The implementation calls AddAvailableDriver after active ride check
 	mockRepo.EXPECT().
 		AddAvailableDriver(gomock.Any(), userID, gomock.Any()).
 		DoAndReturn(func(_ context.Context, id string, loc *models.Location) error {
@@ -95,6 +101,12 @@ func TestHandleFinderEvent_Success_Passenger(t *testing.T) {
 		},
 		Timestamp: time.Now(),
 	}
+
+	// Mock active ride check - passenger has no active ride
+	mockRepo.EXPECT().
+		GetActiveRideByPassenger(gomock.Any(), userID).
+		Return("", nil).
+		Times(1)
 
 	// Mock required calls
 	mockRepo.EXPECT().
@@ -181,6 +193,12 @@ func TestHandleBeaconEvent_RepositoryError(t *testing.T) {
 
 	expectedError := errors.New("database error")
 
+	// Mock active ride check - driver has no active ride
+	mockRepo.EXPECT().
+		GetActiveRideByDriver(gomock.Any(), userID).
+		Return("", nil).
+		Times(1)
+
 	// Set up expectations
 	mockRepo.EXPECT().
 		AddAvailableDriver(gomock.Any(), userID, gomock.Any()).
@@ -192,6 +210,199 @@ func TestHandleBeaconEvent_RepositoryError(t *testing.T) {
 	// Assert
 	assert.Error(t, err)
 	assert.Equal(t, expectedError, err)
+}
+
+func TestHandleBeaconEvent_DriverWithActiveRide(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockMatchRepo(ctrl)
+	mockGW := mocks.NewMockMatchGW(ctrl)
+	cfg := &models.Config{
+		Match: models.MatchConfig{
+			SearchRadiusKm: 5.0,
+		},
+	}
+
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
+
+	userID := uuid.New().String()
+	event := models.BeaconEvent{
+		UserID:   userID,
+		IsActive: true,
+		Location: models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+			Timestamp: time.Now(),
+		},
+		Timestamp: time.Now(),
+	}
+
+	// Mock active ride check - driver has an active ride
+	mockRepo.EXPECT().
+		GetActiveRideByDriver(gomock.Any(), userID).
+		Return("active-ride-123", nil).
+		Times(1)
+
+	// AddAvailableDriver should NOT be called since driver has active ride
+
+	// Act
+	err := uc.HandleBeaconEvent(event)
+
+	// Assert
+	assert.NoError(t, err) // Should not return error, just skip adding to pool
+}
+
+func TestHandleFinderEvent_PassengerWithActiveRide(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockMatchRepo(ctrl)
+	mockGW := mocks.NewMockMatchGW(ctrl)
+	cfg := &models.Config{
+		Match: models.MatchConfig{
+			SearchRadiusKm: 5.0,
+		},
+	}
+
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
+
+	userID := uuid.New().String()
+	event := models.FinderEvent{
+		UserID:   userID,
+		IsActive: true,
+		Location: models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+			Timestamp: time.Now(),
+		},
+		TargetLocation: models.Location{
+			Latitude:  -6.200000,
+			Longitude: 106.816666,
+			Timestamp: time.Now(),
+		},
+		Timestamp: time.Now(),
+	}
+
+	// Mock active ride check - passenger has an active ride
+	mockRepo.EXPECT().
+		GetActiveRideByPassenger(gomock.Any(), userID).
+		Return("active-ride-456", nil).
+		Times(1)
+
+	// AddAvailablePassenger should NOT be called since passenger has active ride
+
+	// Act
+	err := uc.HandleFinderEvent(event)
+
+	// Assert
+	assert.NoError(t, err) // Should not return error, just skip adding to pool
+}
+
+func TestHandleBeaconEvent_ActiveRideCheckError(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockMatchRepo(ctrl)
+	mockGW := mocks.NewMockMatchGW(ctrl)
+	cfg := &models.Config{
+		Match: models.MatchConfig{
+			SearchRadiusKm: 5.0,
+		},
+	}
+
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
+
+	userID := uuid.New().String()
+	event := models.BeaconEvent{
+		UserID:   userID,
+		IsActive: true,
+		Location: models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+			Timestamp: time.Now(),
+		},
+		Timestamp: time.Now(),
+	}
+
+	// Mock active ride check error - should continue with adding to pool
+	mockRepo.EXPECT().
+		GetActiveRideByDriver(gomock.Any(), userID).
+		Return("", errors.New("redis connection error")).
+		Times(1)
+
+	// Should still try to add to pool on error to avoid blocking the system
+	mockRepo.EXPECT().
+		AddAvailableDriver(gomock.Any(), userID, gomock.Any()).
+		Return(nil)
+
+	mockRepo.EXPECT().
+		GetPassengerLocation(gomock.Any(), gomock.Any()).
+		Return(models.Location{Latitude: -6.175392, Longitude: 106.827153}, nil).
+		AnyTimes()
+
+	// Act
+	err := uc.HandleBeaconEvent(event)
+
+	// Assert
+	assert.NoError(t, err)
+}
+
+func TestHandleFinderEvent_ActiveRideCheckError(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockMatchRepo(ctrl)
+	mockGW := mocks.NewMockMatchGW(ctrl)
+	cfg := &models.Config{
+		Match: models.MatchConfig{
+			SearchRadiusKm: 5.0,
+		},
+	}
+
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
+
+	userID := uuid.New().String()
+	event := models.FinderEvent{
+		UserID:   userID,
+		IsActive: true,
+		Location: models.Location{
+			Latitude:  -6.175392,
+			Longitude: 106.827153,
+			Timestamp: time.Now(),
+		},
+		TargetLocation: models.Location{
+			Latitude:  -6.200000,
+			Longitude: 106.816666,
+			Timestamp: time.Now(),
+		},
+		Timestamp: time.Now(),
+	}
+
+	// Mock active ride check error - should continue with adding to pool
+	mockRepo.EXPECT().
+		GetActiveRideByPassenger(gomock.Any(), userID).
+		Return("", errors.New("redis connection error")).
+		Times(1)
+
+	// Should still try to add to pool on error to avoid blocking the system
+	mockRepo.EXPECT().
+		AddAvailablePassenger(gomock.Any(), userID, gomock.Any()).
+		Return(nil)
+
+	mockRepo.EXPECT().
+		FindNearbyDrivers(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return([]*models.NearbyUser{}, nil)
+
+	// Act
+	err := uc.HandleFinderEvent(event)
+
+	// Assert
+	assert.NoError(t, err)
 }
 
 func TestConfirmMatchStatus_AcceptSuccess(t *testing.T) {
@@ -405,4 +616,170 @@ func TestCreateMatch_DatabaseError(t *testing.T) {
 	// Assert
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create match")
+}
+
+// Test HasActiveRide functionality
+func TestHasActiveRide_DriverHasActiveRide(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockMatchRepo(ctrl)
+	mockGW := mocks.NewMockMatchGW(ctrl)
+	cfg := &models.Config{}
+
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
+
+	userID := "driver-123"
+	rideID := "ride-456"
+
+	// Mock repository to return active ride
+	mockRepo.EXPECT().
+		GetActiveRideByDriver(gomock.Any(), userID).
+		Return(rideID, nil).
+		Times(1)
+
+	// Act
+	hasActiveRide, err := uc.HasActiveRide(context.Background(), userID, true) // true = isDriver
+
+	// Assert
+	assert.NoError(t, err)
+	assert.True(t, hasActiveRide)
+}
+
+func TestHasActiveRide_DriverNoActiveRide(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockMatchRepo(ctrl)
+	mockGW := mocks.NewMockMatchGW(ctrl)
+	cfg := &models.Config{}
+
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
+
+	userID := "driver-123"
+
+	// Mock repository to return no active ride
+	mockRepo.EXPECT().
+		GetActiveRideByDriver(gomock.Any(), userID).
+		Return("", nil).
+		Times(1)
+
+	// Act
+	hasActiveRide, err := uc.HasActiveRide(context.Background(), userID, true) // true = isDriver
+
+	// Assert
+	assert.NoError(t, err)
+	assert.False(t, hasActiveRide)
+}
+
+func TestHasActiveRide_PassengerHasActiveRide(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockMatchRepo(ctrl)
+	mockGW := mocks.NewMockMatchGW(ctrl)
+	cfg := &models.Config{}
+
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
+
+	userID := "passenger-123"
+	rideID := "ride-456"
+
+	// Mock repository to return active ride
+	mockRepo.EXPECT().
+		GetActiveRideByPassenger(gomock.Any(), userID).
+		Return(rideID, nil).
+		Times(1)
+
+	// Act
+	hasActiveRide, err := uc.HasActiveRide(context.Background(), userID, false) // false = isPassenger
+
+	// Assert
+	assert.NoError(t, err)
+	assert.True(t, hasActiveRide)
+}
+
+func TestHasActiveRide_PassengerNoActiveRide(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockMatchRepo(ctrl)
+	mockGW := mocks.NewMockMatchGW(ctrl)
+	cfg := &models.Config{}
+
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
+
+	userID := "passenger-123"
+
+	// Mock repository to return no active ride
+	mockRepo.EXPECT().
+		GetActiveRideByPassenger(gomock.Any(), userID).
+		Return("", nil).
+		Times(1)
+
+	// Act
+	hasActiveRide, err := uc.HasActiveRide(context.Background(), userID, false) // false = isPassenger
+
+	// Assert
+	assert.NoError(t, err)
+	assert.False(t, hasActiveRide)
+}
+
+func TestSetActiveRide_Success(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockMatchRepo(ctrl)
+	mockGW := mocks.NewMockMatchGW(ctrl)
+	cfg := &models.Config{}
+
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
+
+	rideID := "ride-123"
+	driverID := "driver-456"
+	passengerID := "passenger-789"
+
+	// Mock repository calls
+	mockRepo.EXPECT().
+		SetActiveRide(gomock.Any(), rideID, driverID, passengerID).
+		Return(nil).
+		Times(1)
+
+	// Act
+	err := uc.SetActiveRide(context.Background(), rideID, driverID, passengerID)
+
+	// Assert
+	assert.NoError(t, err)
+}
+
+func TestRemoveActiveRide_Success(t *testing.T) {
+	// Arrange
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockMatchRepo(ctrl)
+	mockGW := mocks.NewMockMatchGW(ctrl)
+	cfg := &models.Config{}
+
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
+
+	driverID := "driver-456"
+	passengerID := "passenger-789"
+
+	// Mock repository calls
+	mockRepo.EXPECT().
+		RemoveActiveRide(gomock.Any(), driverID, passengerID).
+		Return(nil).
+		Times(1)
+
+	// Act
+	err := uc.RemoveActiveRide(context.Background(), driverID, passengerID)
+
+	// Assert
+	assert.NoError(t, err)
 }

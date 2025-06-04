@@ -29,4 +29,10 @@ type MatchRepo interface {
 	GetPassengerLocation(ctx context.Context, passengerID string) (models.Location, error)
 
 	BatchUpdateMatchStatus(ctx context.Context, matchIDs []string, status models.MatchStatus) error
+
+	// Active ride tracking operations
+	SetActiveRide(ctx context.Context, driverID, passengerID, rideID string) error
+	RemoveActiveRide(ctx context.Context, driverID, passengerID string) error
+	GetActiveRideByDriver(ctx context.Context, driverID string) (string, error)
+	GetActiveRideByPassenger(ctx context.Context, passengerID string) (string, error)
 }

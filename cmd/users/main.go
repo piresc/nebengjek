@@ -8,7 +8,10 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/config"
 	"github.com/piresc/nebengjek/internal/pkg/database"
 	"github.com/piresc/nebengjek/internal/pkg/health"
+	"github.com/piresc/nebengjek/internal/pkg/logger"
+	"github.com/piresc/nebengjek/internal/pkg/middleware"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
+	nrpkg "github.com/piresc/nebengjek/internal/pkg/newrelic"
 	wspkg "github.com/piresc/nebengjek/internal/pkg/websocket"
 	"github.com/piresc/nebengjek/services/users/gateway"
 	"github.com/piresc/nebengjek/services/users/handler"
@@ -23,6 +26,14 @@ func main() {
 	appName := "users-service"
 	configPath := "/Users/pirescerullo/GitHub/assessment/nebengjek/config/users.env"
 	configs := config.InitConfig(configPath)
+
+	// Initialize New Relic and application logger
+	nrApp := nrpkg.InitNewRelic(configs)
+	appLogger, err := logger.InitAppLoggerFromConfig(configs, nrApp)
+	if err != nil {
+		log.Fatalf("Failed to create logger: %v", err)
+	}
+	defer appLogger.Close()
 
 	// Initialize PostgreSQL database connection
 	postgresClient, err := database.NewPostgresClient(configs.Database)
@@ -75,6 +86,10 @@ func main() {
 
 	// Initialize Echo router
 	e := echo.New()
+
+	// Add middlewares
+	e.Use(middleware.RequestIDMiddleware())
+	e.Use(logger.EchoMiddleware(appLogger))
 
 	// Register health endpoints
 	health.RegisterHealthEndpoints(e, appName)

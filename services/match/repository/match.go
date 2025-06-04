@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
+	"github.com/go-redis/redis/v8"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/database"
 	"github.com/piresc/nebengjek/internal/pkg/models"
@@ -708,4 +709,70 @@ func (r *MatchRepo) GetPassengerLocation(ctx context.Context, passengerID string
 		Latitude:  latitude,
 		Timestamp: timestamp,
 	}, nil
+}
+
+// SetActiveRide stores active ride information for both driver and passenger
+func (r *MatchRepo) SetActiveRide(ctx context.Context, driverID, passengerID, rideID string) error {
+	// Set active ride for driver
+	driverKey := fmt.Sprintf(constants.KeyActiveRideDriver, driverID)
+	if err := r.redisClient.Set(ctx, driverKey, rideID, 0); err != nil {
+		return fmt.Errorf("failed to set active ride for driver: %w", err)
+	}
+
+	// Set active ride for passenger
+	passengerKey := fmt.Sprintf(constants.KeyActiveRidePassenger, passengerID)
+	if err := r.redisClient.Set(ctx, passengerKey, rideID, 0); err != nil {
+		return fmt.Errorf("failed to set active ride for passenger: %w", err)
+	}
+
+	log.Printf("Set active ride %s for driver %s and passenger %s", rideID, driverID, passengerID)
+	return nil
+}
+
+// RemoveActiveRide removes active ride information for both driver and passenger
+func (r *MatchRepo) RemoveActiveRide(ctx context.Context, driverID, passengerID string) error {
+	// Remove active ride for driver
+	driverKey := fmt.Sprintf(constants.KeyActiveRideDriver, driverID)
+	if err := r.redisClient.Delete(ctx, driverKey); err != nil {
+		log.Printf("Warning: failed to remove active ride for driver %s: %v", driverID, err)
+		// Continue with passenger cleanup even if driver cleanup fails
+	}
+
+	// Remove active ride for passenger
+	passengerKey := fmt.Sprintf(constants.KeyActiveRidePassenger, passengerID)
+	if err := r.redisClient.Delete(ctx, passengerKey); err != nil {
+		log.Printf("Warning: failed to remove active ride for passenger %s: %v", passengerID, err)
+		// Don't return error for cleanup operations
+	}
+
+	log.Printf("Removed active ride for driver %s and passenger %s", driverID, passengerID)
+	return nil
+}
+
+// GetActiveRideByDriver retrieves the active ride ID for a driver
+func (r *MatchRepo) GetActiveRideByDriver(ctx context.Context, driverID string) (string, error) {
+	driverKey := fmt.Sprintf(constants.KeyActiveRideDriver, driverID)
+	rideID, err := r.redisClient.Get(ctx, driverKey)
+	if err != nil {
+		// If key doesn't exist, it's not an error - just means no active ride
+		if err == redis.Nil {
+			return "", nil
+		}
+		return "", fmt.Errorf("failed to get active ride for driver: %w", err)
+	}
+	return rideID, nil
+}
+
+// GetActiveRideByPassenger retrieves the active ride ID for a passenger
+func (r *MatchRepo) GetActiveRideByPassenger(ctx context.Context, passengerID string) (string, error) {
+	passengerKey := fmt.Sprintf(constants.KeyActiveRidePassenger, passengerID)
+	rideID, err := r.redisClient.Get(ctx, passengerKey)
+	if err != nil {
+		// If key doesn't exist, it's not an error - just means no active ride
+		if err == redis.Nil {
+			return "", nil
+		}
+		return "", fmt.Errorf("failed to get active ride for passenger: %w", err)
+	}
+	return rideID, nil
 }

@@ -123,6 +123,14 @@ func (h *MatchHandler) handleRidePickup(msg []byte) error {
 	log.Printf("Received ride pickup event: rideID=%s, driverID=%s, PassengerID=%s",
 		ridePickup.RideID, ridePickup.DriverID, ridePickup.PassengerID)
 
+	ctx := context.Background()
+
+	// Store active ride information in Redis
+	if err := h.matchUC.SetActiveRide(ctx, ridePickup.DriverID, ridePickup.PassengerID, ridePickup.RideID); err != nil {
+		log.Printf("Failed to set active ride: %v", err)
+		// Continue even if this fails - don't block ride flow
+	}
+
 	// Remove driver from available pool (lock them)
 	if err := h.matchUC.RemoveDriverFromPool(context.Background(), ridePickup.DriverID); err != nil {
 		log.Printf("Failed to lock driver: %v", err)
@@ -148,6 +156,14 @@ func (h *MatchHandler) handleRideCompleted(msg []byte) error {
 
 	log.Printf("Received ride completed event: rideID=%s, driverID=%s, PassengerID=%s",
 		rideComplete.Ride.RideID, rideComplete.Ride.DriverID, rideComplete.Ride.PassengerID)
+
+	ctx := context.Background()
+
+	// Remove active ride information from Redis
+	if err := h.matchUC.RemoveActiveRide(ctx, rideComplete.Ride.DriverID.String(), rideComplete.Ride.PassengerID.String()); err != nil {
+		log.Printf("Failed to remove active ride: %v", err)
+		// Continue even if this fails
+	}
 
 	// Add driver back to available pool
 	if err := h.matchUC.ReleaseDriver(rideComplete.Ride.DriverID.String()); err != nil {

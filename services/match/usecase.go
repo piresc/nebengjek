@@ -19,4 +19,9 @@ type MatchUC interface {
 	ReleasePassenger(passengerID string) error
 	RemoveDriverFromPool(ctx context.Context, driverID string) error
 	RemovePassengerFromPool(ctx context.Context, passengerID string) error
+
+	// Active ride management
+	SetActiveRide(ctx context.Context, driverID, passengerID, rideID string) error
+	RemoveActiveRide(ctx context.Context, driverID, passengerID string) error
+	HasActiveRide(ctx context.Context, userID string, isDriver bool) (bool, error)
 }

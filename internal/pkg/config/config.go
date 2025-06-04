@@ -76,6 +76,24 @@ func loadConfigFromEnv() *models.Config {
 	// Rides config
 	configs.Rides.MinDistanceKm = GetEnvAsFloat("RIDES_MIN_DISTANCE_KM", 1.0)
 
+	// NewRelic config
+	configs.NewRelic.LicenseKey = GetEnv("NEW_RELIC_LICENSE_KEY", "")
+	configs.NewRelic.AppName = GetEnv("NEW_RELIC_APP_NAME", "")
+	configs.NewRelic.Enabled = GetEnvAsBool("NEW_RELIC_ENABLED", true)
+	configs.NewRelic.LogsEnabled = GetEnvAsBool("NEW_RELIC_LOGS_ENABLED", false)
+	configs.NewRelic.LogsEndpoint = GetEnv("NEW_RELIC_LOGS_ENDPOINT", "")
+	configs.NewRelic.LogsAPIKey = GetEnv("NEW_RELIC_LOGS_API_KEY", "")
+	configs.NewRelic.ForwardLogs = GetEnvAsBool("NEW_RELIC_FORWARD_LOGS", false)
+
+	// Logger config
+	configs.Logger.Level = GetEnv("LOG_LEVEL", "info")
+	configs.Logger.FilePath = GetEnv("LOG_FILE_PATH", "logs/nebengjek.log")
+	configs.Logger.MaxSize = GetEnvAsInt64("LOG_MAX_SIZE", 100)
+	configs.Logger.MaxAge = GetEnvAsInt("LOG_MAX_AGE", 7)
+	configs.Logger.MaxBackups = GetEnvAsInt("LOG_MAX_BACKUPS", 3)
+	configs.Logger.Compress = GetEnvAsBool("LOG_COMPRESS", true)
+	configs.Logger.Type = GetEnv("LOG_TYPE", "file")
+
 	return configs
 }
 
@@ -97,6 +115,21 @@ func GetEnvAsInt(key string, defaultValue int) int {
 	value, err := strconv.Atoi(valueStr)
 	if err != nil {
 		log.Printf("Warning: Invalid integer value for %s, using default: %d", key, defaultValue)
+		return defaultValue
+	}
+
+	return value
+}
+
+func GetEnvAsInt64(key string, defaultValue int64) int64 {
+	valueStr := GetEnv(key, "")
+	if valueStr == "" {
+		return defaultValue
+	}
+
+	value, err := strconv.ParseInt(valueStr, 10, 64)
+	if err != nil {
+		log.Printf("Warning: Invalid int64 value for %s, using default: %d", key, defaultValue)
 		return defaultValue
 	}
 

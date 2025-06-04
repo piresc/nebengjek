@@ -108,6 +108,21 @@ func (mr *MockMatchUCMockRecorder) HandleFinderEvent(arg0 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleFinderEvent", reflect.TypeOf((*MockMatchUC)(nil).HandleFinderEvent), arg0)
 }
 
+// HasActiveRide mocks base method.
+func (m *MockMatchUC) HasActiveRide(arg0 context.Context, arg1 string, arg2 bool) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HasActiveRide", arg0, arg1, arg2)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// HasActiveRide indicates an expected call of HasActiveRide.
+func (mr *MockMatchUCMockRecorder) HasActiveRide(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasActiveRide", reflect.TypeOf((*MockMatchUC)(nil).HasActiveRide), arg0, arg1, arg2)
+}
+
 // ReleaseDriver mocks base method.
 func (m *MockMatchUC) ReleaseDriver(arg0 string) error {
 	m.ctrl.T.Helper()
@@ -136,6 +151,20 @@ func (mr *MockMatchUCMockRecorder) ReleasePassenger(arg0 interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleasePassenger", reflect.TypeOf((*MockMatchUC)(nil).ReleasePassenger), arg0)
 }
 
+// RemoveActiveRide mocks base method.
+func (m *MockMatchUC) RemoveActiveRide(arg0 context.Context, arg1, arg2 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveActiveRide", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveActiveRide indicates an expected call of RemoveActiveRide.
+func (mr *MockMatchUCMockRecorder) RemoveActiveRide(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveActiveRide", reflect.TypeOf((*MockMatchUC)(nil).RemoveActiveRide), arg0, arg1, arg2)
+}
+
 // RemoveDriverFromPool mocks base method.
 func (m *MockMatchUC) RemoveDriverFromPool(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
@@ -162,4 +191,18 @@ func (m *MockMatchUC) RemovePassengerFromPool(arg0 context.Context, arg1 string)
 func (mr *MockMatchUCMockRecorder) RemovePassengerFromPool(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemovePassengerFromPool", reflect.TypeOf((*MockMatchUC)(nil).RemovePassengerFromPool), arg0, arg1)
+}
+
+// SetActiveRide mocks base method.
+func (m *MockMatchUC) SetActiveRide(arg0 context.Context, arg1, arg2, arg3 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetActiveRide", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetActiveRide indicates an expected call of SetActiveRide.
+func (mr *MockMatchUCMockRecorder) SetActiveRide(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetActiveRide", reflect.TypeOf((*MockMatchUC)(nil).SetActiveRide), arg0, arg1, arg2, arg3)
 }

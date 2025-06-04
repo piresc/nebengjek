@@ -95,6 +95,16 @@ func (uc *MatchUC) HandleBeaconEvent(event models.BeaconEvent) error {
 	}
 
 	if event.IsActive {
+		// Check if driver has an active ride before adding to pool
+		hasActiveRide, err := uc.HasActiveRide(ctx, event.UserID, true) // true = isDriver
+		if err != nil {
+			log.Printf("Failed to check active ride for driver %s: %v", event.UserID, err)
+			// Continue with adding to pool on error to avoid blocking
+		} else if hasActiveRide {
+			log.Printf("Driver %s has active ride, skipping addition to available pool", event.UserID)
+			return nil
+		}
+
 		// Beacon events are only for drivers
 		return uc.addDriverToPool(ctx, event.UserID, location)
 	}
@@ -117,6 +127,16 @@ func (uc *MatchUC) HandleFinderEvent(event models.FinderEvent) error {
 	}
 
 	if event.IsActive {
+		// Check if passenger has an active ride before adding to pool
+		hasActiveRide, err := uc.HasActiveRide(ctx, event.UserID, false) // false = isPassenger
+		if err != nil {
+			log.Printf("Failed to check active ride for passenger %s: %v", event.UserID, err)
+			// Continue with adding to pool on error to avoid blocking
+		} else if hasActiveRide {
+			log.Printf("Passenger %s has active ride, skipping addition to available pool", event.UserID)
+			return nil
+		}
+
 		// Finder events are only for passengers who initiate the matching process
 		return uc.handleActivePassengerWithTarget(ctx, event, location, targetLocation)
 	}
@@ -499,4 +519,33 @@ func (uc *MatchUC) RemovePassengerFromPool(ctx context.Context, passengerID stri
 
 	log.Printf("Successfully locked passenger %s (removed from available pool)", passengerID)
 	return nil
+}
+
+// SetActiveRide stores active ride information for both driver and passenger
+func (uc *MatchUC) SetActiveRide(ctx context.Context, driverID, passengerID, rideID string) error {
+	return uc.matchRepo.SetActiveRide(ctx, driverID, passengerID, rideID)
+}
+
+// RemoveActiveRide removes active ride information for both driver and passenger
+func (uc *MatchUC) RemoveActiveRide(ctx context.Context, driverID, passengerID string) error {
+	return uc.matchRepo.RemoveActiveRide(ctx, driverID, passengerID)
+}
+
+// HasActiveRide checks if a user (driver or passenger) has an active ride
+func (uc *MatchUC) HasActiveRide(ctx context.Context, userID string, isDriver bool) (bool, error) {
+	var rideID string
+	var err error
+
+	if isDriver {
+		rideID, err = uc.matchRepo.GetActiveRideByDriver(ctx, userID)
+	} else {
+		rideID, err = uc.matchRepo.GetActiveRideByPassenger(ctx, userID)
+	}
+
+	if err != nil {
+		return false, fmt.Errorf("failed to check active ride: %w", err)
+	}
+
+	// If rideID is empty, no active ride exists
+	return rideID != "", nil
 }

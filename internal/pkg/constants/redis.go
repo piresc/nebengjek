@@ -22,6 +22,10 @@ const (
 
 	// Ride Service
 	KeyRideLocation = "rides:location:%s" // Format: trip:location:{trip_id}
+
+	// Active rides tracking - used by match service to prevent matching during active rides
+	KeyActiveRideDriver    = "active_ride:driver:%s"    // Format: active_ride:driver:{driver_id} -> ride_id
+	KeyActiveRidePassenger = "active_ride:passenger:%s" // Format: active_ride:passenger:{passenger_id} -> ride_id
 )
 
 // Redis hash fields

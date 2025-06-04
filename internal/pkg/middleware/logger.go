@@ -90,12 +90,3 @@ func RequestIDMiddleware() echo.MiddlewareFunc {
 		}
 	}
 }
-
-// NewLogger creates a new logrus logger with default configuration
-func NewLogger() *logrus.Logger {
-	logger := logrus.New()
-	logger.SetFormatter(&logrus.JSONFormatter{
-		TimestampFormat: time.RFC3339,
-	})
-	return logger
-}
