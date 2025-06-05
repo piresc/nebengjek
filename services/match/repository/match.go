@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
-	"github.com/go-redis/redis/v8"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/database"
 	"github.com/piresc/nebengjek/internal/pkg/models"

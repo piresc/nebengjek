@@ -423,13 +423,7 @@ func TestRemoveAvailableDriver_Success(t *testing.T) {
 	assert.False(t, locationExists, "Driver location should be removed")
 }
 
-func TestRemoveAvailableDriver_NotImplementedYet(t *testing.T) {
-	t.Skip("This test requires Redis operations that need mocking")
-}
 
-func TestFindNearbyDrivers_NotImplementedYet(t *testing.T) {
-	t.Skip("This test requires Redis operations that need mocking")
-}
 
 // TestFindNearbyDrivers tests finding nearby drivers
 func TestFindNearbyDrivers_Success(t *testing.T) {

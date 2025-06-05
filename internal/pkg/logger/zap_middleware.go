@@ -6,11 +6,12 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/newrelic/go-agent/v3/newrelic"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
-// EchoMiddleware creates middleware for Echo framework using our custom logger
-func EchoMiddleware(logger *AppLogger) echo.MiddlewareFunc {
+// ZapEchoMiddleware creates middleware for Echo framework using Zap logger
+func ZapEchoMiddleware(logger *ZapLogger) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			var txn *newrelic.Transaction
@@ -73,7 +74,7 @@ func EchoMiddleware(logger *AppLogger) echo.MiddlewareFunc {
 				}
 			}
 
-			// Log the HTTP request using our logger
+			// Log the HTTP request using our Zap logger
 			logger.LogHTTPRequest(txn, method, path, clientIP, userIDStr, requestID, statusCode, latency, err)
 
 			return err
@@ -81,8 +82,8 @@ func EchoMiddleware(logger *AppLogger) echo.MiddlewareFunc {
 	}
 }
 
-// GetTransactionFromContext retrieves New Relic transaction from Echo context
-func GetTransactionFromContext(c echo.Context) *newrelic.Transaction {
+// GetZapTransactionFromContext retrieves New Relic transaction from Echo context
+func GetZapTransactionFromContext(c echo.Context) *newrelic.Transaction {
 	if txn := c.Get("nr_txn"); txn != nil {
 		if nrTxn, ok := txn.(*newrelic.Transaction); ok {
 			return nrTxn
@@ -91,17 +92,34 @@ func GetTransactionFromContext(c echo.Context) *newrelic.Transaction {
 	return nil
 }
 
-// LogWithContext logs a message with Echo context and New Relic transaction
-func LogWithContext(logger *AppLogger, c echo.Context, level logrus.Level, message string, fields logrus.Fields) {
-	txn := GetTransactionFromContext(c)
+// ZapLogWithContext logs a message with Echo context and New Relic transaction
+func ZapLogWithContext(logger *ZapLogger, c echo.Context, level zapcore.Level, message string, fields map[string]interface{}) {
+	txn := GetZapTransactionFromContext(c)
 
-	entry := logger.WithFields(fields)
+	zapLogger := logger.WithFields(fields)
 	if txn != nil {
-		entry = logger.WithNewRelicContext(txn)
-		if fields != nil {
-			entry = entry.WithFields(fields)
+		zapLogger = logger.WithNewRelicContext(txn)
+
+		// Re-add fields after adding New Relic context
+		zapFields := make([]zap.Field, 0, len(fields))
+		for key, value := range fields {
+			zapFields = append(zapFields, zap.Any(key, value))
 		}
+		zapLogger = zapLogger.With(zapFields...)
 	}
 
-	entry.Log(level, message)
+	switch level {
+	case zapcore.DebugLevel:
+		zapLogger.Debug(message)
+	case zapcore.InfoLevel:
+		zapLogger.Info(message)
+	case zapcore.WarnLevel:
+		zapLogger.Warn(message)
+	case zapcore.ErrorLevel:
+		zapLogger.Error(message)
+	case zapcore.FatalLevel:
+		zapLogger.Fatal(message)
+	default:
+		zapLogger.Info(message)
+	}
 }

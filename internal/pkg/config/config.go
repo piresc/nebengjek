@@ -79,7 +79,7 @@ func loadConfigFromEnv() *models.Config {
 	// NewRelic config
 	configs.NewRelic.LicenseKey = GetEnv("NEW_RELIC_LICENSE_KEY", "")
 	configs.NewRelic.AppName = GetEnv("NEW_RELIC_APP_NAME", "")
-	configs.NewRelic.Enabled = GetEnvAsBool("NEW_RELIC_ENABLED", true)
+	configs.NewRelic.Enabled = GetEnvAsBool("NEW_RELIC_ENABLED", false)
 	configs.NewRelic.LogsEnabled = GetEnvAsBool("NEW_RELIC_LOGS_ENABLED", false)
 	configs.NewRelic.LogsEndpoint = GetEnv("NEW_RELIC_LOGS_ENDPOINT", "")
 	configs.NewRelic.LogsAPIKey = GetEnv("NEW_RELIC_LOGS_API_KEY", "")

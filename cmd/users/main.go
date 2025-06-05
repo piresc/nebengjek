@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/config"
@@ -20,6 +21,7 @@ import (
 	wsHandler "github.com/piresc/nebengjek/services/users/handler/websocket"
 	"github.com/piresc/nebengjek/services/users/repository"
 	"github.com/piresc/nebengjek/services/users/usecase"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -27,32 +29,49 @@ func main() {
 	configPath := "/Users/pirescerullo/GitHub/assessment/nebengjek/config/users.env"
 	configs := config.InitConfig(configPath)
 
-	// Initialize New Relic and application logger
+	// Initialize New Relic and Zap logger
 	nrApp := nrpkg.InitNewRelic(configs)
-	appLogger, err := logger.InitAppLoggerFromConfig(configs, nrApp)
-	if err != nil {
-		log.Fatalf("Failed to create logger: %v", err)
+
+	// Wait for New Relic connection before proceeding
+	if nrApp != nil {
+		if err := nrApp.WaitForConnection(10 * time.Second); err != nil {
+			log.Printf("Warning: New Relic connection timeout: %v", err)
+		} else {
+			log.Println("New Relic connection established")
+		}
 	}
-	defer appLogger.Close()
+
+	zapLogger, err := logger.InitZapLoggerFromConfig(configs, nrApp)
+	if err != nil {
+		log.Fatalf("Failed to create Zap logger: %v", err)
+	}
+	defer zapLogger.Close()
+
+	// Log startup with Zap
+	zapLogger.Info("Starting application",
+		zap.String("app", appName),
+		zap.String("version", configs.App.Version),
+		zap.String("environment", configs.App.Environment),
+	)
 
 	// Initialize PostgreSQL database connection
 	postgresClient, err := database.NewPostgresClient(configs.Database)
 	if err != nil {
-		log.Fatalf("Failed to connect to PostgreSQL: %v", err)
+		zapLogger.Fatal("Failed to connect to PostgreSQL", zap.Error(err))
 	}
 	defer postgresClient.Close()
 
 	// Initialize Redis client
 	redisClient, err := database.NewRedisClient(configs.Redis)
 	if err != nil {
-		log.Fatalf("Failed to connect to Redis: %v", err)
+		zapLogger.Fatal("Failed to connect to Redis", zap.Error(err))
 	}
 	defer redisClient.Close()
 
 	// Initialize NATS
 	natsClient, err := natspkg.NewClient(configs.NATS.URL)
 	if err != nil {
-		log.Fatalf("Failed to connect to NATS: %v", err)
+		zapLogger.Fatal("Failed to connect to NATS", zap.Error(err))
 	}
 	defer natsClient.Close()
 
@@ -78,7 +97,7 @@ func main() {
 
 	// Initialize NATS consumers
 	if err := natsHandler.InitConsumers(); err != nil {
-		log.Fatalf("Failed to initialize NATS consumers: %v", err)
+		zapLogger.Fatal("Failed to initialize NATS consumers", zap.Error(err))
 	}
 
 	// Initialize handlers
@@ -89,7 +108,7 @@ func main() {
 
 	// Add middlewares
 	e.Use(middleware.RequestIDMiddleware())
-	e.Use(logger.EchoMiddleware(appLogger))
+	e.Use(logger.ZapEchoMiddleware(zapLogger))
 
 	// Register health endpoints
 	health.RegisterHealthEndpoints(e, appName)
@@ -98,8 +117,15 @@ func main() {
 	Handler.RegisterRoutes(e)
 
 	// Start server
-	log.Printf("Starting %s on port %d", appName, configs.Server.Port)
+	zapLogger.Info("Starting server",
+		zap.String("app", appName),
+		zap.Int("port", configs.Server.Port),
+	)
+
 	if err := e.Start(fmt.Sprintf(":%d", configs.Server.Port)); err != nil {
-		log.Fatalf("Failed to start %s: %v", appName, err)
+		zapLogger.Fatal("Failed to start server",
+			zap.String("app", appName),
+			zap.Error(err),
+		)
 	}
 }
