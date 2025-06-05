@@ -423,8 +423,6 @@ func TestRemoveAvailableDriver_Success(t *testing.T) {
 	assert.False(t, locationExists, "Driver location should be removed")
 }
 
-
-
 // TestFindNearbyDrivers tests finding nearby drivers
 func TestFindNearbyDrivers_Success(t *testing.T) {
 	// Arrange

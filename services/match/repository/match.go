@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"fmt"
-	"log"
 	"strconv"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/database"
+	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
@@ -573,7 +573,9 @@ func (r *MatchRepo) BatchUpdateMatchStatus(ctx context.Context, matchIDs []strin
 		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
 
-	log.Printf("Batch updated %d matches to status %s", rowsAffected, status)
+	logger.Info("Batch updated matches",
+		logger.Int64("rows_affected", rowsAffected),
+		logger.String("status", string(status)))
 	return nil
 }
 
@@ -725,7 +727,10 @@ func (r *MatchRepo) SetActiveRide(ctx context.Context, driverID, passengerID, ri
 		return fmt.Errorf("failed to set active ride for passenger: %w", err)
 	}
 
-	log.Printf("Set active ride %s for driver %s and passenger %s", rideID, driverID, passengerID)
+	logger.Info("Set active ride",
+		logger.String("ride_id", rideID),
+		logger.String("driver_id", driverID),
+		logger.String("passenger_id", passengerID))
 	return nil
 }
 
@@ -734,18 +739,24 @@ func (r *MatchRepo) RemoveActiveRide(ctx context.Context, driverID, passengerID 
 	// Remove active ride for driver
 	driverKey := fmt.Sprintf(constants.KeyActiveRideDriver, driverID)
 	if err := r.redisClient.Delete(ctx, driverKey); err != nil {
-		log.Printf("Warning: failed to remove active ride for driver %s: %v", driverID, err)
+		logger.Warn("Failed to remove active ride for driver",
+			logger.String("driver_id", driverID),
+			logger.ErrorField(err))
 		// Continue with passenger cleanup even if driver cleanup fails
 	}
 
 	// Remove active ride for passenger
 	passengerKey := fmt.Sprintf(constants.KeyActiveRidePassenger, passengerID)
 	if err := r.redisClient.Delete(ctx, passengerKey); err != nil {
-		log.Printf("Warning: failed to remove active ride for passenger %s: %v", passengerID, err)
+		logger.Warn("Failed to remove active ride for passenger",
+			logger.String("passenger_id", passengerID),
+			logger.ErrorField(err))
 		// Don't return error for cleanup operations
 	}
 
-	log.Printf("Removed active ride for driver %s and passenger %s", driverID, passengerID)
+	logger.Info("Removed active ride",
+		logger.String("driver_id", driverID),
+		logger.String("passenger_id", passengerID))
 	return nil
 }
 

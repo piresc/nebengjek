@@ -2,11 +2,11 @@ package websocket
 
 import (
 	"encoding/json"
-	"log"
 
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
+	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	pkgws "github.com/piresc/nebengjek/internal/pkg/websocket"
 	"github.com/piresc/nebengjek/services/users"
@@ -49,13 +49,15 @@ func (m *WebSocketManager) messageLoop(client *models.WebSocketClient) error {
 		_, msg, err := client.Conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket error: %v", err)
+				logger.Error("WebSocket error",
+					logger.ErrorField(err))
 			}
 			return err
 		}
 
 		if err := m.handleMessage(client, msg); err != nil {
-			log.Printf("Error handling message: %v", err)
+			logger.Error("Error handling message",
+				logger.ErrorField(err))
 		}
 	}
 }

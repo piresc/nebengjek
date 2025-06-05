@@ -61,7 +61,7 @@ func TestRidesHandler_handleMatchAccepted_Success(t *testing.T) {
 		MatchStatus: models.MatchStatusAccepted,
 	}
 
-	mockRidesUC.EXPECT().CreateRide(matchProposal).Return(nil)
+	mockRidesUC.EXPECT().CreateRide(gomock.Any(), matchProposal).Return(nil)
 
 	// Act
 	matchData, err := json.Marshal(matchProposal)
@@ -120,7 +120,7 @@ func TestRidesHandler_handleMatchAccepted_CreateRideError(t *testing.T) {
 	}
 
 	expectedError := errors.New("create ride failed")
-	mockRidesUC.EXPECT().CreateRide(matchProposal).Return(expectedError)
+	mockRidesUC.EXPECT().CreateRide(gomock.Any(), matchProposal).Return(expectedError)
 
 	// Act
 	matchData, err := json.Marshal(matchProposal)

@@ -36,17 +36,17 @@ func (m *MockRideUC) EXPECT() *MockRideUCMockRecorder {
 }
 
 // CreateRide mocks base method.
-func (m *MockRideUC) CreateRide(arg0 models.MatchProposal) error {
+func (m *MockRideUC) CreateRide(arg0 context.Context, arg1 models.MatchProposal) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateRide", arg0)
+	ret := m.ctrl.Call(m, "CreateRide", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CreateRide indicates an expected call of CreateRide.
-func (mr *MockRideUCMockRecorder) CreateRide(arg0 interface{}) *gomock.Call {
+func (mr *MockRideUCMockRecorder) CreateRide(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRide", reflect.TypeOf((*MockRideUC)(nil).CreateRide), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRide", reflect.TypeOf((*MockRideUC)(nil).CreateRide), arg0, arg1)
 }
 
 // ProcessBillingUpdate mocks base method.

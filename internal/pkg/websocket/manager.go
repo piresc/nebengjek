@@ -3,7 +3,6 @@ package websocket
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -12,6 +11,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
+	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
@@ -64,7 +64,8 @@ func (m *Manager) authenticateClient(c echo.Context) (*models.WebSocketClient, e
 
 	claims, err := m.validateToken(parts[1])
 	if err != nil {
-		log.Printf("Token validation failed: %v", err)
+		logger.Warn("Token validation failed",
+			logger.Err(err))
 		return nil, echo.NewHTTPError(http.StatusUnauthorized, "Invalid token")
 	}
 
@@ -146,7 +147,9 @@ func (m *Manager) SendErrorMessage(conn *websocket.Conn, code string, message st
 
 // NotifyClient sends a notification to a specific client
 func (m *Manager) NotifyClient(userID string, event string, data interface{}) {
-	log.Printf("Notifying client %s with event %s", userID, event)
+	logger.Debug("Notifying client",
+		logger.String("user_id", userID),
+		logger.String("event", event))
 	m.RLock()
 	client, exists := m.clients[userID]
 	m.RUnlock()
@@ -156,6 +159,8 @@ func (m *Manager) NotifyClient(userID string, event string, data interface{}) {
 	}
 
 	if err := m.SendMessage(client.Conn, event, data); err != nil {
-		log.Printf("Error sending message to client %s: %v", userID, err)
+		logger.Warn("Error sending message to client",
+			logger.String("user_id", userID),
+			logger.Err(err))
 	}
 }

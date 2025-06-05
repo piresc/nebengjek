@@ -1,11 +1,11 @@
 package config
 
 import (
-	"log"
 	"os"
 	"strconv"
 
 	"github.com/joho/godotenv"
+	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
@@ -15,7 +15,9 @@ func InitConfig(configPath string) *models.Config {
 		// Load config from file
 		err := godotenv.Load(configPath)
 		if err != nil {
-			log.Println("error loading config from file", err)
+			logger.Warn("error loading config from file",
+				logger.String("config_path", configPath),
+				logger.Err(err))
 		}
 	}
 	// Create config from environment variables
@@ -73,8 +75,21 @@ func loadConfigFromEnv() *models.Config {
 	// Match config
 	configs.Match.SearchRadiusKm = GetEnvAsFloat("MATCH_SEARCH_RADIUS_KM", 1.0)
 
+	// Pricing config
+	configs.Pricing.RatePerKm = GetEnvAsFloat("PRICING_RATE_PER_KM", 1000.0)
+	configs.Pricing.Currency = GetEnv("PRICING_CURRENCY", "IDR")
+	configs.Pricing.BaseFare = GetEnvAsFloat("PRICING_BASE_FARE", 5000.0)
+	configs.Pricing.PerKmRate = GetEnvAsFloat("PRICING_PER_KM_RATE", 2000.0)
+	configs.Pricing.PerMinuteRate = GetEnvAsFloat("PRICING_PER_MINUTE_RATE", 200.0)
+	configs.Pricing.SurgeFactor = GetEnvAsFloat("PRICING_SURGE_FACTOR", 1.0)
+
 	// Rides config
 	configs.Rides.MinDistanceKm = GetEnvAsFloat("RIDES_MIN_DISTANCE_KM", 1.0)
+
+	// Payment config
+	configs.Payment.QRCodeBaseURL = GetEnv("PAYMENT_QR_CODE_BASE_URL", "https://payment.nebengjek.com/qr")
+	configs.Payment.GatewayURL = GetEnv("PAYMENT_GATEWAY_URL", "https://payment.nebengjek.com/api")
+	configs.Payment.Timeout = GetEnvAsInt("PAYMENT_TIMEOUT", 30)
 
 	// NewRelic config
 	configs.NewRelic.LicenseKey = GetEnv("NEW_RELIC_LICENSE_KEY", "")
@@ -84,6 +99,12 @@ func loadConfigFromEnv() *models.Config {
 	configs.NewRelic.LogsEndpoint = GetEnv("NEW_RELIC_LOGS_ENDPOINT", "")
 	configs.NewRelic.LogsAPIKey = GetEnv("NEW_RELIC_LOGS_API_KEY", "")
 	configs.NewRelic.ForwardLogs = GetEnvAsBool("NEW_RELIC_FORWARD_LOGS", false)
+
+	// API Key config
+	configs.APIKey.UserService = GetEnv("API_KEY_USER_SERVICE", "")
+	configs.APIKey.MatchService = GetEnv("API_KEY_MATCH_SERVICE", "")
+	configs.APIKey.RidesService = GetEnv("API_KEY_RIDES_SERVICE", "")
+	configs.APIKey.LocationService = GetEnv("API_KEY_LOCATION_SERVICE", "")
 
 	// Logger config
 	configs.Logger.Level = GetEnv("LOG_LEVEL", "info")
@@ -114,7 +135,11 @@ func GetEnvAsInt(key string, defaultValue int) int {
 
 	value, err := strconv.Atoi(valueStr)
 	if err != nil {
-		log.Printf("Warning: Invalid integer value for %s, using default: %d", key, defaultValue)
+		logger.Warn("Invalid integer value for environment variable, using default",
+			logger.String("key", key),
+			logger.String("value", valueStr),
+			logger.Int("default", defaultValue),
+			logger.Err(err))
 		return defaultValue
 	}
 
@@ -129,7 +154,11 @@ func GetEnvAsInt64(key string, defaultValue int64) int64 {
 
 	value, err := strconv.ParseInt(valueStr, 10, 64)
 	if err != nil {
-		log.Printf("Warning: Invalid int64 value for %s, using default: %d", key, defaultValue)
+		logger.Warn("Invalid int64 value for environment variable, using default",
+			logger.String("key", key),
+			logger.String("value", valueStr),
+			logger.Int64("default", defaultValue),
+			logger.Err(err))
 		return defaultValue
 	}
 
@@ -144,7 +173,11 @@ func GetEnvAsBool(key string, defaultValue bool) bool {
 
 	value, err := strconv.ParseBool(valueStr)
 	if err != nil {
-		log.Printf("Warning: Invalid boolean value for %s, using default: %v", key, defaultValue)
+		logger.Warn("Invalid boolean value for environment variable, using default",
+			logger.String("key", key),
+			logger.String("value", valueStr),
+			logger.Bool("default", defaultValue),
+			logger.Err(err))
 		return defaultValue
 	}
 
@@ -159,7 +192,11 @@ func GetEnvAsFloat(key string, defaultValue float64) float64 {
 
 	value, err := strconv.ParseFloat(valueStr, 64)
 	if err != nil {
-		log.Printf("Warning: Invalid float value for %s, using default: %v", key, defaultValue)
+		logger.Warn("Invalid float value for environment variable, using default",
+			logger.String("key", key),
+			logger.String("value", valueStr),
+			logger.Float64("default", defaultValue),
+			logger.Err(err))
 		return defaultValue
 	}
 

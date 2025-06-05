@@ -3,9 +3,9 @@ package websocket
 import (
 	"context"
 	"encoding/json"
-	"log"
 
 	"github.com/piresc/nebengjek/internal/pkg/constants"
+	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
@@ -55,10 +55,13 @@ func (m *WebSocketManager) handleMatchConfirmation(client *models.WebSocketClien
 	// Update match status
 	result, err := m.userUC.ConfirmMatch(context.Background(), &confirm)
 	if err != nil {
-		log.Printf("Error confirming match for user %s: %v", client.UserID, err)
+		logger.Error("Error confirming match for user",
+			logger.String("user_id", client.UserID),
+			logger.ErrorField(err))
 		return m.manager.SendErrorMessage(client.Conn, constants.ErrorMatchUpdateFailed, err.Error())
 	}
-	log.Print(result)
+	// logger.Info("Match confirmation result",
+	//	logger.Any("result", result))
 
 	// Directly notify both driver and passenger about the confirmation
 	m.manager.NotifyClient(result.DriverID, constants.EventMatchConfirm, result)

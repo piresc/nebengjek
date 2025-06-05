@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	jwtpkg "github.com/piresc/nebengjek/internal/pkg/jwt"
+	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/internal/utils"
 )
@@ -36,7 +37,9 @@ func (u *UserUC) GenerateOTP(ctx context.Context, msisdn string) error {
 
 	// In a real implementation, we would integrate with Telkomsel's SMS API
 	// For now, we'll just log it
-	fmt.Printf("OTP for %s: %s\n", formattedMSISDN, code)
+	logger.Info("Generated OTP",
+		logger.String("msisdn", formattedMSISDN),
+		logger.String("otp_code", code))
 
 	return nil
 }

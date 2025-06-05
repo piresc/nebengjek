@@ -3,6 +3,7 @@ package handler
 import (
 	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
+	"github.com/piresc/nebengjek/internal/pkg/middleware"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/services/users/handler/http"
 	"github.com/piresc/nebengjek/services/users/handler/nats"
@@ -44,13 +45,13 @@ func (h *Handler) GetJWTMiddleware() echo.MiddlewareFunc {
 }
 
 // RegisterRoutes registers all protocol handlers and their routes
-func (h *Handler) RegisterRoutes(e *echo.Echo) {
-	// Auth routes (public)
+func (h *Handler) RegisterRoutes(e *echo.Echo, apiKeyMiddleware *middleware.APIKeyMiddleware) {
+	// Public routes (no authentication required)
 	authGroup := e.Group("/auth")
 	authGroup.POST("/otp/generate", h.authHandler.GenerateOTP)
 	authGroup.POST("/otp/verify", h.authHandler.VerifyOTP)
 
-	// Protected routes with JWT middleware
+	// Protected routes with JWT middleware (user-facing)
 	protected := e.Group("", h.GetJWTMiddleware())
 
 	// User routes
@@ -65,4 +66,16 @@ func (h *Handler) RegisterRoutes(e *echo.Echo) {
 	// WebSocket routes
 	wsGroup := protected.Group("/ws")
 	wsGroup.GET("", h.wsManager.HandleWebSocket)
+
+	// Internal routes (service-to-service communication with API key authentication)
+	internal := e.Group("/internal", apiKeyMiddleware.ValidateAPIKey("user-service"))
+
+	// Internal driver routes for service-to-service communication
+	internalDriverGroup := internal.Group("/drivers")
+	internalDriverGroup.POST("", h.userHandler.RegisterDriver)
+
+	// Internal user routes for service-to-service communication
+	internalUserGroup := internal.Group("/users")
+	internalUserGroup.POST("", h.userHandler.CreateUser)
+	internalUserGroup.GET("/:id", h.userHandler.GetUser)
 }

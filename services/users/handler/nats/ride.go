@@ -1,11 +1,13 @@
 package nats
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
 	"github.com/nats-io/nats.go"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
+	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
@@ -15,7 +17,7 @@ func (h *NatsHandler) initRideConsumers() error {
 	// Subscribe to match accepted events
 	matchAcceptedSub, err := h.natsClient.Subscribe(constants.SubjectMatchAccepted, func(msg *nats.Msg) {
 		if err := h.handleMatchAcceptedEvent(msg.Data); err != nil {
-			fmt.Printf("Error handling match accepted event: %v\n", err)
+			logger.ErrorCtx(context.Background(), "Error handling match accepted event", logger.Err(err))
 		}
 	})
 	if err != nil {
@@ -26,7 +28,7 @@ func (h *NatsHandler) initRideConsumers() error {
 	// Subscribe to ride start trip events
 	ridePickupSub, err := h.natsClient.Subscribe(constants.SubjectRidePickup, func(msg *nats.Msg) {
 		if err := h.handleRidePickupEvent(msg.Data); err != nil {
-			fmt.Printf("Error handling ride start trip event: %v\n", err)
+			logger.ErrorCtx(context.Background(), "Error handling ride pickup event", logger.Err(err))
 		}
 	})
 	if err != nil {
@@ -37,7 +39,7 @@ func (h *NatsHandler) initRideConsumers() error {
 	// Subscribe to ride start trip events
 	rideStartSub, err := h.natsClient.Subscribe(constants.SubjectRideStarted, func(msg *nats.Msg) {
 		if err := h.handleRideStartEvent(msg.Data); err != nil {
-			fmt.Printf("Error handling ride start trip event: %v\n", err)
+			logger.ErrorCtx(context.Background(), "Error handling ride start event", logger.Err(err))
 		}
 	})
 	if err != nil {
@@ -48,7 +50,7 @@ func (h *NatsHandler) initRideConsumers() error {
 	// Subscribe to ride completed events
 	rideCompletedSub, err := h.natsClient.Subscribe(constants.SubjectRideCompleted, func(msg *nats.Msg) {
 		if err := h.handleRideCompletedEvent(msg.Data); err != nil {
-			fmt.Printf("Error handling ride completed event: %v\n", err)
+			logger.ErrorCtx(context.Background(), "Error handling ride completed event", logger.Err(err))
 		}
 	})
 	if err != nil {
@@ -66,8 +68,10 @@ func (h *NatsHandler) handleMatchAcceptedEvent(msg []byte) error {
 		return fmt.Errorf("failed to unmarshal match accepted event: %w", err)
 	}
 
-	fmt.Printf("Received match accepted event: matchID=%s, driverID=%s, passengerID=%s\n",
-		matchProposal.ID, matchProposal.DriverID, matchProposal.PassengerID)
+	logger.InfoCtx(context.Background(), "Received match accepted event",
+		logger.String("match_id", matchProposal.ID),
+		logger.String("driver_id", matchProposal.DriverID),
+		logger.String("passenger_id", matchProposal.PassengerID))
 
 	// Notify both driver and passenger that their match is confirmed and they're locked
 	// Use a specific event type for match acceptance notification
@@ -84,8 +88,10 @@ func (h *NatsHandler) handleRidePickupEvent(msg []byte) error {
 		return fmt.Errorf("failed to unmarshal match event: %w", err)
 	}
 
-	fmt.Printf("Received ride pickup event: rideID=%s, driverID=%s, passengerID=%s\n",
-		ridePickup.RideID, ridePickup.DriverID, ridePickup.PassengerID)
+	logger.InfoCtx(context.Background(), "Received ride pickup event",
+		logger.String("ride_id", ridePickup.RideID),
+		logger.String("driver_id", ridePickup.DriverID),
+		logger.String("passenger_id", ridePickup.PassengerID))
 
 	// Notify both driver and passenger
 	h.wsManager.NotifyClient(ridePickup.DriverID, constants.SubjectRidePickup, ridePickup)
@@ -100,8 +106,10 @@ func (h *NatsHandler) handleRideStartEvent(msg []byte) error {
 		return fmt.Errorf("failed to unmarshal ride start event: %w", err)
 	}
 
-	fmt.Printf("Received ride started event: rideID=%s, driverID=%s, passengerID=%s\n",
-		rideStarted.RideID, rideStarted.DriverID, rideStarted.PassengerID)
+	logger.InfoCtx(context.Background(), "Received ride started event",
+		logger.String("ride_id", rideStarted.RideID),
+		logger.String("driver_id", rideStarted.DriverID),
+		logger.String("passenger_id", rideStarted.PassengerID))
 
 	// Notify both driver and passenger that their match is confirmed and they're locked
 	// Use a specific event type for match acceptance notification
@@ -118,8 +126,10 @@ func (h *NatsHandler) handleRideCompletedEvent(msg []byte) error {
 		return fmt.Errorf("failed to unmarshal ride completed event: %w", err)
 	}
 
-	fmt.Printf("Received ride completed event: rideID=%s, driverID=%s, PassengerID=%s\n",
-		rideComplete.Ride.RideID, rideComplete.Ride.DriverID, rideComplete.Ride.PassengerID)
+	logger.InfoCtx(context.Background(), "Received ride completed event",
+		logger.String("ride_id", rideComplete.Ride.RideID.String()),
+		logger.String("driver_id", rideComplete.Ride.DriverID.String()),
+		logger.String("passenger_id", rideComplete.Ride.PassengerID.String()))
 
 	// Notify driver and passenger about the ride completion
 	h.wsManager.NotifyClient(rideComplete.Ride.DriverID.String(), constants.EventRideCompleted, rideComplete)

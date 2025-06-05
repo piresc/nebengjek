@@ -3,10 +3,10 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/internal/utils"
 	"github.com/piresc/nebengjek/services/rides"
@@ -33,8 +33,10 @@ func NewRideUC(
 }
 
 // CreateRide creates a new ride from a confirmed match
-func (uc *rideUC) CreateRide(mp models.MatchProposal) error {
-	log.Printf("Creating ride for driver %s and customer %s", mp.DriverID, mp.PassengerID)
+func (uc *rideUC) CreateRide(ctx context.Context, mp models.MatchProposal) error {
+	logger.Info("Creating ride",
+		logger.String("driver_id", mp.DriverID),
+		logger.String("passenger_id", mp.PassengerID))
 
 	// Create a new ride from the match proposal
 	ride := &models.Ride{
@@ -47,16 +49,19 @@ func (uc *rideUC) CreateRide(mp models.MatchProposal) error {
 	// Delegate to repository
 	createdRide, err := uc.ridesRepo.CreateRide(ride)
 	if err != nil {
-		log.Printf("Failed to create ride: %v", err)
+		logger.Error("Failed to create ride",
+			logger.ErrorField(err))
 		return err
 	}
 	err = uc.ridesGW.PublishRidePickup(context.Background(), createdRide)
 	if err != nil {
-		log.Printf("Failed to publish ride started event: %v", err)
+		logger.Error("Failed to publish ride started event",
+			logger.ErrorField(err))
 		return err
 	}
 
-	log.Printf("Successfully created ride with ID: %s", createdRide.RideID)
+	logger.Info("Successfully created ride",
+		logger.String("ride_id", createdRide.RideID.String()))
 	return nil
 }
 
@@ -88,11 +93,16 @@ func (uc *rideUC) ProcessBillingUpdate(rideID string, entry *models.BillingLedge
 
 	// Update total cost
 	if err := uc.ridesRepo.UpdateTotalCost(ctx, rideID, entry.Cost); err != nil {
-		log.Printf("Warning: Failed to update total cost for ride %s: %v", rideID, err)
+		logger.Warn("Failed to update total cost for ride",
+			logger.String("ride_id", rideID),
+			logger.ErrorField(err))
 		return fmt.Errorf("failed to update total cost: %w", err)
 	}
 
-	log.Printf("Updated billing for ride %s: +%d IDR (%.2f km)", rideID, entry.Cost, entry.Distance)
+	logger.Info("Updated billing for ride",
+		logger.String("ride_id", rideID),
+		logger.Int("cost", entry.Cost),
+		logger.Float64("distance", entry.Distance))
 	return nil
 }
 
@@ -135,7 +145,8 @@ func (uc *rideUC) StartRide(ctx context.Context, req models.RideStartRequest) (*
 		return &models.Ride{}, fmt.Errorf("failed to update ride status to ongoing: %w", err)
 	}
 
-	log.Printf("Ride %s started. Driver picked up passenger.", req.RideID)
+	logger.Info("Ride started - Driver picked up passenger",
+		logger.String("ride_id", req.RideID))
 	return ride, nil
 }
 
@@ -187,14 +198,23 @@ func (uc *rideUC) RideArrived(ctx context.Context, req models.RideArrivalReq) (*
 		return nil, fmt.Errorf("failed to create payment record: %w", err)
 	}
 
+	// Generate QR code URL for payment processing
+	// This could be a payment gateway URL with ride and amount parameters
+	qrCodeURL := fmt.Sprintf("%s?ride_id=%s&amount=%d&passenger_id=%s",
+		uc.cfg.Payment.QRCodeBaseURL, req.RideID, adjustedCost, ride.PassengerID.String())
+
 	// Create payment request
 	paymentRequest := &models.PaymentRequest{
 		RideID:      req.RideID,
 		PassengerID: ride.PassengerID.String(),
 		TotalCost:   adjustedCost,
+		QRCodeURL:   qrCodeURL,
 	}
 
-	log.Printf("Ride %s arrived at destination. Total cost: %d IDR", req.RideID, adjustedCost)
+	logger.Info("Ride arrived at destination",
+		logger.String("ride_id", req.RideID),
+		logger.Int("total_cost", adjustedCost),
+		logger.String("qr_code_url", qrCodeURL))
 
 	return paymentRequest, nil
 }
@@ -249,7 +269,8 @@ func (uc *rideUC) ProcessPayment(ctx context.Context, req models.PaymentProccess
 		// Publish payment processed event
 		if err := uc.ridesGW.PublishRideCompleted(ctx, rideComplete); err != nil {
 			// Log but don't fail the transaction
-			log.Printf("Warning: Failed to publish ride completed event: %v", err)
+			logger.Warn("Failed to publish ride completed event",
+				logger.ErrorField(err))
 		}
 	}
 

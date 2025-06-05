@@ -60,7 +60,7 @@ func TestCreateRide_Success(t *testing.T) {
 		Return(nil)
 
 	// Act
-	err = uc.CreateRide(matchProposal)
+	err = uc.CreateRide(context.Background(), matchProposal)
 
 	// Assert
 	assert.NoError(t, err)
@@ -96,7 +96,7 @@ func TestCreateRide_RepositoryError(t *testing.T) {
 		Return(nil, expectedError)
 
 	// Act
-	err = uc.CreateRide(matchProposal)
+	err = uc.CreateRide(context.Background(), matchProposal)
 
 	// Assert
 	assert.Error(t, err)
@@ -140,7 +140,7 @@ func TestCreateRide_PublishError(t *testing.T) {
 		Return(expectedError)
 
 	// Act
-	err = uc.CreateRide(matchProposal)
+	err = uc.CreateRide(context.Background(), matchProposal)
 
 	// Assert
 	assert.Error(t, err)

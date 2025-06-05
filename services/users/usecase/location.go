@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
@@ -34,6 +35,8 @@ func (uc *UserUC) UpdateUserLocation(ctx context.Context, lu *models.LocationUpd
 	}
 
 	// Publish to NATS
-	fmt.Printf("Publishing location update for user %s: ride_id=%s\n", lu.DriverID, lu.RideID)
+	logger.Info("Publishing location update for user",
+		logger.String("user_id", lu.DriverID),
+		logger.String("ride_id", lu.RideID))
 	return uc.UserGW.PublishLocationUpdate(ctx, lu)
 }

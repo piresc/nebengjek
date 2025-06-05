@@ -2,6 +2,7 @@ package handler
 
 import (
 	"github.com/labstack/echo/v4"
+	"github.com/piresc/nebengjek/internal/pkg/middleware"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/rides"
@@ -29,12 +30,21 @@ func NewHandler(
 }
 
 // RegisterRoutes registers all HTTP routes
-func (h *Handler) RegisterRoutes(e *echo.Echo) {
-	// Rides routes
+func (h *Handler) RegisterRoutes(e *echo.Echo, apiKeyMiddleware *middleware.APIKeyMiddleware) {
+	// User-facing rides routes (no API key required)
 	ridesGroup := e.Group("/rides")
 	ridesGroup.POST("/:rideID/confirm", h.ridesHTTP.StartRide)
 	ridesGroup.POST("/:rideID/arrive", h.ridesHTTP.RideArrived)
 	ridesGroup.POST("/:rideID/payment", h.ridesHTTP.ProcessPayment)
+
+	// Internal routes for service-to-service communication (API key required)
+	internal := e.Group("/internal", apiKeyMiddleware.ValidateAPIKey("rides-service"))
+
+	// Internal rides endpoints
+	internalRidesGroup := internal.Group("/rides")
+	internalRidesGroup.POST("/:rideID/confirm", h.ridesHTTP.StartRide)
+	internalRidesGroup.POST("/:rideID/arrive", h.ridesHTTP.RideArrived)
+	internalRidesGroup.POST("/:rideID/payment", h.ridesHTTP.ProcessPayment)
 }
 
 // InitNATSConsumers initializes all NATS consumers

@@ -3,10 +3,10 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/piresc/nebengjek/internal/pkg/converter"
+	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
@@ -14,7 +14,9 @@ import (
 func (uc *MatchUC) addDriverToPool(ctx context.Context, driverID string, location *models.Location) error {
 	// Add driver to available pool
 	if err := uc.matchRepo.AddAvailableDriver(ctx, driverID, location); err != nil {
-		log.Printf("Failed to add available driver: %v", err)
+		logger.Error("Failed to add available driver",
+			logger.String("driver_id", driverID),
+			logger.ErrorField(err))
 		return err
 	}
 	return nil
@@ -24,7 +26,10 @@ func (uc *MatchUC) addDriverToPool(ctx context.Context, driverID string, locatio
 func (uc *MatchUC) createMatchesWithNearbyDrivers(ctx context.Context, passengerID string, passengerLocation, targetLocation *models.Location) error {
 	nearbyDrivers, err := uc.matchRepo.FindNearbyDrivers(ctx, passengerLocation, uc.cfg.Match.SearchRadiusKm) // Configurable radius
 	if err != nil {
-		log.Printf("Failed to find nearby drivers: %v", err)
+		logger.Error("Failed to find nearby drivers",
+			logger.String("passenger_id", passengerID),
+			logger.Float64("search_radius_km", uc.cfg.Match.SearchRadiusKm),
+			logger.ErrorField(err))
 		return err
 	}
 
@@ -33,7 +38,10 @@ func (uc *MatchUC) createMatchesWithNearbyDrivers(ctx context.Context, passenger
 		match := uc.buildMatch(driver.ID, passengerID, &driver.Location, passengerLocation, targetLocation)
 
 		if err := uc.CreateMatch(ctx, match); err != nil {
-			log.Printf("Failed to create match with driver %s: %v", driver.ID, err)
+			logger.Error("Failed to create match with driver",
+				logger.String("driver_id", driver.ID),
+				logger.String("passenger_id", passengerID),
+				logger.ErrorField(err))
 			continue
 		}
 	}
@@ -62,7 +70,9 @@ func (uc *MatchUC) buildMatch(driverID, passengerID string, driverLocation, pass
 
 func (uc *MatchUC) handleActivePassengerWithTarget(ctx context.Context, event models.FinderEvent, location *models.Location, targetLocation *models.Location) error {
 	if err := uc.matchRepo.AddAvailablePassenger(ctx, event.UserID, location); err != nil {
-		log.Printf("Failed to add available passenger: %v", err)
+		logger.Error("Failed to add available passenger",
+			logger.String("passenger_id", event.UserID),
+			logger.ErrorField(err))
 		return err
 	}
 
@@ -79,7 +89,10 @@ func (uc *MatchUC) handleInactiveUser(ctx context.Context, userID string, role s
 	}
 
 	if err != nil {
-		log.Printf("Failed to remove available %s: %v", role, err)
+		logger.Error("Failed to remove available user",
+			logger.String("user_id", userID),
+			logger.String("role", role),
+			logger.ErrorField(err))
 		return err
 	}
 	return nil
@@ -98,10 +111,12 @@ func (uc *MatchUC) HandleBeaconEvent(event models.BeaconEvent) error {
 		// Check if driver has an active ride before adding to pool
 		hasActiveRide, err := uc.HasActiveRide(ctx, event.UserID, true) // true = isDriver
 		if err != nil {
-			log.Printf("Failed to check active ride for driver %s: %v", event.UserID, err)
+			logger.Error("Failed to check active ride for driver",
+				logger.String("driver_id", event.UserID),
+				logger.ErrorField(err))
 			// Continue with adding to pool on error to avoid blocking
 		} else if hasActiveRide {
-			log.Printf("Driver %s has active ride, skipping addition to available pool", event.UserID)
+			// Driver has active ride, skipping addition to available pool
 			return nil
 		}
 
@@ -130,10 +145,12 @@ func (uc *MatchUC) HandleFinderEvent(event models.FinderEvent) error {
 		// Check if passenger has an active ride before adding to pool
 		hasActiveRide, err := uc.HasActiveRide(ctx, event.UserID, false) // false = isPassenger
 		if err != nil {
-			log.Printf("Failed to check active ride for passenger %s: %v", event.UserID, err)
+			logger.Error("Failed to check active ride for passenger",
+				logger.String("passenger_id", event.UserID),
+				logger.ErrorField(err))
 			// Continue with adding to pool on error to avoid blocking
 		} else if hasActiveRide {
-			log.Printf("Passenger %s has active ride, skipping addition to available pool", event.UserID)
+			// Passenger has active ride, skipping addition to available pool
 			return nil
 		}
 
@@ -187,17 +204,18 @@ func (uc *MatchUC) updateMatchConfirmation(ctx context.Context, match *models.Ma
 	// Determine new status based on confirmations
 	if match.DriverConfirmed && match.PassengerConfirmed {
 		match.Status = models.MatchStatusAccepted
-		log.Printf("Match %s fully confirmed by both parties", match.ID.String())
+		logger.Info("Match fully confirmed by both parties",
+			logger.String("match_id", match.ID.String()))
 
 		// Remove users from available pools when fully confirmed
 		uc.matchRepo.RemoveAvailableDriver(ctx, match.DriverID.String())
 		uc.matchRepo.RemoveAvailablePassenger(ctx, match.PassengerID.String())
 	} else if match.DriverConfirmed {
 		match.Status = models.MatchStatusDriverConfirmed
-		log.Printf("Match %s confirmed by driver, waiting for passenger", match.ID.String())
+		// Match confirmed by driver, waiting for passenger
 	} else if match.PassengerConfirmed {
 		match.Status = models.MatchStatusPassengerConfirmed
-		log.Printf("Match %s confirmed by passenger, waiting for driver", match.ID.String())
+		// Match confirmed by passenger, waiting for driver
 	}
 
 	match.UpdatedAt = time.Now()
@@ -210,7 +228,9 @@ func (uc *MatchUC) handleMatchAcceptance(ctx context.Context, match *models.Matc
 
 	updatedMatch, err := uc.updateMatchConfirmation(ctx, match, req.UserID, isDriver)
 	if err != nil {
-		log.Printf("Warning: Failed to update match confirmation: %v", err)
+		logger.Warn("Failed to update match confirmation",
+			logger.String("match_id", match.ID.String()),
+			logger.ErrorField(err))
 		updatedMatch = match // Use original match if update fails
 	}
 
@@ -221,7 +241,7 @@ func (uc *MatchUC) handleMatchAcceptance(ctx context.Context, match *models.Matc
 	}
 
 	responseEvent := uc.buildMatchProposal(updatedMatch)
-	log.Printf("Created match proposal response: %+v", responseEvent)
+	// Created match proposal response
 
 	return responseEvent, nil
 }
@@ -238,7 +258,9 @@ func (uc *MatchUC) PublishMatchAccepted(match *models.Match) {
 		MatchStatus:    match.Status,
 	}
 	if err := uc.matchGW.PublishMatchAccepted(context.Background(), PublishMatchAccepted); err != nil {
-		log.Printf("Failed to publish match accepted event: %v", err)
+		logger.Error("Failed to publish match accepted event",
+			logger.String("match_id", PublishMatchAccepted.ID),
+			logger.ErrorField(err))
 	}
 }
 
@@ -252,8 +274,9 @@ func (uc *MatchUC) startAsyncAutoRejection(match *models.Match) {
 		defer cancel() // Ensure context is cleaned up
 
 		if err := uc.handleAutoRejectionForAcceptedMatch(bgCtx, match); err != nil {
-			log.Printf("Critical: Failed to handle auto-rejection for match %s: %v",
-				match.ID.String(), err)
+			logger.Error("Critical: Failed to handle auto-rejection for match",
+				logger.String("match_id", match.ID.String()),
+				logger.ErrorField(err))
 			// TODO: Add alerting/retry mechanism for critical failures
 		}
 	}()
@@ -307,9 +330,7 @@ func (uc *MatchUC) handleAutoRejectionForAcceptedMatch(ctx context.Context, acce
 	}
 
 	if len(rejectionBatch) > 0 {
-		log.Printf("Auto-rejected %d matches for passenger %s",
-			len(rejectionBatch),
-			converter.UUIDToStr(acceptedMatch.PassengerID))
+		// Auto-rejected matches for passenger
 	}
 
 	return nil
@@ -323,7 +344,9 @@ func (uc *MatchUC) processRejectionBatch(ctx context.Context, rejectionBatch []s
 
 	// Attempt batch update
 	if err := uc.matchRepo.BatchUpdateMatchStatus(ctx, rejectionBatch, models.MatchStatusRejected); err != nil {
-		log.Printf("Batch update failed, falling back to individual updates: %v", err)
+		logger.Warn("Batch update failed, falling back to individual updates",
+			logger.Int("batch_size", len(rejectionBatch)),
+			logger.ErrorField(err))
 		return uc.processIndividualRejections(ctx, rejectionBatch, eventBatch)
 	}
 
@@ -341,13 +364,17 @@ func (uc *MatchUC) processIndividualRejections(ctx context.Context, matchIDs []s
 		}
 
 		if err := uc.matchRepo.UpdateMatchStatus(ctx, matchID, models.MatchStatusRejected); err != nil {
-			log.Printf("Failed to update rejected match status for match %s: %v", matchID, err)
+			logger.Error("Failed to update rejected match status",
+				logger.String("match_id", matchID),
+				logger.ErrorField(err))
 			continue
 		}
 
 		// Publish rejection event
 		if err := uc.matchGW.PublishMatchRejected(ctx, events[i]); err != nil {
-			log.Printf("Failed to publish match rejection for match %s: %v", matchID, err)
+			logger.Error("Failed to publish match rejection",
+				logger.String("match_id", matchID),
+				logger.ErrorField(err))
 		}
 	}
 	return nil
@@ -363,7 +390,9 @@ func (uc *MatchUC) publishRejectionEvents(ctx context.Context, events []models.M
 		}
 
 		if err := uc.matchGW.PublishMatchRejected(ctx, event); err != nil {
-			log.Printf("Failed to publish match rejection for match %s: %v", event.ID, err)
+			logger.Error("Failed to publish match rejection",
+				logger.String("match_id", event.ID),
+				logger.ErrorField(err))
 		}
 	}
 	return nil
@@ -387,13 +416,17 @@ func (uc *MatchUC) handleMatchRejection(ctx context.Context, match *models.Match
 	matchID := match.ID.String()
 
 	if err := uc.matchRepo.UpdateMatchStatus(ctx, matchID, models.MatchStatusRejected); err != nil {
-		log.Printf("Warning: Failed to update match status to rejected: %v", err)
+		logger.Error("Failed to update match status to rejected",
+			logger.String("match_id", matchID),
+			logger.ErrorField(err))
 	}
 
 	// Get updated match to ensure correct state
 	updatedMatch, err := uc.matchRepo.GetMatch(ctx, matchID)
 	if err != nil {
-		log.Printf("Warning: Failed to get updated match after rejection: %v", err)
+		logger.Error("Failed to get updated match after rejection",
+			logger.String("match_id", matchID),
+			logger.ErrorField(err))
 		match.Status = models.MatchStatusRejected // Fallback to local update
 		updatedMatch = match
 	}
@@ -448,23 +481,26 @@ func (uc *MatchUC) ReleaseDriver(driverID string) error {
 	ctx := context.Background()
 
 	// Add driver back to the available pool
-	log.Printf("Releasing driver %s back to available pool", driverID)
 
 	// Get driver's last known location (if any)
 	location, err := uc.matchRepo.GetDriverLocation(ctx, driverID)
 	if err != nil {
-		log.Printf("Warning: Failed to get driver location: %v", err)
+		logger.Error("Failed to get driver location",
+			logger.String("driver_id", driverID),
+			logger.ErrorField(err))
 		// If we can't get the location, we can't add them back to the geo index
 		return fmt.Errorf("failed to get driver location: %w", err)
 	}
 
 	// Re-add driver to available pool with their last known location
 	if err := uc.matchRepo.AddAvailableDriver(ctx, driverID, &location); err != nil {
-		log.Printf("Error adding driver back to available pool: %v", err)
+		logger.Error("Error adding driver back to available pool",
+			logger.String("driver_id", driverID),
+			logger.ErrorField(err))
 		return fmt.Errorf("failed to add driver back to available pool: %w", err)
 	}
 
-	log.Printf("Successfully released driver %s back to available pool", driverID)
+	// Successfully released driver back to available pool
 	return nil
 }
 
@@ -473,51 +509,58 @@ func (uc *MatchUC) ReleasePassenger(passengerID string) error {
 	ctx := context.Background()
 
 	// Add passenger back to the available pool
-	log.Printf("Releasing passenger %s back to available pool", passengerID)
 
 	// Get passenger's last known location (if any)
 	location, err := uc.matchRepo.GetPassengerLocation(ctx, passengerID)
 	if err != nil {
-		log.Printf("Warning: Failed to get passenger location: %v", err)
+		logger.Error("Failed to get passenger location",
+			logger.String("passenger_id", passengerID),
+			logger.ErrorField(err))
 		// If we can't get the location, we can't add them back to the geo index
 		return fmt.Errorf("failed to get passenger location: %w", err)
 	}
 
 	// Re-add passenger to available pool with their last known location
 	if err := uc.matchRepo.AddAvailablePassenger(ctx, passengerID, &location); err != nil {
-		log.Printf("Error adding passenger back to available pool: %v", err)
+		logger.Error("Error adding passenger back to available pool",
+			logger.String("passenger_id", passengerID),
+			logger.ErrorField(err))
 		return fmt.Errorf("failed to add passenger back to available pool: %w", err)
 	}
 
-	log.Printf("Successfully released passenger %s back to available pool", passengerID)
+	// Successfully released passenger back to available pool
 	return nil
 }
 
 // RemoveDriverFromPool removes a driver from the available pool (locks them)
 func (uc *MatchUC) RemoveDriverFromPool(ctx context.Context, driverID string) error {
-	log.Printf("Locking driver %s (removing from available pool)", driverID)
+	// Locking driver (removing from available pool)
 
 	// Remove driver from available pool
 	if err := uc.matchRepo.RemoveAvailableDriver(ctx, driverID); err != nil {
-		log.Printf("Error removing driver from available pool: %v", err)
+		logger.Error("Error removing driver from available pool",
+			logger.String("driver_id", driverID),
+			logger.ErrorField(err))
 		return fmt.Errorf("failed to remove driver from available pool: %w", err)
 	}
 
-	log.Printf("Successfully locked driver %s (removed from available pool)", driverID)
+	// Successfully locked driver (removed from available pool)
 	return nil
 }
 
 // RemovePassengerFromPool removes a passenger from the available pool (locks them)
 func (uc *MatchUC) RemovePassengerFromPool(ctx context.Context, passengerID string) error {
-	log.Printf("Locking passenger %s (removing from available pool)", passengerID)
+	// Locking passenger (removing from available pool)
 
 	// Remove passenger from available pool
 	if err := uc.matchRepo.RemoveAvailablePassenger(ctx, passengerID); err != nil {
-		log.Printf("Error removing passenger from available pool: %v", err)
+		logger.Error("Error removing passenger from available pool",
+			logger.String("passenger_id", passengerID),
+			logger.ErrorField(err))
 		return fmt.Errorf("failed to remove passenger from available pool: %w", err)
 	}
 
-	log.Printf("Successfully locked passenger %s (removed from available pool)", passengerID)
+	// Successfully locked passenger (removed from available pool)
 	return nil
 }
 

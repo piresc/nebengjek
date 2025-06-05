@@ -175,6 +175,161 @@ Each microservice follows **Clean Architecture** principles with clear separatio
 | **Database Migration**| Custom SQL migrations            | Database schema management                         |
 | **Testing**           | Testify, GoMock                  | Unit and integration testing                       |
 | **Containerization** | Docker & Docker Compose          | Service containerization and orchestration        |
+| **Monitoring**        | New Relic APM                    | Application performance monitoring and observability |
+| **Logging**           | Zap Logger                       | Structured JSON logging with New Relic integration |
+
+---
+
+## 📊 Monitoring & Logging
+
+### New Relic Integration
+
+The application integrates with **New Relic APM** for comprehensive application performance monitoring, distributed tracing, and log management.
+
+#### Features
+- **Application Performance Monitoring**: Real-time performance metrics and transaction tracing
+- **Distributed Tracing**: End-to-end request tracing across microservices
+- **Log Forwarding**: Automatic log forwarding to New Relic Logs
+- **Custom Attributes**: Enhanced transaction context with user ID, request ID, and business metrics
+- **Error Tracking**: Automatic error capture and notification
+
+#### Configuration
+
+```go
+// New Relic configuration in config files
+type NewRelicConfig struct {
+    LicenseKey   string `json:"license_key"`   // New Relic license key
+    AppName      string `json:"app_name"`      // Application name in New Relic
+    Enabled      bool   `json:"enabled"`       // Enable/disable New Relic
+    LogsEnabled  bool   `json:"logs_enabled"`  // Enable log forwarding
+    LogsEndpoint string `json:"logs_endpoint"` // Custom logs endpoint
+    LogsAPIKey   string `json:"logs_api_key"`  // Logs API key
+    ForwardLogs  bool   `json:"forward_logs"`  // Forward application logs
+}
+```
+
+#### Environment Variables
+
+```bash
+# New Relic Configuration
+NEW_RELIC_LICENSE_KEY=your_license_key_here
+NEW_RELIC_APP_NAME=nebengjek-users-service
+NEW_RELIC_ENABLED=true
+NEW_RELIC_LOGS_ENABLED=true
+NEW_RELIC_FORWARD_LOGS=true
+```
+
+### Zap Logger Implementation
+
+The application uses **Uber's Zap** as the primary logging framework, providing high-performance, structured JSON logging with New Relic integration.
+
+#### Key Features
+- **Structured JSON Logging**: Machine-readable log format for better parsing and analysis
+- **Multiple Output Targets**: Console, file, and New Relic log forwarding
+- **Performance Optimized**: Zero-allocation logging in production
+- **Log Rotation**: Automatic log file rotation with configurable size and retention
+- **Context Correlation**: Automatic correlation with New Relic transactions
+- **HTTP Request Logging**: Comprehensive HTTP request/response logging with metrics
+
+#### Logger Configuration
+
+```go
+// Logger configuration structure
+type LoggerConfig struct {
+    Level      string `json:"level"`       // Log level: debug, info, warn, error
+    FilePath   string `json:"file_path"`   // Log file path
+    MaxSize    int64  `json:"max_size"`    // Max size in MB before rotation
+    MaxAge     int    `json:"max_age"`     // Max age in days
+    MaxBackups int    `json:"max_backups"` // Max number of backup files
+    Compress   bool   `json:"compress"`    // Compress rotated files
+    Type       string `json:"type"`        // Logger type: file, console, hybrid, newrelic
+}
+```
+
+#### Environment Variables
+
+```bash
+# Zap Logger Configuration
+LOG_LEVEL=info
+LOG_FILE_PATH=./logs/app.log
+LOG_MAX_SIZE=100
+LOG_MAX_AGE=30
+LOG_MAX_BACKUPS=10
+LOG_COMPRESS=true
+LOG_TYPE=hybrid
+```
+
+#### Usage Examples
+
+```go
+// Initialize logger with New Relic integration
+zapLogger, err := logger.InitZapLoggerFromConfig(configs, nrApp)
+if err != nil {
+    log.Fatalf("Failed to create Zap logger: %v", err)
+}
+defer zapLogger.Close()
+
+// Structured logging with context
+zapLogger.Info("User authentication successful",
+    zap.String("user_id", userID),
+    zap.String("method", "OTP"),
+    zap.Duration("response_time", time.Since(start)),
+)
+
+// Error logging with stack trace
+zapLogger.Error("Database connection failed",
+    zap.Error(err),
+    zap.String("database", "postgresql"),
+    zap.String("operation", "user_lookup"),
+)
+
+// HTTP request logging (automatic via middleware)
+// Logs include: method, path, status, latency, user_id, request_id
+```
+
+#### Echo Middleware Integration
+
+The Zap logger integrates seamlessly with Echo framework through custom middleware:
+
+```go
+// Automatic HTTP request logging
+func ZapEchoMiddleware(logger *ZapLogger) echo.MiddlewareFunc {
+    // Logs all HTTP requests with:
+    // - Request method, path, and query parameters
+    // - Response status code and latency
+    // - Client IP and User ID (if authenticated)
+    // - Request ID for correlation
+    // - New Relic transaction context
+}
+```
+
+#### Log Output Format
+
+```json
+{
+  "timestamp": "2024-01-15T10:30:45.123Z",
+  "level": "info",
+  "message": "HTTP Request",
+  "method": "POST",
+  "path": "/api/v1/auth/login",
+  "status": 200,
+  "latency_ms": 45,
+  "client_ip": "192.168.1.100",
+  "user_id": "550e8400-e29b-41d4-a716-446655440000",
+  "request_id": "req_123456789",
+  "service": "nebengjek-users-app",
+  "caller": "handler/http/auth.go:45"
+}
+```
+
+#### Benefits
+
+1. **Observability**: Complete visibility into application behavior and performance
+2. **Debugging**: Structured logs with correlation IDs for easier troubleshooting
+3. **Monitoring**: Real-time alerts and dashboards in New Relic
+4. **Compliance**: Comprehensive audit trails for security and compliance
+5. **Performance**: High-performance logging that doesn't impact application speed
+6. **Scalability**: Centralized log management across all microservices
 
 ## Entity-Relationship Diagram (ERD)
 

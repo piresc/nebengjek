@@ -99,6 +99,7 @@ func (m *testWebSocketManager) handleLocationUpdate(userID string, data json.Raw
 		})
 		return fmt.Errorf("invalid location format: %w", err)
 	}
+	req.DriverID = userID
 
 	if err := m.userUC.UpdateUserLocation(nil, &req); err != nil {
 		m.manager.sentErrors = append(m.manager.sentErrors, MockError{

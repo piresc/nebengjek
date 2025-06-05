@@ -3,7 +3,6 @@ package gateway
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/models"
@@ -25,8 +24,6 @@ func NewRideGW(client *natspkg.Client) rides.RideGW {
 
 // PublishRideStarted publishes a ride started event to NATS
 func (g *RideGW) PublishRidePickup(ctx context.Context, ride *models.Ride) error {
-	fmt.Printf("Publishing ride started event: rideID=%s, driverID=%s, PassengerID=%s\n",
-		ride.RideID, ride.DriverID, ride.PassengerID)
 
 	RideResponse := models.RideResp{
 		RideID:      ride.RideID.String(),
@@ -46,8 +43,6 @@ func (g *RideGW) PublishRidePickup(ctx context.Context, ride *models.Ride) error
 
 // PublishRideStarted publishes a ride started event to NATS
 func (g *RideGW) PublishRideStarted(ctx context.Context, ride *models.Ride) error {
-	fmt.Printf("Publishing ride started event: rideID=%s, driverID=%s, PassengerID=%s\n",
-		ride.RideID, ride.DriverID, ride.PassengerID)
 
 	RideResponse := models.RideResp{
 		RideID:      ride.RideID.String(),
@@ -67,8 +62,6 @@ func (g *RideGW) PublishRideStarted(ctx context.Context, ride *models.Ride) erro
 
 // PublishRideCompleted publishes a ride completed event to NATS
 func (g *RideGW) PublishRideCompleted(ctx context.Context, rideComplete models.RideComplete) error {
-	fmt.Printf("Publishing ride completed event: rideID=%s, driverID=%s, PassengerID=%s\n",
-		rideComplete.Ride.RideID, rideComplete.Ride.DriverID, rideComplete.Ride.PassengerID)
 
 	data, err := json.Marshal(rideComplete)
 	if err != nil {

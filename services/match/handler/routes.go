@@ -2,6 +2,7 @@ package handler
 
 import (
 	"github.com/labstack/echo/v4"
+	"github.com/piresc/nebengjek/internal/pkg/middleware"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/match"
 	httpHandler "github.com/piresc/nebengjek/services/match/handler/http"
@@ -26,10 +27,17 @@ func NewHandler(
 }
 
 // RegisterRoutes registers all HTTP routes
-func (h *Handler) RegisterRoutes(e *echo.Echo) {
-	// Match routes
+func (h *Handler) RegisterRoutes(e *echo.Echo, apiKeyMiddleware *middleware.APIKeyMiddleware) {
+	// User-facing match routes (no API key required)
 	matchGroup := e.Group("/matches")
 	matchGroup.POST("/:matchID/confirm", h.matchHTTP.ConfirmMatch)
+
+	// Internal routes for service-to-service communication (API key required)
+	internal := e.Group("/internal", apiKeyMiddleware.ValidateAPIKey("match-service"))
+
+	// Internal match endpoints
+	internalMatchGroup := internal.Group("/matches")
+	internalMatchGroup.POST("/:matchID/confirm", h.matchHTTP.ConfirmMatch)
 }
 
 // InitNATSConsumers initializes all NATS consumers

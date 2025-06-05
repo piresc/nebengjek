@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/internal/utils"
 	"github.com/piresc/nebengjek/services/users"
@@ -27,13 +28,31 @@ func NewUserHandler(
 func (h *UserHandler) CreateUser(c echo.Context) error {
 	var user models.User
 	if err := c.Bind(&user); err != nil {
+		logger.Warn("Invalid request payload for user creation",
+			logger.ErrorField(err),
+			logger.String("endpoint", "CreateUser"),
+		)
 		return utils.BadRequestResponse(c, "Invalid request payload")
 	}
 
+	// logger.Info("Creating new user",
+	//	logger.String("user_id", user.ID.String()),
+	//	logger.String("user_type", string(user.UserType)),
+	//)
+
 	err := h.userUC.RegisterUser(c.Request().Context(), &user)
 	if err != nil {
+		logger.Error("Failed to create user",
+			logger.ErrorField(err),
+			logger.String("user_id", user.ID.String()),
+		)
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, "Failed to create user")
 	}
+
+	// logger.Info("User created successfully",
+	//	logger.String("user_id", user.ID.String()),
+	//	logger.String("user_type", string(user.UserType)),
+	//)
 
 	return utils.SuccessResponse(c, http.StatusCreated, "User created successfully", user)
 }

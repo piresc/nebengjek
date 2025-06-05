@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/internal/utils"
@@ -30,14 +29,13 @@ func NewLocationUC(
 func (uc *locationUC) StoreLocation(update models.LocationUpdate) error {
 	ctx := context.Background()
 
-	log.Printf("Processing location update for ride %s: lat=%.6f, long=%.6f",
-		update.RideID, update.Location.Latitude, update.Location.Longitude)
+	// Processing location update for ride
 
 	// Get last location to calculate distance
 	lastLocation, err := uc.locationRepo.GetLastLocation(ctx, update.RideID)
 	if err != nil {
 		// If no previous location found, store this as first location
-		log.Printf("No previous location found for ride %s, storing initial location", update.RideID)
+		// No previous location found for ride, storing initial location
 		err = uc.locationRepo.StoreLocation(ctx, update.RideID, update.Location)
 		if err != nil {
 			return fmt.Errorf("failed to store initial location: %w", err)
@@ -45,8 +43,10 @@ func (uc *locationUC) StoreLocation(update models.LocationUpdate) error {
 		return nil
 	}
 
-	log.Printf("Found previous location for ride %s: lat=%.6f, long=%.6f",
-		update.RideID, lastLocation.Latitude, lastLocation.Longitude)
+	// logger.Info("Found previous location for ride",
+	//	logger.String("ride_id", update.RideID),
+	//	logger.Float64("prev_latitude", lastLocation.Latitude),
+	//	logger.Float64("prev_longitude", lastLocation.Longitude))
 
 	// Calculate distance using Haversine formula
 	lastPoint := utils.GeoPoint{
@@ -59,7 +59,9 @@ func (uc *locationUC) StoreLocation(update models.LocationUpdate) error {
 	}
 	distance := utils.CalculateDistance(lastPoint, currentPoint)
 
-	log.Printf("Calculated distance for ride %s: %.2f km", update.RideID, distance)
+	// logger.Info("Calculated distance for ride",
+	//	logger.String("ride_id", update.RideID),
+	//	logger.Float64("distance_km", distance))
 
 	// Store new location
 	err = uc.locationRepo.StoreLocation(ctx, update.RideID, update.Location)
@@ -68,7 +70,9 @@ func (uc *locationUC) StoreLocation(update models.LocationUpdate) error {
 	}
 
 	// Publish location aggregate
-	log.Printf("Publishing location aggregate: ride_id=%s, distance=%.2f km", update.RideID, distance)
+	// logger.Info("Publishing location aggregate",
+	//	logger.String("ride_id", update.RideID),
+	//	logger.Float64("distance_km", distance))
 	aggregate := models.LocationAggregate{
 		RideID:    update.RideID,
 		Distance:  distance,

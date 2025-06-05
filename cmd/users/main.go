@@ -1,8 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -11,7 +16,7 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/health"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/middleware"
-	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
+	"github.com/piresc/nebengjek/internal/pkg/nats"
 	nrpkg "github.com/piresc/nebengjek/internal/pkg/newrelic"
 	wspkg "github.com/piresc/nebengjek/internal/pkg/websocket"
 	"github.com/piresc/nebengjek/services/users/gateway"
@@ -21,25 +26,15 @@ import (
 	wsHandler "github.com/piresc/nebengjek/services/users/handler/websocket"
 	"github.com/piresc/nebengjek/services/users/repository"
 	"github.com/piresc/nebengjek/services/users/usecase"
-	"go.uber.org/zap"
 )
 
 func main() {
 	appName := "users-service"
-	configPath := "/Users/pirescerullo/GitHub/assessment/nebengjek/config/users.env"
+	configPath := "config/users.env"
 	configs := config.InitConfig(configPath)
 
 	// Initialize New Relic and Zap logger
 	nrApp := nrpkg.InitNewRelic(configs)
-
-	// Wait for New Relic connection before proceeding
-	if nrApp != nil {
-		if err := nrApp.WaitForConnection(10 * time.Second); err != nil {
-			log.Printf("Warning: New Relic connection timeout: %v", err)
-		} else {
-			log.Println("New Relic connection established")
-		}
-	}
 
 	zapLogger, err := logger.InitZapLoggerFromConfig(configs, nrApp)
 	if err != nil {
@@ -47,85 +42,139 @@ func main() {
 	}
 	defer zapLogger.Close()
 
-	// Log startup with Zap
-	zapLogger.Info("Starting application",
-		zap.String("app", appName),
-		zap.String("version", configs.App.Version),
-		zap.String("environment", configs.App.Environment),
+	// Set global logger for application-wide access
+	logger.SetGlobalLogger(zapLogger)
+
+	// Log startup with global logger
+	logger.Info("Starting application",
+		logger.String("app", appName),
+		logger.String("version", configs.App.Version),
+		logger.String("environment", configs.App.Environment),
 	)
 
 	// Initialize PostgreSQL database connection
 	postgresClient, err := database.NewPostgresClient(configs.Database)
 	if err != nil {
-		zapLogger.Fatal("Failed to connect to PostgreSQL", zap.Error(err))
+		zapLogger.Fatal("Failed to connect to PostgreSQL", logger.Err(err))
 	}
 	defer postgresClient.Close()
 
 	// Initialize Redis client
 	redisClient, err := database.NewRedisClient(configs.Redis)
 	if err != nil {
-		zapLogger.Fatal("Failed to connect to Redis", zap.Error(err))
+		zapLogger.Fatal("Failed to connect to Redis", logger.Err(err))
 	}
 	defer redisClient.Close()
 
-	// Initialize NATS
-	natsClient, err := natspkg.NewClient(configs.NATS.URL)
+	// Initialize NATS client
+	natsClient, err := nats.NewClient(configs.NATS.URL)
 	if err != nil {
-		zapLogger.Fatal("Failed to connect to NATS", zap.Error(err))
+		zapLogger.Fatal("Failed to connect to NATS", logger.Err(err))
 	}
 	defer natsClient.Close()
 
 	// Initialize repository
 	userRepo := repository.NewUserRepo(configs, postgresClient.GetDB(), redisClient)
 
-	// Initialize Gateway
-	userGW := gateway.NewUserGW(natsClient, configs.Services.MatchServiceURL, configs.Services.RidesServiceURL)
+	// Initialize gateway with API key support
+	userGW := gateway.NewUserGWWithAPIKey(natsClient, configs.Services.MatchServiceURL, configs.Services.RidesServiceURL, &configs.APIKey)
 
-	// Initialize UseCase
+	// Initialize usecase
 	userUC := usecase.NewUserUC(userRepo, userGW, configs)
 
-	// Handlers for HTTP
+	// Initialize handlers
 	userHandler := httpHandler.NewUserHandler(userUC)
 	authHandler := httpHandler.NewAuthHandler(userUC)
 
-	// Handlers for WebSocket
+	// Initialize WebSocket manager
 	manager := wspkg.NewManager(configs.JWT)
 	wsManager := wsHandler.NewWebSocketManager(userUC, manager)
 
-	// Handlers for NATS
+	// Initialize NATS handler
 	natsHandler := natsHandler.NewNatsHandler(wsManager, natsClient)
 
 	// Initialize NATS consumers
 	if err := natsHandler.InitConsumers(); err != nil {
-		zapLogger.Fatal("Failed to initialize NATS consumers", zap.Error(err))
+		zapLogger.Fatal("Failed to initialize NATS consumers", logger.Err(err))
 	}
 
 	// Initialize handlers
 	Handler := handler.NewHandler(userHandler, authHandler, wsManager, natsHandler, configs)
 
-	// Initialize Echo router
+	// Initialize Echo server
 	e := echo.New()
 
-	// Add middlewares
+	// Add middlewares (panic recovery should be first)
+	e.Use(middleware.PanicRecoveryWithZapMiddleware(zapLogger))
 	e.Use(middleware.RequestIDMiddleware())
 	e.Use(logger.ZapEchoMiddleware(zapLogger))
 
-	// Register health endpoints
-	health.RegisterHealthEndpoints(e, appName)
+	// Initialize API key middleware for internal routes only
+	apiKeyMiddleware := middleware.NewAPIKeyMiddleware(&configs.APIKey)
+
+	// Initialize enhanced health service
+	healthService := health.NewHealthService(zapLogger)
+	healthService.AddChecker("postgres", health.NewPostgresHealthChecker(postgresClient))
+	healthService.AddChecker("redis", health.NewRedisHealthChecker(redisClient))
+	healthService.AddChecker("nats", health.NewNATSHealthChecker(natsClient))
+
+	// Register enhanced health endpoints
+	health.RegisterEnhancedHealthEndpoints(e, appName, configs.App.Version, healthService)
 
 	// Register service routes
-	Handler.RegisterRoutes(e)
+	Handler.RegisterRoutes(e, apiKeyMiddleware)
 
-	// Start server
-	zapLogger.Info("Starting server",
-		zap.String("app", appName),
-		zap.Int("port", configs.Server.Port),
-	)
+	// Start server in goroutine
+	go func() {
+		addr := fmt.Sprintf(":%d", configs.Server.Port)
+		zapLogger.Info("Starting HTTP server",
+			logger.String("address", addr),
+			logger.String("app", appName))
 
-	if err := e.Start(fmt.Sprintf(":%d", configs.Server.Port)); err != nil {
-		zapLogger.Fatal("Failed to start server",
-			zap.String("app", appName),
-			zap.Error(err),
-		)
+		if err := e.Start(addr); err != nil && err != http.ErrServerClosed {
+			zapLogger.Fatal("Failed to start server", logger.Err(err))
+		}
+	}()
+
+	// Graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	// Wait for interrupt signal
+	sig := <-quit
+	zapLogger.Info("Received shutdown signal", logger.String("signal", sig.String()))
+
+	// Create shutdown context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Shutdown HTTP server
+	zapLogger.Info("Shutting down HTTP server...")
+	if err := e.Shutdown(ctx); err != nil {
+		zapLogger.Error("Server forced to shutdown", logger.Err(err))
 	}
+
+	// Close PostgreSQL connection
+	zapLogger.Info("Closing PostgreSQL connection...")
+	postgresClient.Close()
+
+	// Close Redis connection
+	zapLogger.Info("Closing Redis connection...")
+	if err := redisClient.Close(); err != nil {
+		zapLogger.Error("Error closing Redis connection", logger.Err(err))
+	}
+
+	// Close NATS connection
+	zapLogger.Info("Closing NATS connection...")
+	natsClient.Close()
+
+	// Shutdown New Relic
+	if nrApp != nil {
+		zapLogger.Info("Shutting down New Relic...")
+		nrApp.Shutdown(10 * time.Second)
+	}
+
+	// Sync and close logger
+	zapLogger.Info("Server exiting gracefully")
+	_ = zapLogger.Sync()
 }

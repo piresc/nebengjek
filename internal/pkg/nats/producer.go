@@ -3,9 +3,9 @@ package nats
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/nats-io/nats.go"
+	"github.com/piresc/nebengjek/internal/pkg/logger"
 )
 
 // Producer handles publishing messages to NATS topics
@@ -36,7 +36,8 @@ func (p *Producer) Publish(topic string, message interface{}) error {
 		return fmt.Errorf("failed to publish message: %w", err)
 	}
 
-	log.Printf("Published message to topic: %s", topic)
+	logger.Debug("Published message to topic",
+		logger.String("topic", topic))
 	return nil
 }
 

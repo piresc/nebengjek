@@ -8,7 +8,9 @@ type Config struct {
 	Redis    RedisConfig
 	NATS     NATSConfig
 	JWT      JWTConfig
+	APIKey   APIKeyConfig
 	Pricing  PricingConfig
+	Payment  PaymentConfig
 	Services ServicesConfig
 	Match    MatchConfig
 	Rides    RidesConfig
@@ -75,6 +77,14 @@ type JWTConfig struct {
 	Issuer     string
 }
 
+// APIKeyConfig contains API key authentication configuration
+type APIKeyConfig struct {
+	UserService     string
+	MatchService    string
+	RidesService    string
+	LocationService string
+}
+
 type PricingConfig struct {
 	RatePerKm     float64 `json:"rate_per_km"`
 	Currency      string  `json:"currency"`
@@ -82,6 +92,13 @@ type PricingConfig struct {
 	PerKmRate     float64 `json:"per_km_rate"`
 	PerMinuteRate float64 `json:"per_minute_rate"`
 	SurgeFactor   float64 `json:"surge_factor"`
+}
+
+// PaymentConfig contains payment service configuration
+type PaymentConfig struct {
+	QRCodeBaseURL string `json:"qr_code_base_url"`
+	GatewayURL    string `json:"gateway_url"`
+	Timeout       int    `json:"timeout"` // timeout in seconds
 }
 
 // MatchConfig contains match service specific configuration

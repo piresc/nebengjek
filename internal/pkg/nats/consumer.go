@@ -2,9 +2,9 @@ package nats
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/nats-io/nats.go"
+	"github.com/piresc/nebengjek/internal/pkg/logger"
 )
 
 // MessageHandler is a function that processes NATS messages
@@ -31,7 +31,10 @@ func NewConsumer(topic, queueGroup, address string, handler MessageHandler) (*Co
 			// Process the message
 			err := handler(msg.Data)
 			if err != nil {
-				log.Printf("Error processing message: %v", err)
+				logger.Debug("Error processing message",
+					logger.String("topic", topic),
+					logger.String("queue_group", queueGroup),
+					logger.Err(err))
 			}
 		})
 	} else {
@@ -39,7 +42,9 @@ func NewConsumer(topic, queueGroup, address string, handler MessageHandler) (*Co
 			// Process the message
 			err := handler(msg.Data)
 			if err != nil {
-				log.Printf("Error processing message: %v", err)
+				logger.Debug("Error processing message",
+					logger.String("topic", topic),
+					logger.Err(err))
 			}
 		})
 	}

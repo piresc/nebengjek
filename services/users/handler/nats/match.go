@@ -1,12 +1,13 @@
 package nats
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/nats-io/nats.go"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
+	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
@@ -14,9 +15,9 @@ import (
 func (h *NatsHandler) initMatchConsumers() error {
 	// Subscribe to match found events
 	matchSub, err := h.natsClient.Subscribe(constants.SubjectMatchFound, func(msg *nats.Msg) {
-		log.Printf("Received match event: %s\n", msg.Data)
+		logger.InfoCtx(context.Background(), "Received match event", logger.String("data", string(msg.Data)))
 		if err := h.handleMatchEvent(msg.Data); err != nil {
-			fmt.Printf("Error handling match event: %v\n", err)
+			logger.ErrorCtx(context.Background(), "Error handling match event", logger.Err(err))
 		}
 	})
 	if err != nil {
@@ -26,9 +27,9 @@ func (h *NatsHandler) initMatchConsumers() error {
 
 	// Subscribe to match accepted events
 	matchAccSub, err := h.natsClient.Subscribe(constants.SubjectMatchAccepted, func(msg *nats.Msg) {
-		log.Printf("Received match accept event: %s\n", msg.Data)
+		logger.InfoCtx(context.Background(), "Received match accept event", logger.String("data", string(msg.Data)))
 		if err := h.handleMatchAccEvent(msg.Data); err != nil {
-			fmt.Printf("Error handling match event: %v\n", err)
+			logger.ErrorCtx(context.Background(), "Error handling match accept event", logger.Err(err))
 		}
 	})
 	if err != nil {
@@ -39,7 +40,7 @@ func (h *NatsHandler) initMatchConsumers() error {
 	// Subscribe to match rejected events
 	matchRejectSub, err := h.natsClient.Subscribe(constants.SubjectMatchRejected, func(msg *nats.Msg) {
 		if err := h.handleMatchRejectedEvent(msg.Data); err != nil {
-			fmt.Printf("Error handling match rejected event: %v\n", err)
+			logger.ErrorCtx(context.Background(), "Error handling match rejected event", logger.Err(err))
 		}
 	})
 	if err != nil {

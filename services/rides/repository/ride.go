@@ -3,11 +3,11 @@ package repository
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
@@ -62,11 +62,11 @@ func (r *RideRepo) CreateRide(ride *models.Ride) (*models.Ride, error) {
 	)
 
 	if err != nil {
-		log.Printf("Failed to create ride: %v", err)
+		logger.Error("Failed to create ride", logger.ErrorField(err))
 		return nil, err
 	}
 
-	log.Printf("Created ride with ID: %s", ride.RideID)
+	logger.Info("Created ride", logger.String("rideID", ride.RideID.String()))
 	return ride, nil
 }
 

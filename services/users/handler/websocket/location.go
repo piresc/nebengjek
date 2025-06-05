@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/piresc/nebengjek/internal/pkg/constants"
+	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
@@ -15,12 +15,17 @@ import (
 func (m *WebSocketManager) handleLocationUpdate(driverID string, data json.RawMessage) error {
 	var locationUpdate models.LocationUpdate
 	if err := json.Unmarshal(data, &locationUpdate); err != nil {
-		log.Printf("Error parsing location update from user %s: %v", driverID, err)
+		logger.Error("Error parsing location update from user",
+			logger.String("user_id", driverID),
+			logger.ErrorField(err))
 		return fmt.Errorf("invalid location format")
 	}
 
-	log.Printf("Location update from user %s: lat=%f, lng=%f, tripID=%s",
-		driverID, locationUpdate.Location.Latitude, locationUpdate.Location.Longitude, locationUpdate.RideID)
+	// logger.Info("Location update from user",
+	//	logger.String("user_id", driverID),
+	//	logger.Float64("latitude", locationUpdate.Location.Latitude),
+	//	logger.Float64("longitude", locationUpdate.Location.Longitude),
+	//	logger.String("trip_id", locationUpdate.RideID))
 
 	// Set timestamp if not provided
 	if locationUpdate.Location.Timestamp.IsZero() {
@@ -33,10 +38,13 @@ func (m *WebSocketManager) handleLocationUpdate(driverID string, data json.RawMe
 	if err := m.userUC.UpdateUserLocation(context.Background(), &locationUpdate); err != nil {
 		client, exists := m.manager.GetClient(driverID)
 		if !exists {
-			log.Printf("Client with ID %s not found", driverID)
+			logger.Warn("Client not found",
+				logger.String("user_id", driverID))
 			return fmt.Errorf("client not found")
 		}
-		log.Printf("Error updating location for user %s: %v", driverID, err)
+		logger.Error("Error updating location for user",
+			logger.String("user_id", driverID),
+			logger.ErrorField(err))
 		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidLocation, err.Error())
 	}
 
