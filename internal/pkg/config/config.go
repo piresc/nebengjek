@@ -70,7 +70,7 @@ func loadConfigFromEnv() *models.Config {
 	// Services config
 	configs.Services.MatchServiceURL = GetEnv("MATCH_SERVICE_URL", "http://localhost:9993")
 	configs.Services.RidesServiceURL = GetEnv("RIDES_SERVICE_URL", "http://localhost:9992")
-	configs.Services.LocationServiceURL = GetEnv("LOCATION_SERVICE_URL", "http://localhost:9991")
+	configs.Services.LocationServiceURL = GetEnv("LOCATION_SERVICE_URL", "http://localhost:9994")
 
 	// Match config
 	configs.Match.SearchRadiusKm = GetEnvAsFloat("MATCH_SEARCH_RADIUS_KM", 1.0)

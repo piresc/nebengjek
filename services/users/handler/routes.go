@@ -67,15 +67,4 @@ func (h *Handler) RegisterRoutes(e *echo.Echo, apiKeyMiddleware *middleware.APIK
 	wsGroup := protected.Group("/ws")
 	wsGroup.GET("", h.wsManager.HandleWebSocket)
 
-	// Internal routes (service-to-service communication with API key authentication)
-	internal := e.Group("/internal", apiKeyMiddleware.ValidateAPIKey("user-service"))
-
-	// Internal driver routes for service-to-service communication
-	internalDriverGroup := internal.Group("/drivers")
-	internalDriverGroup.POST("", h.userHandler.RegisterDriver)
-
-	// Internal user routes for service-to-service communication
-	internalUserGroup := internal.Group("/users")
-	internalUserGroup.POST("", h.userHandler.CreateUser)
-	internalUserGroup.GET("/:id", h.userHandler.GetUser)
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/utils"
 )
 
 const (
@@ -94,7 +95,23 @@ func (c *APIKeyClient) PostJSON(ctx context.Context, endpoint string, body inter
 	}
 
 	if result != nil {
-		return json.NewDecoder(resp.Body).Decode(result)
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			logger.Error("Failed to read response body",
+				logger.String("url", c.baseURL+endpoint),
+				logger.Int("status_code", resp.StatusCode),
+				logger.Err(err))
+			return fmt.Errorf("failed to read response body: %w", err)
+		}
+
+		// Decode the JSON response using utils.ParseJSONResponse
+		if err := utils.ParseJSONResponse(bodyBytes, result); err != nil {
+			logger.Error("Failed to decode JSON response",
+				logger.String("url", c.baseURL+endpoint),
+				logger.String("body", string(bodyBytes)),
+				logger.Err(err))
+			return fmt.Errorf("failed to decode JSON response: %w", err)
+		}
 	}
 
 	return nil
@@ -113,7 +130,23 @@ func (c *APIKeyClient) GetJSON(ctx context.Context, endpoint string, result inte
 	}
 
 	if result != nil {
-		return json.NewDecoder(resp.Body).Decode(result)
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			logger.Error("Failed to read response body",
+				logger.String("url", c.baseURL+endpoint),
+				logger.Int("status_code", resp.StatusCode),
+				logger.Err(err))
+			return fmt.Errorf("failed to read response body: %w", err)
+		}
+
+		// Decode the JSON response using utils.ParseJSONResponse
+		if err := utils.ParseJSONResponse(bodyBytes, result); err != nil {
+			logger.Error("Failed to decode JSON response",
+				logger.String("url", c.baseURL+endpoint),
+				logger.String("body", string(bodyBytes)),
+				logger.Err(err))
+			return fmt.Errorf("failed to decode JSON response: %w", err)
+		}
 	}
 
 	return nil

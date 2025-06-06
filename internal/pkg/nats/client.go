@@ -2,6 +2,7 @@ package nats
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/nats-io/nats.go"
 )
@@ -45,6 +46,16 @@ func (c *Client) Subscribe(subject string, handler nats.MsgHandler) (*nats.Subsc
 	}
 
 	return sub, nil
+}
+
+// Request sends a request and waits for a response
+func (c *Client) Request(subject string, data []byte) (*nats.Msg, error) {
+	msg, err := c.conn.Request(subject, data, 5*time.Second) // 5 second timeout
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+
+	return msg, nil
 }
 
 // Close closes the NATS connection

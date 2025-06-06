@@ -18,16 +18,6 @@ type MatchRepo interface {
 	ListMatchesByPassenger(ctx context.Context, passengerID uuid.UUID) ([]*models.Match, error)
 	ConfirmMatchByUser(ctx context.Context, matchID string, userID string, isDriver bool) (*models.Match, error)
 
-	// Location-based operations
-	AddAvailableDriver(ctx context.Context, driverID string, location *models.Location) error
-	RemoveAvailableDriver(ctx context.Context, driverID string) error
-	FindNearbyDrivers(ctx context.Context, location *models.Location, radiusKm float64) ([]*models.NearbyUser, error)
-	GetDriverLocation(ctx context.Context, driverID string) (models.Location, error)
-
-	AddAvailablePassenger(ctx context.Context, passengerID string, location *models.Location) error
-	RemoveAvailablePassenger(ctx context.Context, passengerID string) error
-	GetPassengerLocation(ctx context.Context, passengerID string) (models.Location, error)
-
 	BatchUpdateMatchStatus(ctx context.Context, matchIDs []string, status models.MatchStatus) error
 
 	// Active ride tracking operations

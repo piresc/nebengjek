@@ -1,0 +1,75 @@
+# GitLeaks configuration file
+# This file configures secret scanning rules and exclusions
+
+title = "Nebengjek Secret Scanning Configuration"
+
+[extend]
+# Use the default GitLeaks rules as a base
+useDefault = true
+
+# Additional rules for common secrets in Go projects
+[[rules]]
+id = "go-private-key"
+description = "Go application private key"
+regex = '''-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----'''
+keywords = [
+    "private",
+    "key",
+]
+
+[[rules]]
+id = "database-url"
+description = "Database connection string"
+regex = '''(postgres|mysql|mongodb)://[^\s]+'''
+keywords = [
+    "postgres://",
+    "mysql://",
+    "mongodb://",
+]
+
+[[rules]]
+id = "redis-url"
+description = "Redis connection string"
+regex = '''redis://[^\s]+'''
+keywords = [
+    "redis://",
+]
+
+# Allowlist for known false positives
+[allowlist]
+# Allow test files with dummy secrets
+paths = [
+    '''.*_test\.go''',
+    '''.*test.*''',
+    '''.*/testdata/.*''',
+    '''.*/mocks/.*''',
+]
+
+# Allow specific patterns that are not actual secrets
+regexes = [
+    '''example\.com''',
+    '''localhost''',
+    '''127\.0\.0\.1''',
+    '''test.*password''',
+    '''dummy.*key''',
+    '''fake.*secret''',
+    '''placeholder''',
+    '''YOUR_.*_HERE''',
+    '''<.*>''',  # Template placeholders
+]
+
+# Allow commits that are known to be safe
+commits = [
+    # Add specific commit hashes here if needed
+]
+
+# Stop words that indicate test/example content
+stopwords = [
+    "test",
+    "example",
+    "dummy",
+    "fake",
+    "mock",
+    "placeholder",
+    "sample",
+]

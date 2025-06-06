@@ -60,7 +60,11 @@ func TestHTTPGateway_StartRide(t *testing.T) {
 			}))
 			defer server.Close()
 
-			gateway := NewHTTPGateway("", server.URL)
+			config := &models.APIKeyConfig{
+				MatchService: "test-api-key",
+				RidesService: "test-api-key",
+			}
+			gateway := NewHTTPGatewayWithAPIKey("", server.URL, config)
 			result, err := gateway.StartRide(tt.request)
 
 			if tt.expectError {
@@ -124,7 +128,11 @@ func TestHTTPGateway_RideArrived(t *testing.T) {
 			}))
 			defer server.Close()
 
-			gateway := NewHTTPGateway("", server.URL)
+			config := &models.APIKeyConfig{
+				MatchService: "test-api-key",
+				RidesService: "test-api-key",
+			}
+			gateway := NewHTTPGatewayWithAPIKey("", server.URL, config)
 			result, err := gateway.RideArrived(tt.request)
 
 			if tt.expectError {
@@ -192,7 +200,11 @@ func TestHTTPGateway_ProcessPayment(t *testing.T) {
 			}))
 			defer server.Close()
 
-			gateway := NewHTTPGateway("", server.URL)
+			config := &models.APIKeyConfig{
+				MatchService: "test-api-key",
+				RidesService: "test-api-key",
+			}
+			gateway := NewHTTPGatewayWithAPIKey("", server.URL, config)
 			result, err := gateway.ProcessPayment(tt.request)
 
 			if tt.expectError {
@@ -305,13 +317,24 @@ func TestHTTPGateway_StartRide_ErrorScenarios(t *testing.T) {
 			server := tt.setupServer()
 			defer server.Close()
 
-			gateway := NewHTTPGateway("", server.URL)
+			config := &models.APIKeyConfig{
+				MatchService: "test-api-key",
+				RidesService: "test-api-key",
+			}
+			gateway := NewHTTPGatewayWithAPIKey("", server.URL, config)
 			result, err := gateway.StartRide(tt.request)
 
 			assert.Error(t, err)
 			assert.Nil(t, result)
 			if tt.errorContains != "" {
-				assert.Contains(t, err.Error(), tt.errorContains)
+				// Update error message expectations to match actual HTTP client errors
+				if tt.errorContains == "failed to send start trip request" {
+					assert.Contains(t, err.Error(), "failed to start ride")
+				} else if tt.errorContains == "failed to parse start trip response" {
+					assert.Contains(t, err.Error(), "failed to decode JSON response")
+				} else {
+					assert.Contains(t, err.Error(), tt.errorContains)
+				}
 			}
 		})
 	}
@@ -382,13 +405,26 @@ func TestHTTPGateway_RideArrived_ErrorScenarios(t *testing.T) {
 			server := tt.setupServer()
 			defer server.Close()
 
-			gateway := NewHTTPGateway("", server.URL)
+			config := &models.APIKeyConfig{
+				MatchService: "test-api-key",
+				RidesService: "test-api-key",
+			}
+			gateway := NewHTTPGatewayWithAPIKey("", server.URL, config)
 			result, err := gateway.RideArrived(tt.request)
 
 			assert.Error(t, err)
 			assert.Nil(t, result)
 			if tt.errorContains != "" {
-				assert.Contains(t, err.Error(), tt.errorContains)
+				// Update error message expectations to match actual HTTP client errors
+				if tt.errorContains == "failed to send ride arrival request" {
+					assert.Contains(t, err.Error(), "failed to process ride arrival")
+				} else if tt.errorContains == "failed to parse ride arrival response" {
+					assert.Contains(t, err.Error(), "failed to decode JSON response")
+				} else if tt.errorContains == "ride arrival request failed" {
+					assert.Contains(t, err.Error(), "HTTP error")
+				} else {
+					assert.Contains(t, err.Error(), tt.errorContains)
+				}
 			}
 		})
 	}
@@ -462,13 +498,26 @@ func TestHTTPGateway_ProcessPayment_ErrorScenarios(t *testing.T) {
 			server := tt.setupServer()
 			defer server.Close()
 
-			gateway := NewHTTPGateway("", server.URL)
+			config := &models.APIKeyConfig{
+				MatchService: "test-api-key",
+				RidesService: "test-api-key",
+			}
+			gateway := NewHTTPGatewayWithAPIKey("", server.URL, config)
 			result, err := gateway.ProcessPayment(tt.request)
 
 			assert.Error(t, err)
 			assert.Nil(t, result)
 			if tt.errorContains != "" {
-				assert.Contains(t, err.Error(), tt.errorContains)
+				// Update error message expectations to match actual HTTP client errors
+				if tt.errorContains == "failed to send payment request" {
+					assert.Contains(t, err.Error(), "failed to process payment")
+				} else if tt.errorContains == "failed to parse payment response" {
+					assert.Contains(t, err.Error(), "failed to decode JSON response")
+				} else if tt.errorContains == "payment request failed" {
+					assert.Contains(t, err.Error(), "HTTP error")
+				} else {
+					assert.Contains(t, err.Error(), tt.errorContains)
+				}
 			}
 		})
 	}
@@ -502,7 +551,11 @@ func TestHTTPGateway_RequestBodyValidation(t *testing.T) {
 		}))
 		defer server.Close()
 
-		gateway := NewHTTPGateway("", server.URL)
+		config := &models.APIKeyConfig{
+			MatchService: "test-api-key",
+			RidesService: "test-api-key",
+		}
+		gateway := NewHTTPGatewayWithAPIKey("", server.URL, config)
 		request := &models.RideStartRequest{
 			RideID: "ride-123",
 			DriverLocation: &models.Location{
@@ -546,7 +599,11 @@ func TestHTTPGateway_RequestBodyValidation(t *testing.T) {
 		}))
 		defer server.Close()
 
-		gateway := NewHTTPGateway("", server.URL)
+		config := &models.APIKeyConfig{
+			MatchService: "test-api-key",
+			RidesService: "test-api-key",
+		}
+		gateway := NewHTTPGatewayWithAPIKey("", server.URL, config)
 		request := &models.RideArrivalReq{
 			RideID:           "ride-123",
 			AdjustmentFactor: 0.9,
@@ -585,7 +642,11 @@ func TestHTTPGateway_RequestBodyValidation(t *testing.T) {
 		}))
 		defer server.Close()
 
-		gateway := NewHTTPGateway("", server.URL)
+		config := &models.APIKeyConfig{
+			MatchService: "test-api-key",
+			RidesService: "test-api-key",
+		}
+		gateway := NewHTTPGatewayWithAPIKey("", server.URL, config)
 		request := &models.PaymentProccessRequest{
 			RideID:    "ride-123",
 			TotalCost: 25000,

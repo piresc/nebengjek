@@ -13,6 +13,7 @@ type Config struct {
 	Payment  PaymentConfig
 	Services ServicesConfig
 	Match    MatchConfig
+	Location LocationConfig
 	Rides    RidesConfig
 	NewRelic NewRelicConfig
 	Logger   LoggerConfig
@@ -103,7 +104,13 @@ type PaymentConfig struct {
 
 // MatchConfig contains match service specific configuration
 type MatchConfig struct {
-	SearchRadiusKm float64 `json:"search_radius_km"` // Radius in kilometers for matching users
+	SearchRadiusKm     float64 `json:"search_radius_km"`      // Radius in kilometers for matching users
+	ActiveRideTTLHours int     `json:"active_ride_ttl_hours"` // TTL in hours for active ride tracking
+}
+
+// LocationConfig contains location service specific configuration
+type LocationConfig struct {
+	AvailabilityTTLMinutes int `json:"availability_ttl_minutes"` // TTL in minutes for user availability in pools
 }
 
 // RidesConfig contains rides service specific configuration

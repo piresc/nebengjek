@@ -31,4 +31,19 @@ const (
 	ErrorInvalidBeacon     = "invalid_beacon"
 	ErrorInvalidLocation   = "invalid_location"
 	ErrorMatchUpdateFailed = "match_update_failed"
+	ErrorUnauthorized      = "unauthorized"
+	ErrorSystemUnavailable = "system_unavailable"
+	ErrorAccessDenied      = "access_denied"
+)
+
+// Error severity levels for WebSocket error handling
+type ErrorSeverity int
+
+const (
+	// ErrorSeverityClient - Show detailed error to client (validation errors, user input issues)
+	ErrorSeverityClient ErrorSeverity = iota
+	// ErrorSeverityServer - Hide details from client, log server-side (system errors, database issues)
+	ErrorSeverityServer
+	// ErrorSeveritySecurity - Minimal info to client + security alert (authentication, authorization)
+	ErrorSeveritySecurity
 )

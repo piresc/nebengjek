@@ -15,9 +15,9 @@ import (
 func (m *WebSocketManager) handleLocationUpdate(driverID string, data json.RawMessage) error {
 	var locationUpdate models.LocationUpdate
 	if err := json.Unmarshal(data, &locationUpdate); err != nil {
-		logger.Error("Error parsing location update from user",
-			logger.String("user_id", driverID),
-			logger.ErrorField(err))
+		// Create a temporary client for error handling
+		tempClient := &models.WebSocketClient{UserID: driverID}
+		m.SendCategorizedError(tempClient, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
 		return fmt.Errorf("invalid location format")
 	}
 
@@ -42,10 +42,7 @@ func (m *WebSocketManager) handleLocationUpdate(driverID string, data json.RawMe
 				logger.String("user_id", driverID))
 			return fmt.Errorf("client not found")
 		}
-		logger.Error("Error updating location for user",
-			logger.String("user_id", driverID),
-			logger.ErrorField(err))
-		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidLocation, err.Error())
+		return m.SendCategorizedError(client, err, constants.ErrorInvalidLocation, constants.ErrorSeverityServer)
 	}
 
 	return nil

@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -217,133 +216,6 @@ func (r *MatchRepo) UpdateMatchStatus(ctx context.Context, matchID string, statu
 	return nil
 }
 
-// addToRedisGeo adds a user to Redis geospatial index
-func (r *MatchRepo) addToRedisGeo(ctx context.Context, geoKey, availableKey, locationKeyTemplate, userID string, location *models.Location) error {
-	// Add to geo set
-	if err := r.redisClient.GeoAdd(ctx, geoKey, location.Longitude, location.Latitude, userID); err != nil {
-		return fmt.Errorf("failed to add to geo index: %w", err)
-	}
-
-	// Add to available set
-	if err := r.redisClient.SAdd(ctx, availableKey, userID); err != nil {
-		return fmt.Errorf("failed to add to available set: %w", err)
-	}
-
-	// Store individual location
-	locationKey := fmt.Sprintf(locationKeyTemplate, userID)
-	locationData := map[string]interface{}{
-		constants.FieldLatitude:  location.Latitude,
-		constants.FieldLongitude: location.Longitude,
-		constants.FieldTimestamp: time.Now().Unix(),
-	}
-	if err := r.redisClient.HMSet(ctx, locationKey, locationData); err != nil {
-		return fmt.Errorf("failed to store location: %w", err)
-	}
-
-	return nil
-}
-
-// removeFromRedisGeo removes a user from Redis geospatial index
-func (r *MatchRepo) removeFromRedisGeo(ctx context.Context, geoKey, availableKey, locationKeyTemplate, userID string) error {
-	// Remove from geo set
-	if err := r.redisClient.ZRem(ctx, geoKey, userID); err != nil {
-		return fmt.Errorf("failed to remove from geo index: %w", err)
-	}
-
-	// Remove from available set
-	if err := r.redisClient.SRem(ctx, availableKey, userID); err != nil {
-		return fmt.Errorf("failed to remove from available set: %w", err)
-	}
-
-	// Remove individual location
-	locationKey := fmt.Sprintf(locationKeyTemplate, userID)
-	if err := r.redisClient.Delete(ctx, locationKey); err != nil {
-		return fmt.Errorf("failed to remove location data: %w", err)
-	}
-
-	return nil
-}
-
-// AddAvailableDriver adds a driver to the available drivers geo set
-func (r *MatchRepo) AddAvailableDriver(ctx context.Context, driverID string, location *models.Location) error {
-	return r.addToRedisGeo(ctx,
-		constants.KeyDriverGeo,
-		constants.KeyAvailableDrivers,
-		constants.KeyDriverLocation,
-		driverID,
-		location)
-}
-
-// RemoveAvailableDriver removes a driver from the available drivers sets
-func (r *MatchRepo) RemoveAvailableDriver(ctx context.Context, driverID string) error {
-	return r.removeFromRedisGeo(ctx,
-		constants.KeyDriverGeo,
-		constants.KeyAvailableDrivers,
-		constants.KeyDriverLocation,
-		driverID)
-}
-
-// AddAvailablePassenger adds a passenger to the Redis geospatial index
-func (r *MatchRepo) AddAvailablePassenger(ctx context.Context, passengerID string, location *models.Location) error {
-	return r.addToRedisGeo(ctx,
-		constants.KeyPassengerGeo,
-		constants.KeyAvailablePassengers,
-		constants.KeyPassengerLocation,
-		passengerID,
-		location)
-}
-
-// RemoveAvailablePassenger removes a passenger from the Redis geospatial index
-func (r *MatchRepo) RemoveAvailablePassenger(ctx context.Context, passengerID string) error {
-	return r.removeFromRedisGeo(ctx,
-		constants.KeyPassengerGeo,
-		constants.KeyAvailablePassengers,
-		constants.KeyPassengerLocation,
-		passengerID)
-}
-
-// findNearbyUsers finds available users within the specified radius
-func (r *MatchRepo) findNearbyUsers(ctx context.Context, geoKey, availableKey string, location *models.Location, radiusKm float64) ([]*models.NearbyUser, error) {
-	results, err := r.redisClient.GeoRadius(
-		ctx,
-		geoKey,
-		location.Longitude,
-		location.Latitude,
-		radiusKm,
-		"km",
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find nearby users: %w", err)
-	}
-
-	nearbyUsers := make([]*models.NearbyUser, 0, len(results))
-	for _, result := range results {
-		isMember, err := r.redisClient.SIsMember(ctx, availableKey, result.Name)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check user availability: %w", err)
-		}
-
-		if isMember {
-			nearbyUsers = append(nearbyUsers, &models.NearbyUser{
-				ID: result.Name,
-				Location: models.Location{
-					Latitude:  result.Latitude,
-					Longitude: result.Longitude,
-					Timestamp: time.Now(),
-				},
-				Distance: result.Dist,
-			})
-		}
-	}
-
-	return nearbyUsers, nil
-}
-
-// FindNearbyDrivers finds available drivers within the specified radius
-func (r *MatchRepo) FindNearbyDrivers(ctx context.Context, location *models.Location, radiusKm float64) ([]*models.NearbyUser, error) {
-	return r.findNearbyUsers(ctx, constants.KeyDriverGeo, constants.KeyAvailableDrivers, location, radiusKm)
-}
-
 // validateUserForMatch validates that the user is part of the match
 func (r *MatchRepo) validateUserForMatch(match *models.Match, userID string, isDriver bool) error {
 	userUUID, err := uuid.Parse(userID)
@@ -474,16 +346,6 @@ func (r *MatchRepo) ConfirmMatchByUser(ctx context.Context, matchID string, user
 		return nil, fmt.Errorf("match not found or was modified by another transaction")
 	}
 
-	// Remove from available pools if fully confirmed
-	if match.Status == models.MatchStatusAccepted {
-		if err := r.RemoveAvailableDriver(ctx, match.DriverID.String()); err != nil {
-			return nil, fmt.Errorf("failed to remove driver from available pool: %w", err)
-		}
-		if err := r.RemoveAvailablePassenger(ctx, match.PassengerID.String()); err != nil {
-			return nil, fmt.Errorf("failed to remove passenger from available pool: %w", err)
-		}
-	}
-
 	if err = tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
@@ -579,158 +441,32 @@ func (r *MatchRepo) BatchUpdateMatchStatus(ctx context.Context, matchIDs []strin
 	return nil
 }
 
-// GetDriverLocation retrieves a driver's last known location
-func (r *MatchRepo) GetDriverLocation(ctx context.Context, driverID string) (models.Location, error) {
-	// Try to get from the Redis location key
-	locationKey := fmt.Sprintf(constants.KeyDriverLocation, driverID)
-	fields, err := r.redisClient.HGetAll(ctx, locationKey)
-	if err != nil {
-		return models.Location{}, fmt.Errorf("failed to get location from Redis: %w", err)
-	}
-
-	// If we got data from Redis, parse it
-	if len(fields) > 0 {
-		var lat, lng float64
-		var timestamp int64
-
-		if latStr, ok := fields[constants.FieldLatitude]; ok {
-			lat, _ = strconv.ParseFloat(latStr, 64)
-		}
-
-		if lngStr, ok := fields[constants.FieldLongitude]; ok {
-			lng, _ = strconv.ParseFloat(lngStr, 64)
-		}
-
-		if tsStr, ok := fields[constants.FieldTimestamp]; ok {
-			timestamp, _ = strconv.ParseInt(tsStr, 10, 64)
-		}
-
-		return models.Location{
-			Latitude:  lat,
-			Longitude: lng,
-			Timestamp: time.Unix(timestamp, 0),
-		}, nil
-	}
-
-	// If not in Redis, try to get the latest from the database
-	driverUUID, err := uuid.Parse(driverID)
-	if err != nil {
-		return models.Location{}, fmt.Errorf("invalid driver ID format: %w", err)
-	}
-
-	query := `
-		SELECT 
-			(driver_location[0])::float8 as driver_longitude,
-			(driver_location[1])::float8 as driver_latitude,
-			updated_at
-		FROM matches
-		WHERE driver_id = $1
-		ORDER BY updated_at DESC
-		LIMIT 1
-	`
-
-	var longitude, latitude float64
-	var timestamp time.Time
-	err = r.db.QueryRowContext(ctx, query, driverUUID).Scan(
-		&longitude, &latitude, &timestamp,
-	)
-
-	if err != nil {
-		return models.Location{}, fmt.Errorf("failed to get driver location from database: %w", err)
-	}
-
-	return models.Location{
-		Longitude: longitude,
-		Latitude:  latitude,
-		Timestamp: timestamp,
-	}, nil
-}
-
-// GetPassengerLocation retrieves a passenger's last known location
-func (r *MatchRepo) GetPassengerLocation(ctx context.Context, passengerID string) (models.Location, error) {
-	// Try to get from the Redis location key
-	locationKey := fmt.Sprintf(constants.KeyPassengerLocation, passengerID)
-	fields, err := r.redisClient.HGetAll(ctx, locationKey)
-	if err != nil {
-		return models.Location{}, fmt.Errorf("failed to get location from Redis: %w", err)
-	}
-
-	// If we got data from Redis, parse it
-	if len(fields) > 0 {
-		var lat, lng float64
-		var timestamp int64
-
-		if latStr, ok := fields[constants.FieldLatitude]; ok {
-			lat, _ = strconv.ParseFloat(latStr, 64)
-		}
-
-		if lngStr, ok := fields[constants.FieldLongitude]; ok {
-			lng, _ = strconv.ParseFloat(lngStr, 64)
-		}
-
-		if tsStr, ok := fields[constants.FieldTimestamp]; ok {
-			timestamp, _ = strconv.ParseInt(tsStr, 10, 64)
-		}
-
-		return models.Location{
-			Latitude:  lat,
-			Longitude: lng,
-			Timestamp: time.Unix(timestamp, 0),
-		}, nil
-	}
-
-	// If not in Redis, try to get the latest from the database
-	passengerUUID, err := uuid.Parse(passengerID)
-	if err != nil {
-		return models.Location{}, fmt.Errorf("invalid passenger ID format: %w", err)
-	}
-
-	query := `
-		SELECT 
-			(passenger_location[0])::float8 as passenger_longitude,
-			(passenger_location[1])::float8 as passenger_latitude,
-			updated_at
-		FROM matches
-		WHERE passenger_id = $1
-		ORDER BY updated_at DESC
-		LIMIT 1
-	`
-
-	var longitude, latitude float64
-	var timestamp time.Time
-	err = r.db.QueryRowContext(ctx, query, passengerUUID).Scan(
-		&longitude, &latitude, &timestamp,
-	)
-
-	if err != nil {
-		return models.Location{}, fmt.Errorf("failed to get passenger location from database: %w", err)
-	}
-
-	return models.Location{
-		Longitude: longitude,
-		Latitude:  latitude,
-		Timestamp: timestamp,
-	}, nil
-}
-
 // SetActiveRide stores active ride information for both driver and passenger
 func (r *MatchRepo) SetActiveRide(ctx context.Context, driverID, passengerID, rideID string) error {
-	// Set active ride for driver
+	// Get TTL from config, default to 24 hours if not configured
+	ttlHours := 24
+	if r.cfg != nil && r.cfg.Match.ActiveRideTTLHours > 0 {
+		ttlHours = r.cfg.Match.ActiveRideTTLHours
+	}
+	ttl := time.Duration(ttlHours) * time.Hour
+
+	// Set active ride for driver with TTL
 	driverKey := fmt.Sprintf(constants.KeyActiveRideDriver, driverID)
-	if err := r.redisClient.Set(ctx, driverKey, rideID, 0); err != nil {
+	if err := r.redisClient.Set(ctx, driverKey, rideID, ttl); err != nil {
 		return fmt.Errorf("failed to set active ride for driver: %w", err)
 	}
 
-	// Set active ride for passenger
+	// Set active ride for passenger with TTL
 	passengerKey := fmt.Sprintf(constants.KeyActiveRidePassenger, passengerID)
-	if err := r.redisClient.Set(ctx, passengerKey, rideID, 0); err != nil {
+	if err := r.redisClient.Set(ctx, passengerKey, rideID, ttl); err != nil {
 		return fmt.Errorf("failed to set active ride for passenger: %w", err)
 	}
 
 	logger.Info("Set active ride",
 		logger.String("ride_id", rideID),
 		logger.String("driver_id", driverID),
-		logger.String("passenger_id", passengerID))
+		logger.String("passenger_id", passengerID),
+		logger.String("ttl", ttl.String()))
 	return nil
 }
 

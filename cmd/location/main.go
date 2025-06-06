@@ -63,7 +63,7 @@ func main() {
 	defer natsClient.Close()
 
 	// Initialize repository
-	locationRepo := repository.NewLocationRepository(redisClient)
+	locationRepo := repository.NewLocationRepository(redisClient, configs)
 
 	// Initialize gateway
 	locationGW := gateway.NewLocationGW(natsClient)
@@ -72,10 +72,10 @@ func main() {
 	locationUC := usecase.NewLocationUC(locationRepo, locationGW)
 
 	// Initialize handlers
-	locationhandler := handler.NewLocationHandler(locationUC, natsClient)
+	locationHandler := handler.NewHTTPHandler(locationUC, natsClient, configs)
 
 	// Initialize NATS consumers
-	if err := locationhandler.InitNATSConsumers(); err != nil {
+	if err := locationHandler.InitNATSConsumers(); err != nil {
 		zapLogger.Fatal("Failed to initialize NATS consumers", logger.Err(err))
 	}
 
@@ -88,8 +88,8 @@ func main() {
 	e.Use(middleware.RequestContextMiddleware(appName))
 	e.Use(logger.ZapEchoMiddleware(zapLogger))
 
-	// Initialize API key middleware (for potential future internal endpoints)
-	_ = middleware.NewAPIKeyMiddleware(&configs.APIKey)
+	// Initialize API key middleware
+	apiKeyMiddleware := middleware.NewAPIKeyMiddleware(&configs.APIKey)
 
 	// Initialize enhanced health service
 	healthService := health.NewHealthService(zapLogger)
@@ -98,6 +98,9 @@ func main() {
 
 	// Register enhanced health endpoints
 	health.RegisterEnhancedHealthEndpoints(e, appName, configs.App.Version, healthService)
+
+	// Register service routes
+	locationHandler.RegisterRoutes(e, apiKeyMiddleware)
 
 	// Start server in goroutine
 	go func() {

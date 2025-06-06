@@ -87,3 +87,38 @@ func (uc *locationUC) StoreLocation(update models.LocationUpdate) error {
 
 	return nil
 }
+
+// AddAvailableDriver adds a driver to the available drivers geo set
+func (uc *locationUC) AddAvailableDriver(ctx context.Context, driverID string, location *models.Location) error {
+	return uc.locationRepo.AddAvailableDriver(ctx, driverID, location)
+}
+
+// RemoveAvailableDriver removes a driver from the available drivers sets
+func (uc *locationUC) RemoveAvailableDriver(ctx context.Context, driverID string) error {
+	return uc.locationRepo.RemoveAvailableDriver(ctx, driverID)
+}
+
+// AddAvailablePassenger adds a passenger to the Redis geospatial index
+func (uc *locationUC) AddAvailablePassenger(ctx context.Context, passengerID string, location *models.Location) error {
+	return uc.locationRepo.AddAvailablePassenger(ctx, passengerID, location)
+}
+
+// RemoveAvailablePassenger removes a passenger from the Redis geospatial index
+func (uc *locationUC) RemoveAvailablePassenger(ctx context.Context, passengerID string) error {
+	return uc.locationRepo.RemoveAvailablePassenger(ctx, passengerID)
+}
+
+// FindNearbyDrivers finds available drivers within the specified radius
+func (uc *locationUC) FindNearbyDrivers(ctx context.Context, location *models.Location, radiusKm float64) ([]*models.NearbyUser, error) {
+	return uc.locationRepo.FindNearbyDrivers(ctx, location, radiusKm)
+}
+
+// GetDriverLocation retrieves a driver's last known location
+func (uc *locationUC) GetDriverLocation(ctx context.Context, driverID string) (models.Location, error) {
+	return uc.locationRepo.GetDriverLocation(ctx, driverID)
+}
+
+// GetPassengerLocation retrieves a passenger's last known location
+func (uc *locationUC) GetPassengerLocation(ctx context.Context, passengerID string) (models.Location, error) {
+	return uc.locationRepo.GetPassengerLocation(ctx, passengerID)
+}

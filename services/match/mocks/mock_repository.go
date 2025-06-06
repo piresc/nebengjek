@@ -36,34 +36,6 @@ func (m *MockMatchRepo) EXPECT() *MockMatchRepoMockRecorder {
 	return m.recorder
 }
 
-// AddAvailableDriver mocks base method.
-func (m *MockMatchRepo) AddAvailableDriver(arg0 context.Context, arg1 string, arg2 *models.Location) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddAvailableDriver", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// AddAvailableDriver indicates an expected call of AddAvailableDriver.
-func (mr *MockMatchRepoMockRecorder) AddAvailableDriver(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddAvailableDriver", reflect.TypeOf((*MockMatchRepo)(nil).AddAvailableDriver), arg0, arg1, arg2)
-}
-
-// AddAvailablePassenger mocks base method.
-func (m *MockMatchRepo) AddAvailablePassenger(arg0 context.Context, arg1 string, arg2 *models.Location) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddAvailablePassenger", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// AddAvailablePassenger indicates an expected call of AddAvailablePassenger.
-func (mr *MockMatchRepoMockRecorder) AddAvailablePassenger(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddAvailablePassenger", reflect.TypeOf((*MockMatchRepo)(nil).AddAvailablePassenger), arg0, arg1, arg2)
-}
-
 // BatchUpdateMatchStatus mocks base method.
 func (m *MockMatchRepo) BatchUpdateMatchStatus(arg0 context.Context, arg1 []string, arg2 models.MatchStatus) error {
 	m.ctrl.T.Helper()
@@ -108,21 +80,6 @@ func (mr *MockMatchRepoMockRecorder) CreateMatch(arg0, arg1 interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateMatch", reflect.TypeOf((*MockMatchRepo)(nil).CreateMatch), arg0, arg1)
 }
 
-// FindNearbyDrivers mocks base method.
-func (m *MockMatchRepo) FindNearbyDrivers(arg0 context.Context, arg1 *models.Location, arg2 float64) ([]*models.NearbyUser, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindNearbyDrivers", arg0, arg1, arg2)
-	ret0, _ := ret[0].([]*models.NearbyUser)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// FindNearbyDrivers indicates an expected call of FindNearbyDrivers.
-func (mr *MockMatchRepoMockRecorder) FindNearbyDrivers(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindNearbyDrivers", reflect.TypeOf((*MockMatchRepo)(nil).FindNearbyDrivers), arg0, arg1, arg2)
-}
-
 // GetActiveRideByDriver mocks base method.
 func (m *MockMatchRepo) GetActiveRideByDriver(arg0 context.Context, arg1 string) (string, error) {
 	m.ctrl.T.Helper()
@@ -153,21 +110,6 @@ func (mr *MockMatchRepoMockRecorder) GetActiveRideByPassenger(arg0, arg1 interfa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActiveRideByPassenger", reflect.TypeOf((*MockMatchRepo)(nil).GetActiveRideByPassenger), arg0, arg1)
 }
 
-// GetDriverLocation mocks base method.
-func (m *MockMatchRepo) GetDriverLocation(arg0 context.Context, arg1 string) (models.Location, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetDriverLocation", arg0, arg1)
-	ret0, _ := ret[0].(models.Location)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetDriverLocation indicates an expected call of GetDriverLocation.
-func (mr *MockMatchRepoMockRecorder) GetDriverLocation(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDriverLocation", reflect.TypeOf((*MockMatchRepo)(nil).GetDriverLocation), arg0, arg1)
-}
-
 // GetMatch mocks base method.
 func (m *MockMatchRepo) GetMatch(arg0 context.Context, arg1 string) (*models.Match, error) {
 	m.ctrl.T.Helper()
@@ -181,21 +123,6 @@ func (m *MockMatchRepo) GetMatch(arg0 context.Context, arg1 string) (*models.Mat
 func (mr *MockMatchRepoMockRecorder) GetMatch(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMatch", reflect.TypeOf((*MockMatchRepo)(nil).GetMatch), arg0, arg1)
-}
-
-// GetPassengerLocation mocks base method.
-func (m *MockMatchRepo) GetPassengerLocation(arg0 context.Context, arg1 string) (models.Location, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPassengerLocation", arg0, arg1)
-	ret0, _ := ret[0].(models.Location)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetPassengerLocation indicates an expected call of GetPassengerLocation.
-func (mr *MockMatchRepoMockRecorder) GetPassengerLocation(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPassengerLocation", reflect.TypeOf((*MockMatchRepo)(nil).GetPassengerLocation), arg0, arg1)
 }
 
 // ListMatchesByPassenger mocks base method.
@@ -225,34 +152,6 @@ func (m *MockMatchRepo) RemoveActiveRide(arg0 context.Context, arg1, arg2 string
 func (mr *MockMatchRepoMockRecorder) RemoveActiveRide(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveActiveRide", reflect.TypeOf((*MockMatchRepo)(nil).RemoveActiveRide), arg0, arg1, arg2)
-}
-
-// RemoveAvailableDriver mocks base method.
-func (m *MockMatchRepo) RemoveAvailableDriver(arg0 context.Context, arg1 string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RemoveAvailableDriver", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// RemoveAvailableDriver indicates an expected call of RemoveAvailableDriver.
-func (mr *MockMatchRepoMockRecorder) RemoveAvailableDriver(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveAvailableDriver", reflect.TypeOf((*MockMatchRepo)(nil).RemoveAvailableDriver), arg0, arg1)
-}
-
-// RemoveAvailablePassenger mocks base method.
-func (m *MockMatchRepo) RemoveAvailablePassenger(arg0 context.Context, arg1 string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RemoveAvailablePassenger", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// RemoveAvailablePassenger indicates an expected call of RemoveAvailablePassenger.
-func (mr *MockMatchRepoMockRecorder) RemoveAvailablePassenger(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveAvailablePassenger", reflect.TypeOf((*MockMatchRepo)(nil).RemoveAvailablePassenger), arg0, arg1)
 }
 
 // SetActiveRide mocks base method.

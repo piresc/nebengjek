@@ -35,7 +35,7 @@ func TestStoreLocation(t *testing.T) {
 	// Create the repository with the Redis client
 	repo := NewLocationRepository(&database.RedisClient{
 		Client: client,
-	})
+	}, &models.Config{})
 
 	// Test data
 	ctx := context.Background()
@@ -84,7 +84,7 @@ func TestStoreLocation_RedisError(t *testing.T) {
 	// Create the repository with the Redis client
 	repo := NewLocationRepository(&database.RedisClient{
 		Client: client,
-	})
+	}, &models.Config{})
 	// Test data
 	ctx := context.Background()
 	rideID := "ride-123"
@@ -116,7 +116,7 @@ func TestGetLastLocation(t *testing.T) {
 	// Create the repository with the Redis client
 	repo := NewLocationRepository(&database.RedisClient{
 		Client: client,
-	})
+	}, &models.Config{})
 	// Test data
 	ctx := context.Background()
 	rideID := "ride-123"
@@ -148,7 +148,7 @@ func TestGetLastLocation_NoData(t *testing.T) {
 	// Create the repository with the Redis client
 	repo := NewLocationRepository(&database.RedisClient{
 		Client: client,
-	})
+	}, &models.Config{})
 	// Test data
 	ctx := context.Background()
 	rideID := "ride-123"
@@ -174,7 +174,7 @@ func TestGetLastLocation_InvalidLatitude(t *testing.T) {
 	// Create the repository with the Redis client
 	repo := NewLocationRepository(&database.RedisClient{
 		Client: client,
-	})
+	}, &models.Config{})
 	// Test data
 	ctx := context.Background()
 	rideID := "ride-123"
@@ -204,7 +204,7 @@ func TestGetLastLocation_InvalidLongitude(t *testing.T) {
 	// Create the repository with the Redis client
 	repo := NewLocationRepository(&database.RedisClient{
 		Client: client,
-	})
+	}, &models.Config{})
 	// Test data
 	ctx := context.Background()
 	rideID := "ride-123"
@@ -234,7 +234,7 @@ func TestGetLastLocation_InvalidTimestamp(t *testing.T) {
 	// Create the repository with the Redis client
 	repo := NewLocationRepository(&database.RedisClient{
 		Client: client,
-	})
+	}, &models.Config{})
 	// Test data
 	ctx := context.Background()
 	rideID := "ride-123"
@@ -264,7 +264,7 @@ func TestGetLastLocation_RedisError(t *testing.T) {
 	// Create the repository with the Redis client
 	repo := NewLocationRepository(&database.RedisClient{
 		Client: client,
-	})
+	}, &models.Config{})
 	// Test data
 	ctx := context.Background()
 	rideID := "ride-123"

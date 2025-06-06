@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
@@ -66,11 +67,16 @@ func (m *WebSocketManager) NotifyClient(userID string, event string, data interf
 	m.manager.NotifyClient(userID, event, data)
 }
 
+// SendCategorizedError sends an error message based on severity level
+func (m *WebSocketManager) SendCategorizedError(client *models.WebSocketClient, err error, code string, severity constants.ErrorSeverity) error {
+	return m.manager.SendCategorizedError(client.Conn, err, code, severity, client.UserID)
+}
+
 // handleMessage processes incoming WebSocket messages
 func (m *WebSocketManager) handleMessage(client *models.WebSocketClient, msg []byte) error {
 	var wsMsg models.WSMessage
 	if err := json.Unmarshal(msg, &wsMsg); err != nil {
-		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Invalid message format")
+		return m.SendCategorizedError(client, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
 	}
 
 	switch wsMsg.Event {
@@ -89,6 +95,7 @@ func (m *WebSocketManager) handleMessage(client *models.WebSocketClient, msg []b
 	case constants.EventPaymentProcessed:
 		return m.handleProcessPayment(client, wsMsg.Data)
 	default:
-		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Unknown event type")
+		unknownEventErr := fmt.Errorf("unknown event type: %s", wsMsg.Event)
+		return m.SendCategorizedError(client, unknownEventErr, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
 	}
 }

@@ -1,4 +1,4 @@
-name: Unit Tests
+name: continous-integration
 
 on:
   pull_request:
@@ -12,9 +12,25 @@ permissions:
   pull-requests: write
 
 jobs:
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch full history for comprehensive scanning
+
+      - name: Run GitLeaks Secret Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} # Only required for commercial use
+
   test:
     name: Run Unit Tests
     runs-on: ubuntu-latest
+    needs: secret-scan  # Run tests only after secret scan passes
     
     services:
       # Setup Redis service container for tests that require Redis

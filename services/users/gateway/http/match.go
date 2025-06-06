@@ -1,18 +1,12 @@
 package gateaway_http
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"time"
 
 	httpclient "github.com/piresc/nebengjek/internal/pkg/http"
-	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
-	"github.com/piresc/nebengjek/internal/utils"
 )
 
 // MatchClient is an HTTP client for communicating with the match service
@@ -61,63 +55,17 @@ func NewHTTPGatewayWithAPIKey(matchServiceURL string, rideServiceURL string, con
 // MatchAccept sends a match confirmation request to the match service
 func (g *HTTPGateway) MatchConfirm(req *models.MatchConfirmRequest) (*models.MatchProposal, error) {
 	ctx := context.Background()
-	endpoint := fmt.Sprintf("/matches/%s/confirm", req.ID)
+	endpoint := fmt.Sprintf("/internal/matches/%s/confirm", req.ID)
 
-	// Use API key client if available, otherwise fallback to regular client
-	if g.matchClient.apiClient != nil {
-		var matchProposal models.MatchProposal
-		err := g.matchClient.apiClient.PostJSON(ctx, endpoint, req, &matchProposal)
-		if err != nil {
-			return nil, fmt.Errorf("failed to send match confirmation request with API key: %w", err)
-		}
-		return &matchProposal, nil
+	// Ensure API key client is available
+	if g.matchClient.apiClient == nil {
+		return nil, fmt.Errorf("API key client not configured for match service")
 	}
 
-	// Fallback to original implementation
-	url := fmt.Sprintf("%s/matches/%s/confirm", g.matchClient.client.BaseURL, req.ID)
-
-	// Marshal request to JSON
-	reqBody, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal match confirmation request: %w", err)
-	}
-
-	// Create HTTP request
-	httpReq, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(reqBody))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
-	}
-
-	// Set headers
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	// Send request
-	resp, err := g.matchClient.client.HTTPClient.Do(httpReq)
+	var matchProposal models.MatchProposal
+	err := g.matchClient.apiClient.PostJSON(ctx, endpoint, req, &matchProposal)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send match confirmation request: %w", err)
 	}
-	defer resp.Body.Close()
-
-	// Read the full response body
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	// Check response status
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("match confirmation failed: (status: %d, body: %s)", resp.StatusCode, string(respBody))
-	}
-
-	// Parse the response using our utility function
-	var matchProposal models.MatchProposal
-	if err := utils.ParseJSONResponse(respBody, &matchProposal); err != nil {
-		// Log the raw response for debugging
-		logger.Error("Error parsing response",
-			logger.String("raw_response", string(respBody)),
-			logger.ErrorField(err))
-		return nil, fmt.Errorf("failed to parse match confirmation response: %w", err)
-	}
-
 	return &matchProposal, nil
 }

@@ -13,7 +13,7 @@ import (
 // addDriverToPool adds a driver to the available pool without creating matches
 func (uc *MatchUC) addDriverToPool(ctx context.Context, driverID string, location *models.Location) error {
 	// Add driver to available pool
-	if err := uc.matchRepo.AddAvailableDriver(ctx, driverID, location); err != nil {
+	if err := uc.locationGW.AddAvailableDriver(ctx, driverID, location); err != nil {
 		logger.Error("Failed to add available driver",
 			logger.String("driver_id", driverID),
 			logger.ErrorField(err))
@@ -24,7 +24,7 @@ func (uc *MatchUC) addDriverToPool(ctx context.Context, driverID string, locatio
 
 // createMatchesWithNearbyDrivers finds nearby drivers and creates match proposals
 func (uc *MatchUC) createMatchesWithNearbyDrivers(ctx context.Context, passengerID string, passengerLocation, targetLocation *models.Location) error {
-	nearbyDrivers, err := uc.matchRepo.FindNearbyDrivers(ctx, passengerLocation, uc.cfg.Match.SearchRadiusKm) // Configurable radius
+	nearbyDrivers, err := uc.locationGW.FindNearbyDrivers(ctx, passengerLocation, uc.cfg.Match.SearchRadiusKm) // Configurable radius
 	if err != nil {
 		logger.Error("Failed to find nearby drivers",
 			logger.String("passenger_id", passengerID),
@@ -69,7 +69,7 @@ func (uc *MatchUC) buildMatch(driverID, passengerID string, driverLocation, pass
 }
 
 func (uc *MatchUC) handleActivePassengerWithTarget(ctx context.Context, event models.FinderEvent, location *models.Location, targetLocation *models.Location) error {
-	if err := uc.matchRepo.AddAvailablePassenger(ctx, event.UserID, location); err != nil {
+	if err := uc.locationGW.AddAvailablePassenger(ctx, event.UserID, location); err != nil {
 		logger.Error("Failed to add available passenger",
 			logger.String("passenger_id", event.UserID),
 			logger.ErrorField(err))
@@ -83,9 +83,9 @@ func (uc *MatchUC) handleActivePassengerWithTarget(ctx context.Context, event mo
 func (uc *MatchUC) handleInactiveUser(ctx context.Context, userID string, role string) error {
 	var err error
 	if role == "driver" {
-		err = uc.matchRepo.RemoveAvailableDriver(ctx, userID)
+		err = uc.locationGW.RemoveAvailableDriver(ctx, userID)
 	} else {
-		err = uc.matchRepo.RemoveAvailablePassenger(ctx, userID)
+		err = uc.locationGW.RemoveAvailablePassenger(ctx, userID)
 	}
 
 	if err != nil {
@@ -208,8 +208,8 @@ func (uc *MatchUC) updateMatchConfirmation(ctx context.Context, match *models.Ma
 			logger.String("match_id", match.ID.String()))
 
 		// Remove users from available pools when fully confirmed
-		uc.matchRepo.RemoveAvailableDriver(ctx, match.DriverID.String())
-		uc.matchRepo.RemoveAvailablePassenger(ctx, match.PassengerID.String())
+		uc.locationGW.RemoveAvailableDriver(ctx, match.DriverID.String())
+		uc.locationGW.RemoveAvailablePassenger(ctx, match.PassengerID.String())
 	} else if match.DriverConfirmed {
 		match.Status = models.MatchStatusDriverConfirmed
 		// Match confirmed by driver, waiting for passenger
@@ -476,59 +476,27 @@ func (uc *MatchUC) GetPendingMatch(ctx context.Context, matchID string) (*models
 	return nil, fmt.Errorf("match is not in pending state")
 }
 
-// ReleaseDriver adds a driver back to the available pool after a ride completes
+// ReleaseDriver releases a driver from the ride lock after a ride completes
+// The driver will be available for matching again when they send their next beacon event
 func (uc *MatchUC) ReleaseDriver(driverID string) error {
-	ctx := context.Background()
+	// The locking system only needs to track that the driver is no longer in an active ride
+	// The driver will be added back to the available pool when they send their next beacon event
+	// with their current location, so we don't need to add them back here
 
-	// Add driver back to the available pool
-
-	// Get driver's last known location (if any)
-	location, err := uc.matchRepo.GetDriverLocation(ctx, driverID)
-	if err != nil {
-		logger.Error("Failed to get driver location",
-			logger.String("driver_id", driverID),
-			logger.ErrorField(err))
-		// If we can't get the location, we can't add them back to the geo index
-		return fmt.Errorf("failed to get driver location: %w", err)
-	}
-
-	// Re-add driver to available pool with their last known location
-	if err := uc.matchRepo.AddAvailableDriver(ctx, driverID, &location); err != nil {
-		logger.Error("Error adding driver back to available pool",
-			logger.String("driver_id", driverID),
-			logger.ErrorField(err))
-		return fmt.Errorf("failed to add driver back to available pool: %w", err)
-	}
-
-	// Successfully released driver back to available pool
+	logger.Info("Successfully released driver from ride lock",
+		logger.String("driver_id", driverID))
 	return nil
 }
 
-// ReleasePassenger adds a passenger back to the available pool after a ride completes
+// ReleasePassenger releases a passenger from the ride lock after a ride completes
+// The passenger will be available for matching again when they send their next finder event
 func (uc *MatchUC) ReleasePassenger(passengerID string) error {
-	ctx := context.Background()
+	// The locking system only needs to track that the passenger is no longer in an active ride
+	// The passenger will be added back to the available pool when they send their next finder event
+	// with their current location, so we don't need to add them back here
 
-	// Add passenger back to the available pool
-
-	// Get passenger's last known location (if any)
-	location, err := uc.matchRepo.GetPassengerLocation(ctx, passengerID)
-	if err != nil {
-		logger.Error("Failed to get passenger location",
-			logger.String("passenger_id", passengerID),
-			logger.ErrorField(err))
-		// If we can't get the location, we can't add them back to the geo index
-		return fmt.Errorf("failed to get passenger location: %w", err)
-	}
-
-	// Re-add passenger to available pool with their last known location
-	if err := uc.matchRepo.AddAvailablePassenger(ctx, passengerID, &location); err != nil {
-		logger.Error("Error adding passenger back to available pool",
-			logger.String("passenger_id", passengerID),
-			logger.ErrorField(err))
-		return fmt.Errorf("failed to add passenger back to available pool: %w", err)
-	}
-
-	// Successfully released passenger back to available pool
+	logger.Info("Successfully released passenger from ride lock",
+		logger.String("passenger_id", passengerID))
 	return nil
 }
 
@@ -537,7 +505,7 @@ func (uc *MatchUC) RemoveDriverFromPool(ctx context.Context, driverID string) er
 	// Locking driver (removing from available pool)
 
 	// Remove driver from available pool
-	if err := uc.matchRepo.RemoveAvailableDriver(ctx, driverID); err != nil {
+	if err := uc.locationGW.RemoveAvailableDriver(ctx, driverID); err != nil {
 		logger.Error("Error removing driver from available pool",
 			logger.String("driver_id", driverID),
 			logger.ErrorField(err))
@@ -553,7 +521,7 @@ func (uc *MatchUC) RemovePassengerFromPool(ctx context.Context, passengerID stri
 	// Locking passenger (removing from available pool)
 
 	// Remove passenger from available pool
-	if err := uc.matchRepo.RemoveAvailablePassenger(ctx, passengerID); err != nil {
+	if err := uc.locationGW.RemoveAvailablePassenger(ctx, passengerID); err != nil {
 		logger.Error("Error removing passenger from available pool",
 			logger.String("passenger_id", passengerID),
 			logger.ErrorField(err))

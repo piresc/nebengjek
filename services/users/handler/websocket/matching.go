@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	"github.com/piresc/nebengjek/internal/pkg/constants"
-	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
@@ -13,12 +12,12 @@ import (
 func (m *WebSocketManager) handleFinderUpdate(client *models.WebSocketClient, data json.RawMessage) error {
 	var req models.FinderRequest
 	if err := json.Unmarshal(data, &req); err != nil {
-		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Invalid finder request format")
+		return m.SendCategorizedError(client, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
 	}
 
 	// Update finder status
 	if err := m.userUC.UpdateFinderStatus(context.Background(), &req); err != nil {
-		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidBeacon, err.Error())
+		return m.SendCategorizedError(client, err, constants.ErrorInvalidBeacon, constants.ErrorSeverityServer)
 	}
 
 	return m.manager.SendMessage(client.Conn, constants.EventFinderUpdate, models.FinderResponse{
@@ -30,12 +29,12 @@ func (m *WebSocketManager) handleFinderUpdate(client *models.WebSocketClient, da
 func (m *WebSocketManager) handleBeaconUpdate(client *models.WebSocketClient, data json.RawMessage) error {
 	var req models.BeaconRequest
 	if err := json.Unmarshal(data, &req); err != nil {
-		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Invalid beacon request format")
+		return m.SendCategorizedError(client, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
 	}
 
 	// Update beacon status
 	if err := m.userUC.UpdateBeaconStatus(context.Background(), &req); err != nil {
-		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidBeacon, err.Error())
+		return m.SendCategorizedError(client, err, constants.ErrorInvalidBeacon, constants.ErrorSeverityServer)
 	}
 
 	return m.manager.SendMessage(client.Conn, constants.EventBeaconUpdate, models.BeaconResponse{
@@ -48,17 +47,14 @@ func (m *WebSocketManager) handleMatchConfirmation(client *models.WebSocketClien
 
 	var confirm models.MatchConfirmRequest
 	if err := json.Unmarshal(data, &confirm); err != nil {
-		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Invalid match proposal format")
+		return m.SendCategorizedError(client, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
 	}
 	confirm.UserID = client.UserID
 
 	// Update match status
 	result, err := m.userUC.ConfirmMatch(context.Background(), &confirm)
 	if err != nil {
-		logger.Error("Error confirming match for user",
-			logger.String("user_id", client.UserID),
-			logger.ErrorField(err))
-		return m.manager.SendErrorMessage(client.Conn, constants.ErrorMatchUpdateFailed, err.Error())
+		return m.SendCategorizedError(client, err, constants.ErrorMatchUpdateFailed, constants.ErrorSeverityServer)
 	}
 	// logger.Info("Match confirmation result",
 	//	logger.Any("result", result))

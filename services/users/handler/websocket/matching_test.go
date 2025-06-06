@@ -23,7 +23,7 @@ func (h *testWebSocketManager) handleFinderUpdate(client *models.WebSocketClient
 	}
 
 	if err := h.userUC.UpdateFinderStatus(context.Background(), &finderReq); err != nil {
-		return h.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidBeacon, err.Error())
+		return h.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidBeacon, "Unable to update finder status")
 	}
 
 	response := models.FinderResponse{
@@ -39,7 +39,7 @@ func (h *testWebSocketManager) handleBeaconUpdate(client *models.WebSocketClient
 	}
 
 	if err := h.userUC.UpdateBeaconStatus(context.Background(), &beaconReq); err != nil {
-		return h.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidBeacon, err.Error())
+		return h.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidBeacon, "Unable to update beacon status")
 	}
 
 	response := models.BeaconResponse{
@@ -57,7 +57,7 @@ func (h *testWebSocketManager) handleMatchConfirmation(client *models.WebSocketC
 
 	result, err := h.userUC.ConfirmMatch(context.Background(), &confirm)
 	if err != nil {
-		return h.manager.SendErrorMessage(client.Conn, constants.ErrorMatchUpdateFailed, err.Error())
+		return h.manager.SendErrorMessage(client.Conn, constants.ErrorMatchUpdateFailed, "Unable to confirm match")
 	}
 
 	h.manager.NotifyClient(result.DriverID, constants.EventMatchConfirm, result)

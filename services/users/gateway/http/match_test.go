@@ -118,8 +118,12 @@ func TestHTTPGateway_MatchConfirm(t *testing.T) {
 			}))
 			defer server.Close()
 
-			// Create gateway with mock server URL
-			gateway := NewHTTPGateway(server.URL, "")
+			// Create gateway with mock server URL and API key config
+			config := &models.APIKeyConfig{
+				MatchService: "test-api-key",
+				RidesService: "test-api-key",
+			}
+			gateway := NewHTTPGatewayWithAPIKey(server.URL, "", config)
 
 			// Execute test
 			result, err := gateway.MatchConfirm(tt.request)
@@ -162,7 +166,11 @@ func TestHTTPGateway_MatchConfirm_NetworkError(t *testing.T) {
 	}))
 	server.Close() // Close server immediately to simulate network error
 
-	gateway := NewHTTPGateway(server.URL, "")
+	config := &models.APIKeyConfig{
+		MatchService: "test-api-key",
+		RidesService: "test-api-key",
+	}
+	gateway := NewHTTPGatewayWithAPIKey(server.URL, "", config)
 	request := &models.MatchConfirmRequest{
 		ID:     "match-123",
 		UserID: "user-456",
@@ -183,7 +191,11 @@ func TestHTTPGateway_MatchConfirm_InvalidResponseJSON(t *testing.T) {
 	}))
 	defer server.Close()
 
-	gateway := NewHTTPGateway(server.URL, "")
+	config := &models.APIKeyConfig{
+		MatchService: "test-api-key",
+		RidesService: "test-api-key",
+	}
+	gateway := NewHTTPGatewayWithAPIKey(server.URL, "", config)
 	request := &models.MatchConfirmRequest{
 		ID:     "match-123",
 		UserID: "user-456",
@@ -194,7 +206,7 @@ func TestHTTPGateway_MatchConfirm_InvalidResponseJSON(t *testing.T) {
 	result, err := gateway.MatchConfirm(request)
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "failed to parse match confirmation response")
+	assert.Contains(t, err.Error(), "failed to decode JSON response")
 }
 
 func TestHTTPGateway_MatchConfirm_EmptyResponse(t *testing.T) {
@@ -204,7 +216,11 @@ func TestHTTPGateway_MatchConfirm_EmptyResponse(t *testing.T) {
 	}))
 	defer server.Close()
 
-	gateway := NewHTTPGateway(server.URL, "")
+	config := &models.APIKeyConfig{
+		MatchService: "test-api-key",
+		RidesService: "test-api-key",
+	}
+	gateway := NewHTTPGatewayWithAPIKey(server.URL, "", config)
 	request := &models.MatchConfirmRequest{
 		ID:     "match-123",
 		UserID: "user-456",
@@ -215,7 +231,7 @@ func TestHTTPGateway_MatchConfirm_EmptyResponse(t *testing.T) {
 	result, err := gateway.MatchConfirm(request)
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "failed to parse match confirmation response")
+	assert.Contains(t, err.Error(), "failed to decode JSON response")
 }
 
 func TestNewMatchClient(t *testing.T) {

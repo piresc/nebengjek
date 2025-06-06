@@ -7,20 +7,23 @@ import (
 
 // MatchUC implements the match use case interface
 type MatchUC struct {
-	matchRepo match.MatchRepo
-	matchGW   match.MatchGW
-	cfg       *models.Config
+	matchRepo  match.MatchRepo
+	locationGW match.LocationGW
+	matchGW    match.MatchGW
+	cfg        *models.Config
 }
 
 // NewMatchUC creates a new match use case
 func NewMatchUC(
 	cfg *models.Config,
 	matchRepo match.MatchRepo,
+	locationGW match.LocationGW,
 	matchGW match.MatchGW,
 ) *MatchUC {
 	return &MatchUC{
-		cfg:       cfg,
-		matchRepo: matchRepo,
-		matchGW:   matchGW,
+		cfg:        cfg,
+		matchRepo:  matchRepo,
+		locationGW: locationGW,
+		matchGW:    matchGW,
 	}
 }

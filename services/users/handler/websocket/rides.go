@@ -3,6 +3,7 @@ package websocket
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/models"
@@ -12,11 +13,11 @@ import (
 func (m *WebSocketManager) handleRideStart(client *models.WebSocketClient, data json.RawMessage) error {
 	var event models.RideStartRequest
 	if err := json.Unmarshal(data, &event); err != nil {
-		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Invalid ride start trip format")
+		return m.SendCategorizedError(client, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
 	}
 	resp, err := m.userUC.RideStart(context.Background(), &event)
 	if err != nil {
-		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Failed to process ride start trip")
+		return m.SendCategorizedError(client, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 	}
 	// Directly notify both driver and passenger about the confirmation
 	m.manager.NotifyClient(resp.DriverID.String(), constants.EventRideStarted, resp)
@@ -29,13 +30,13 @@ func (m *WebSocketManager) handleRideStart(client *models.WebSocketClient, data 
 func (m *WebSocketManager) handleRideArrived(client *models.WebSocketClient, data json.RawMessage) error {
 	var event models.RideArrivalReq
 	if err := json.Unmarshal(data, &event); err != nil {
-		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Invalid ride arrival format")
+		return m.SendCategorizedError(client, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
 	}
 
 	// Call the use case to process the ride arrival via HTTP
 	paymentReq, err := m.userUC.RideArrived(context.Background(), &event)
 	if err != nil {
-		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Failed to process ride arrival")
+		return m.SendCategorizedError(client, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 	}
 	m.manager.NotifyClient(paymentReq.PassengerID, constants.EventPaymentRequest, paymentReq)
 
@@ -46,16 +47,17 @@ func (m *WebSocketManager) handleRideArrived(client *models.WebSocketClient, dat
 func (m *WebSocketManager) handleProcessPayment(client *models.WebSocketClient, data json.RawMessage) error {
 	var paymentReq models.PaymentProccessRequest
 	if err := json.Unmarshal(data, &paymentReq); err != nil {
-		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Invalid payment request format")
+		return m.SendCategorizedError(client, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
 	}
 	if paymentReq.Status != models.PaymentStatusAccepted && paymentReq.Status != models.PaymentStatusRejected {
-		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Invalid payment status")
+		validationErr := fmt.Errorf("invalid payment status: %s", paymentReq.Status)
+		return m.SendCategorizedError(client, validationErr, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
 	}
 
 	// Call the use case to process the payment
 	payment, err := m.userUC.ProcessPayment(context.Background(), &paymentReq)
 	if err != nil {
-		return m.manager.SendErrorMessage(client.Conn, constants.ErrorInvalidFormat, "Failed to process payment")
+		return m.SendCategorizedError(client, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 	}
 
 	// Notify the client about the processed payment

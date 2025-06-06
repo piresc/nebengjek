@@ -145,6 +145,46 @@ func (m *Manager) SendErrorMessage(conn *websocket.Conn, code string, message st
 	})
 }
 
+// SendCategorizedError sends an error message based on severity level
+func (m *Manager) SendCategorizedError(conn *websocket.Conn, err error, code string, severity constants.ErrorSeverity, userID string) error {
+	// Always log detailed error server-side
+	logger.Error("WebSocket operation failed",
+		logger.String("user_id", userID),
+		logger.String("error_code", code),
+		logger.String("severity", m.getSeverityString(severity)),
+		logger.Err(err))
+
+	switch severity {
+	case constants.ErrorSeverityClient:
+		// Show detailed error to client for validation/input issues
+		return m.SendErrorMessage(conn, code, err.Error())
+	case constants.ErrorSeveritySecurity:
+		// Minimal info to client for security issues
+		logger.Warn("Security-related error occurred",
+			logger.String("user_id", userID),
+			logger.String("error_code", code),
+			logger.Err(err))
+		return m.SendErrorMessage(conn, code, "Access denied")
+	default: // ErrorSeverityServer
+		// Generic message for server errors
+		return m.SendErrorMessage(conn, code, "Operation failed")
+	}
+}
+
+// getSeverityString returns string representation of error severity
+func (m *Manager) getSeverityString(severity constants.ErrorSeverity) string {
+	switch severity {
+	case constants.ErrorSeverityClient:
+		return "client"
+	case constants.ErrorSeverityServer:
+		return "server"
+	case constants.ErrorSeveritySecurity:
+		return "security"
+	default:
+		return "unknown"
+	}
+}
+
 // NotifyClient sends a notification to a specific client
 func (m *Manager) NotifyClient(userID string, event string, data interface{}) {
 	logger.Debug("Notifying client",

@@ -69,14 +69,15 @@ func main() {
 	}
 	defer natsClient.Close()
 
-	// Initialize repository
+	// Initialize repositories
 	matchRepo := repository.NewMatchRepository(configs, postgresClient.GetDB(), redisClient)
 
-	// Initialize gateway
+	// Initialize gateways
 	matchGW := gateway.NewMatchGW(natsClient)
+	locationGW := gateway.NewLocationGW(configs.Services.LocationServiceURL, &configs.APIKey) // Location service URL with API key
 
 	// Initialize usecase
-	matchUC := usecase.NewMatchUC(configs, matchRepo, matchGW)
+	matchUC := usecase.NewMatchUC(configs, matchRepo, locationGW, matchGW)
 
 	// Initialize handlers
 	handler := handler.NewHandler(matchUC, natsClient)
@@ -94,7 +95,7 @@ func main() {
 	e.Use(middleware.RequestIDMiddleware())
 	e.Use(middleware.RequestContextMiddleware(appName))
 	e.Use(logger.ZapEchoMiddleware(zapLogger))
-	
+
 	// Initialize API key middleware
 	apiKeyMiddleware := middleware.NewAPIKeyMiddleware(&configs.APIKey)
 
