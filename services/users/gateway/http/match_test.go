@@ -123,7 +123,7 @@ func TestHTTPGateway_MatchConfirm(t *testing.T) {
 				MatchService: "test-api-key",
 				RidesService: "test-api-key",
 			}
-			gateway := NewHTTPGatewayWithAPIKey(server.URL, "", config)
+			gateway := NewHTTPGateway(server.URL, "", config)
 
 			// Execute test
 			result, err := gateway.MatchConfirm(tt.request)
@@ -170,7 +170,7 @@ func TestHTTPGateway_MatchConfirm_NetworkError(t *testing.T) {
 		MatchService: "test-api-key",
 		RidesService: "test-api-key",
 	}
-	gateway := NewHTTPGatewayWithAPIKey(server.URL, "", config)
+	gateway := NewHTTPGateway(server.URL, "", config)
 	request := &models.MatchConfirmRequest{
 		ID:     "match-123",
 		UserID: "user-456",
@@ -195,7 +195,7 @@ func TestHTTPGateway_MatchConfirm_InvalidResponseJSON(t *testing.T) {
 		MatchService: "test-api-key",
 		RidesService: "test-api-key",
 	}
-	gateway := NewHTTPGatewayWithAPIKey(server.URL, "", config)
+	gateway := NewHTTPGateway(server.URL, "", config)
 	request := &models.MatchConfirmRequest{
 		ID:     "match-123",
 		UserID: "user-456",
@@ -220,7 +220,7 @@ func TestHTTPGateway_MatchConfirm_EmptyResponse(t *testing.T) {
 		MatchService: "test-api-key",
 		RidesService: "test-api-key",
 	}
-	gateway := NewHTTPGatewayWithAPIKey(server.URL, "", config)
+	gateway := NewHTTPGateway(server.URL, "", config)
 	request := &models.MatchConfirmRequest{
 		ID:     "match-123",
 		UserID: "user-456",
@@ -236,7 +236,10 @@ func TestHTTPGateway_MatchConfirm_EmptyResponse(t *testing.T) {
 
 func TestNewMatchClient(t *testing.T) {
 	url := "http://match-service:8080"
-	client := NewMatchClient(url)
+	config := &models.APIKeyConfig{
+		MatchService: "test-api-key",
+	}
+	client := NewMatchClient(url, config)
 
 	assert.NotNil(t, client)
 	assert.NotNil(t, client.client)
@@ -246,8 +249,12 @@ func TestNewMatchClient(t *testing.T) {
 func TestNewHTTPGateway(t *testing.T) {
 	matchURL := "http://match-service:8080"
 	rideURL := "http://ride-service:8080"
+	config := &models.APIKeyConfig{
+		MatchService: "test-api-key",
+		RidesService: "test-api-key",
+	}
 
-	gateway := NewHTTPGateway(matchURL, rideURL)
+	gateway := NewHTTPGateway(matchURL, rideURL, config)
 
 	assert.NotNil(t, gateway)
 	assert.NotNil(t, gateway.matchClient)

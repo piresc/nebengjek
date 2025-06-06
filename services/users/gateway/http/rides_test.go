@@ -64,7 +64,7 @@ func TestHTTPGateway_StartRide(t *testing.T) {
 				MatchService: "test-api-key",
 				RidesService: "test-api-key",
 			}
-			gateway := NewHTTPGatewayWithAPIKey("", server.URL, config)
+			gateway := NewHTTPGateway("", server.URL, config)
 			result, err := gateway.StartRide(tt.request)
 
 			if tt.expectError {
@@ -132,7 +132,7 @@ func TestHTTPGateway_RideArrived(t *testing.T) {
 				MatchService: "test-api-key",
 				RidesService: "test-api-key",
 			}
-			gateway := NewHTTPGatewayWithAPIKey("", server.URL, config)
+			gateway := NewHTTPGateway("", server.URL, config)
 			result, err := gateway.RideArrived(tt.request)
 
 			if tt.expectError {
@@ -204,7 +204,7 @@ func TestHTTPGateway_ProcessPayment(t *testing.T) {
 				MatchService: "test-api-key",
 				RidesService: "test-api-key",
 			}
-			gateway := NewHTTPGatewayWithAPIKey("", server.URL, config)
+			gateway := NewHTTPGateway("", server.URL, config)
 			result, err := gateway.ProcessPayment(tt.request)
 
 			if tt.expectError {
@@ -223,7 +223,10 @@ func TestHTTPGateway_ProcessPayment(t *testing.T) {
 
 func TestNewRideClient(t *testing.T) {
 	url := "http://ride-service:8080"
-	client := NewRideClient(url)
+	config := &models.APIKeyConfig{
+		RidesService: "test-api-key",
+	}
+	client := NewRideClient(url, config)
 
 	assert.NotNil(t, client)
 	assert.NotNil(t, client.client)
@@ -321,7 +324,7 @@ func TestHTTPGateway_StartRide_ErrorScenarios(t *testing.T) {
 				MatchService: "test-api-key",
 				RidesService: "test-api-key",
 			}
-			gateway := NewHTTPGatewayWithAPIKey("", server.URL, config)
+			gateway := NewHTTPGateway("", server.URL, config)
 			result, err := gateway.StartRide(tt.request)
 
 			assert.Error(t, err)
@@ -409,7 +412,7 @@ func TestHTTPGateway_RideArrived_ErrorScenarios(t *testing.T) {
 				MatchService: "test-api-key",
 				RidesService: "test-api-key",
 			}
-			gateway := NewHTTPGatewayWithAPIKey("", server.URL, config)
+			gateway := NewHTTPGateway("", server.URL, config)
 			result, err := gateway.RideArrived(tt.request)
 
 			assert.Error(t, err)
@@ -502,7 +505,7 @@ func TestHTTPGateway_ProcessPayment_ErrorScenarios(t *testing.T) {
 				MatchService: "test-api-key",
 				RidesService: "test-api-key",
 			}
-			gateway := NewHTTPGatewayWithAPIKey("", server.URL, config)
+			gateway := NewHTTPGateway("", server.URL, config)
 			result, err := gateway.ProcessPayment(tt.request)
 
 			assert.Error(t, err)
@@ -555,7 +558,7 @@ func TestHTTPGateway_RequestBodyValidation(t *testing.T) {
 			MatchService: "test-api-key",
 			RidesService: "test-api-key",
 		}
-		gateway := NewHTTPGatewayWithAPIKey("", server.URL, config)
+		gateway := NewHTTPGateway("", server.URL, config)
 		request := &models.RideStartRequest{
 			RideID: "ride-123",
 			DriverLocation: &models.Location{
@@ -603,7 +606,7 @@ func TestHTTPGateway_RequestBodyValidation(t *testing.T) {
 			MatchService: "test-api-key",
 			RidesService: "test-api-key",
 		}
-		gateway := NewHTTPGatewayWithAPIKey("", server.URL, config)
+		gateway := NewHTTPGateway("", server.URL, config)
 		request := &models.RideArrivalReq{
 			RideID:           "ride-123",
 			AdjustmentFactor: 0.9,
@@ -646,7 +649,7 @@ func TestHTTPGateway_RequestBodyValidation(t *testing.T) {
 			MatchService: "test-api-key",
 			RidesService: "test-api-key",
 		}
-		gateway := NewHTTPGatewayWithAPIKey("", server.URL, config)
+		gateway := NewHTTPGateway("", server.URL, config)
 		request := &models.PaymentProccessRequest{
 			RideID:    "ride-123",
 			TotalCost: 25000,

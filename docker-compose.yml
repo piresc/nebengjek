@@ -12,7 +12,7 @@ services:
       - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
       - NEW_RELIC_APP_NAME=NebengJek-Users
     env_file:
-      - ./cmd/users/.env
+      - ./config/users.env
     volumes:
       - ./logs:/app/logs
     depends_on:
@@ -45,7 +45,7 @@ services:
       - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
       - NEW_RELIC_APP_NAME=NebengJek-Location
     env_file:
-      - ./cmd/location/.env
+      - ./config/location.env
     volumes:
       - ./logs:/app/logs
     depends_on:
@@ -78,7 +78,7 @@ services:
       - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
       - NEW_RELIC_APP_NAME=NebengJek-Match
     env_file:
-      - ./cmd/match/.env
+      - ./config/match.env
     volumes:
       - ./logs:/app/logs
     depends_on:
@@ -111,7 +111,7 @@ services:
       - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
       - NEW_RELIC_APP_NAME=NebengJek-Rides
     env_file:
-      - ./cmd/rides/.env
+      - ./config/rides.env
     volumes:
       - ./logs:/app/logs
     depends_on:
@@ -180,13 +180,20 @@ services:
       retries: 5
       start_period: 30s
 
-  # NATS message broker
+  # NATS message broker with JetStream
   nats:
     image: nats:latest
     container_name: nebengjek-nats
+    command: [
+      "--jetstream",
+      "--store_dir=/data",
+      "--http_port=8222"
+    ]
     ports:
       - "4222:4222"
       - "8222:8222"
+    volumes:
+      - nats_data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8222/healthz"]
       interval: 5s
@@ -194,6 +201,7 @@ services:
       retries: 5
     networks:
       - backend
+    restart: unless-stopped
 
 volumes:
   postgres_data:

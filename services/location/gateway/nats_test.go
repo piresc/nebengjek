@@ -9,6 +9,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/models"
+	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -31,6 +32,15 @@ func (m *MockNATSClient) Publish(subject string, data []byte) error {
 		return m.publishError
 	}
 	m.publishedMessages[subject] = data
+	return nil
+}
+
+// PublishWithOptions simulates publishing a message with options (for JetStream compatibility)
+func (m *MockNATSClient) PublishWithOptions(opts natspkg.PublishOptions) error {
+	if m.publishError != nil {
+		return m.publishError
+	}
+	m.publishedMessages[opts.Subject] = opts.Data
 	return nil
 }
 

@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/nats-io/nats.go"
-	"github.com/piresc/nebengjek/internal/pkg/constants"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
@@ -31,20 +31,49 @@ func NewLocationHandler(
 	}
 }
 
-// InitNATSConsumers initializes all NATS consumers for the location service
+// InitNATSConsumers initializes all JetStream consumers for the location service
 func (h *LocationHandler) InitNATSConsumers() error {
-	// Initialize location update consumer
-	sub, err := h.natsClient.Subscribe(constants.SubjectLocationUpdate, func(msg *nats.Msg) {
-		if err := h.handleLocationUpdate(msg.Data); err != nil {
-			logger.Error("Error handling location update", logger.Err(err))
-		}
-	})
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to location updates: %w", err)
-	}
-	h.subs = append(h.subs, sub)
+	logger.Info("Initializing JetStream consumers for location service")
 
+	// Create JetStream consumers for location service
+	consumerConfigs := natspkg.DefaultConsumerConfigs()
+
+	// Create location update consumer
+	locationUpdateConfig := consumerConfigs["location_update_location"]
+	logger.Info("Creating location update consumer for location service",
+		logger.String("stream", locationUpdateConfig.StreamName),
+		logger.String("consumer", locationUpdateConfig.ConsumerName))
+
+	if err := h.natsClient.CreateConsumer(locationUpdateConfig); err != nil {
+		logger.Error("Failed to create location update consumer for location service",
+			logger.ErrorField(err))
+		return fmt.Errorf("failed to create location update consumer: %w", err)
+	}
+
+	// Start consuming location update events
+	if err := h.natsClient.ConsumeMessages("LOCATION_STREAM", "location_update_location", h.handleLocationUpdateJS); err != nil {
+		logger.Error("Failed to start consuming location update events for location service",
+			logger.ErrorField(err))
+		return fmt.Errorf("failed to start consuming location update events: %w", err)
+	}
+
+	logger.Info("Successfully initialized JetStream consumers for location service")
 	return nil
+}
+
+// JetStream message handlers with proper acknowledgment
+
+// handleLocationUpdateJS processes location update events from JetStream
+func (h *LocationHandler) handleLocationUpdateJS(msg jetstream.Msg) error {
+	logger.InfoCtx(context.Background(), "Received location update event from JetStream",
+		logger.String("subject", msg.Subject()))
+
+	if err := h.handleLocationUpdate(msg.Data()); err != nil {
+		logger.ErrorCtx(context.Background(), "Error handling location update event", logger.Err(err))
+		return err // Return error to trigger NAK and retry
+	}
+
+	return nil // Success - message will be ACKed automatically
 }
 
 // handleLocationUpdate processes location update events

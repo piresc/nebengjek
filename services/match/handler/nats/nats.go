@@ -6,21 +6,21 @@ import (
 	"fmt"
 
 	"github.com/nats-io/nats.go"
-	"github.com/piresc/nebengjek/internal/pkg/constants"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/match"
 )
 
-// NatsHandler handles NATS subscriptions for the match service
+// MatchHandler handles JetStream subscriptions for the match service
 type MatchHandler struct {
 	matchUC    match.MatchUC
 	natsClient *natspkg.Client
 	subs       []*nats.Subscription
 }
 
-// NewNatsHandler creates a new match NATS handler
+// NewMatchHandler creates a new match NATS handler
 func NewMatchHandler(matchUC match.MatchUC, client *natspkg.Client) *MatchHandler {
 	return &MatchHandler{
 		matchUC:    matchUC,
@@ -29,55 +29,145 @@ func NewMatchHandler(matchUC match.MatchUC, client *natspkg.Client) *MatchHandle
 	}
 }
 
-// InitNATSConsumers initializes all NATS consumers for the match service
+// InitNATSConsumers initializes all JetStream consumers for the match service
 func (h *MatchHandler) InitNATSConsumers() error {
-	// Initialize beacon events consumer
-	sub, err := h.natsClient.Subscribe(constants.SubjectUserBeacon, func(msg *nats.Msg) {
-		if err := h.handleBeaconEvent(msg.Data); err != nil {
-			logger.Error("Error handling beacon event", logger.Err(err))
-		}
-	})
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to beacon events: %w", err)
+	logger.Info("Initializing JetStream consumers for match service")
+
+	// Create JetStream consumers for match service
+	consumerConfigs := natspkg.DefaultConsumerConfigs()
+
+	// Create user beacon consumer
+	beaconConfig := consumerConfigs["user_beacon_match"]
+	logger.Info("Creating user beacon consumer for match service",
+		logger.String("stream", beaconConfig.StreamName),
+		logger.String("consumer", beaconConfig.ConsumerName))
+
+	if err := h.natsClient.CreateConsumer(beaconConfig); err != nil {
+		logger.Error("Failed to create user beacon consumer for match service",
+			logger.ErrorField(err))
+		return fmt.Errorf("failed to create user beacon consumer: %w", err)
 	}
-	h.subs = append(h.subs, sub)
 
-	// Initialize finder events consumer
-	sub, err = h.natsClient.Subscribe(constants.SubjectUserFinder, func(msg *nats.Msg) {
-		if err := h.handleFinderEvent(msg.Data); err != nil {
-			logger.Error("Error handling finder event", logger.Err(err))
-		}
-	})
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to finder events: %w", err)
+	// Start consuming beacon events
+	if err := h.natsClient.ConsumeMessages("USER_STREAM", "user_beacon_match", h.handleBeaconEventJS); err != nil {
+		logger.Error("Failed to start consuming beacon events for match service",
+			logger.ErrorField(err))
+		return fmt.Errorf("failed to start consuming beacon events: %w", err)
 	}
-	h.subs = append(h.subs, sub)
 
-	// Subscribe to ride pickup events to lock drivers
-	sub, err = h.natsClient.Subscribe(constants.SubjectRidePickup, func(msg *nats.Msg) {
-		if err := h.handleRidePickup(msg.Data); err != nil {
-			logger.Error("Error handling ride pickup event", logger.Err(err))
-		}
-	})
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to ride pickup events: %w", err)
+	// Create user finder consumer
+	finderConfig := consumerConfigs["user_finder_match"]
+	logger.Info("Creating user finder consumer for match service",
+		logger.String("stream", finderConfig.StreamName),
+		logger.String("consumer", finderConfig.ConsumerName))
+
+	if err := h.natsClient.CreateConsumer(finderConfig); err != nil {
+		logger.Error("Failed to create user finder consumer for match service",
+			logger.ErrorField(err))
+		return fmt.Errorf("failed to create user finder consumer: %w", err)
 	}
-	h.subs = append(h.subs, sub)
 
-	// Subscribe to ride completed events to unlock users
-	sub, err = h.natsClient.Subscribe(constants.SubjectRideCompleted, func(msg *nats.Msg) {
-		if err := h.handleRideCompleted(msg.Data); err != nil {
-			logger.Error("Error handling ride completed event", logger.Err(err))
-		}
-	})
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to ride completed events: %w", err)
+	// Start consuming finder events
+	if err := h.natsClient.ConsumeMessages("USER_STREAM", "user_finder_match", h.handleFinderEventJS); err != nil {
+		logger.Error("Failed to start consuming finder events for match service",
+			logger.ErrorField(err))
+		return fmt.Errorf("failed to start consuming finder events: %w", err)
 	}
-	h.subs = append(h.subs, sub)
 
-	// Note: Match confirmations are now handled directly via HTTP responses
+	// Create ride pickup consumer
+	ridePickupConfig := consumerConfigs["ride_pickup_match"]
+	logger.Info("Creating ride pickup consumer for match service",
+		logger.String("stream", ridePickupConfig.StreamName),
+		logger.String("consumer", ridePickupConfig.ConsumerName))
 
+	if err := h.natsClient.CreateConsumer(ridePickupConfig); err != nil {
+		logger.Error("Failed to create ride pickup consumer for match service",
+			logger.ErrorField(err))
+		return fmt.Errorf("failed to create ride pickup consumer: %w", err)
+	}
+
+	// Start consuming ride pickup events
+	if err := h.natsClient.ConsumeMessages("RIDE_STREAM", "ride_pickup_match", h.handleRidePickupJS); err != nil {
+		logger.Error("Failed to start consuming ride pickup events for match service",
+			logger.ErrorField(err))
+		return fmt.Errorf("failed to start consuming ride pickup events: %w", err)
+	}
+
+	// Create ride completed consumer
+	rideCompletedConfig := consumerConfigs["ride_completed_match"]
+	logger.Info("Creating ride completed consumer for match service",
+		logger.String("stream", rideCompletedConfig.StreamName),
+		logger.String("consumer", rideCompletedConfig.ConsumerName))
+
+	if err := h.natsClient.CreateConsumer(rideCompletedConfig); err != nil {
+		logger.Error("Failed to create ride completed consumer for match service",
+			logger.ErrorField(err))
+		return fmt.Errorf("failed to create ride completed consumer: %w", err)
+	}
+
+	// Start consuming ride completed events
+	if err := h.natsClient.ConsumeMessages("RIDE_STREAM", "ride_completed_match", h.handleRideCompletedJS); err != nil {
+		logger.Error("Failed to start consuming ride completed events for match service",
+			logger.ErrorField(err))
+		return fmt.Errorf("failed to start consuming ride completed events: %w", err)
+	}
+
+	logger.Info("Successfully initialized JetStream consumers for match service")
 	return nil
+}
+
+// JetStream message handlers with proper acknowledgment
+
+// handleBeaconEventJS processes beacon events from JetStream
+func (h *MatchHandler) handleBeaconEventJS(msg jetstream.Msg) error {
+	logger.InfoCtx(context.Background(), "Received beacon event from JetStream",
+		logger.String("subject", msg.Subject()))
+
+	if err := h.handleBeaconEvent(msg.Data()); err != nil {
+		logger.ErrorCtx(context.Background(), "Error handling beacon event", logger.Err(err))
+		return err // Return error to trigger NAK and retry
+	}
+
+	return nil // Success - message will be ACKed automatically
+}
+
+// handleFinderEventJS processes finder events from JetStream
+func (h *MatchHandler) handleFinderEventJS(msg jetstream.Msg) error {
+	logger.InfoCtx(context.Background(), "Received finder event from JetStream",
+		logger.String("subject", msg.Subject()))
+
+	if err := h.handleFinderEvent(msg.Data()); err != nil {
+		logger.ErrorCtx(context.Background(), "Error handling finder event", logger.Err(err))
+		return err // Return error to trigger NAK and retry
+	}
+
+	return nil // Success - message will be ACKed automatically
+}
+
+// handleRidePickupJS processes ride pickup events from JetStream
+func (h *MatchHandler) handleRidePickupJS(msg jetstream.Msg) error {
+	logger.InfoCtx(context.Background(), "Received ride pickup event from JetStream",
+		logger.String("subject", msg.Subject()))
+
+	if err := h.handleRidePickup(msg.Data()); err != nil {
+		logger.ErrorCtx(context.Background(), "Error handling ride pickup event", logger.Err(err))
+		return err // Return error to trigger NAK and retry
+	}
+
+	return nil // Success - message will be ACKed automatically
+}
+
+// handleRideCompletedJS processes ride completed events from JetStream
+func (h *MatchHandler) handleRideCompletedJS(msg jetstream.Msg) error {
+	logger.InfoCtx(context.Background(), "Received ride completed event from JetStream",
+		logger.String("subject", msg.Subject()))
+
+	if err := h.handleRideCompleted(msg.Data()); err != nil {
+		logger.ErrorCtx(context.Background(), "Error handling ride completed event", logger.Err(err))
+		return err // Return error to trigger NAK and retry
+	}
+
+	return nil // Success - message will be ACKed automatically
 }
 
 // handleBeaconEvent processes beacon events from the user service

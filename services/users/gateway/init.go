@@ -14,18 +14,10 @@ type UserGW struct {
 	httpGateway *gateaway_http.HTTPGateway
 }
 
-// NewUserGW creates a new gateway instance with NATS and HTTP clients
-func NewUserGW(natsClient *natspkg.Client, matchServiceURL string, rideServiceURL string) users.UserGW {
+// NewUserGW creates a new gateway instance with NATS and HTTP clients with API key authentication
+func NewUserGW(natsClient *natspkg.Client, matchServiceURL string, rideServiceURL string, config *models.APIKeyConfig) users.UserGW {
 	return &UserGW{
 		natsGateway: gateway_nats.NewNATSGateway(natsClient),
-		httpGateway: gateaway_http.NewHTTPGateway(matchServiceURL, rideServiceURL),
-	}
-}
-
-// NewUserGWWithAPIKey creates a new gateway instance with NATS and HTTP clients with API key authentication
-func NewUserGWWithAPIKey(natsClient *natspkg.Client, matchServiceURL string, rideServiceURL string, config *models.APIKeyConfig) users.UserGW {
-	return &UserGW{
-		natsGateway: gateway_nats.NewNATSGateway(natsClient),
-		httpGateway: gateaway_http.NewHTTPGatewayWithAPIKey(matchServiceURL, rideServiceURL, config),
+		httpGateway: gateaway_http.NewHTTPGateway(matchServiceURL, rideServiceURL, config),
 	}
 }

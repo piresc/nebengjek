@@ -62,12 +62,21 @@ func main() {
 	}
 	defer redisClient.Close()
 
-	// Initialize NATS client
+	// Initialize JetStream-enabled NATS client
 	natsClient, err := nats.NewClient(configs.NATS.URL)
 	if err != nil {
-		zapLogger.Fatal("Failed to connect to NATS", logger.Err(err))
+		zapLogger.Fatal("Failed to connect to NATS with JetStream", logger.Err(err))
 	}
 	defer natsClient.Close()
+
+	// Verify JetStream is available
+	if !natsClient.IsConnected() {
+		zapLogger.Fatal("NATS JetStream client not connected")
+	}
+
+	logger.Info("JetStream client initialized successfully",
+		logger.String("url", configs.NATS.URL),
+		logger.Bool("connected", natsClient.IsConnected()))
 
 	// Initialize repository
 	rideRepo := repository.NewRideRepository(configs, postgresClient.GetDB())
@@ -96,7 +105,7 @@ func main() {
 	e.Use(middleware.PanicRecoveryWithZapMiddleware(zapLogger))
 	e.Use(middleware.RequestIDMiddleware())
 	e.Use(logger.ZapEchoMiddleware(zapLogger))
-	
+
 	// Initialize API key middleware
 	apiKeyMiddleware := middleware.NewAPIKeyMiddleware(&configs.APIKey)
 

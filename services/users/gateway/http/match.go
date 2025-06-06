@@ -15,15 +15,8 @@ type MatchClient struct {
 	apiClient *httpclient.APIKeyClient
 }
 
-// NewMatchClient creates a new match HTTP client
-func NewMatchClient(matchServiceURL string) *MatchClient {
-	return &MatchClient{
-		client: httpclient.NewClient(matchServiceURL, 10*time.Second),
-	}
-}
-
-// NewMatchClientWithAPIKey creates a new match HTTP client with API key authentication
-func NewMatchClientWithAPIKey(matchServiceURL string, config *models.APIKeyConfig) *MatchClient {
+// NewMatchClient creates a new match HTTP client with API key authentication
+func NewMatchClient(matchServiceURL string, config *models.APIKeyConfig) *MatchClient {
 	return &MatchClient{
 		client:    httpclient.NewClient(matchServiceURL, 10*time.Second),
 		apiClient: httpclient.NewAPIKeyClient(config, "match-service", matchServiceURL),
@@ -36,19 +29,11 @@ type HTTPGateway struct {
 	rideClient  *RideClient
 }
 
-// NewHTTPGateway creates a new HTTP gateway for the users service
-func NewHTTPGateway(matchServiceURL string, rideServiceURL string) *HTTPGateway {
+// NewHTTPGateway creates a new HTTP gateway for the users service with API key authentication
+func NewHTTPGateway(matchServiceURL string, rideServiceURL string, config *models.APIKeyConfig) *HTTPGateway {
 	return &HTTPGateway{
-		matchClient: NewMatchClient(matchServiceURL),
-		rideClient:  NewRideClient(rideServiceURL),
-	}
-}
-
-// NewHTTPGatewayWithAPIKey creates a new HTTP gateway with API key authentication
-func NewHTTPGatewayWithAPIKey(matchServiceURL string, rideServiceURL string, config *models.APIKeyConfig) *HTTPGateway {
-	return &HTTPGateway{
-		matchClient: NewMatchClientWithAPIKey(matchServiceURL, config),
-		rideClient:  NewRideClientWithAPIKey(rideServiceURL, config),
+		matchClient: NewMatchClient(matchServiceURL, config),
+		rideClient:  NewRideClient(rideServiceURL, config),
 	}
 }
 

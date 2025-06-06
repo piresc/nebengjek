@@ -66,18 +66,27 @@ func main() {
 	}
 	defer redisClient.Close()
 
-	// Initialize NATS client
+	// Initialize JetStream-enabled NATS client
 	natsClient, err := nats.NewClient(configs.NATS.URL)
 	if err != nil {
-		zapLogger.Fatal("Failed to connect to NATS", logger.Err(err))
+		zapLogger.Fatal("Failed to connect to NATS with JetStream", logger.Err(err))
 	}
 	defer natsClient.Close()
+
+	// Verify JetStream is available
+	if !natsClient.IsConnected() {
+		zapLogger.Fatal("NATS JetStream client not connected")
+	}
+
+	logger.Info("JetStream client initialized successfully",
+		logger.String("url", configs.NATS.URL),
+		logger.Bool("connected", natsClient.IsConnected()))
 
 	// Initialize repository
 	userRepo := repository.NewUserRepo(configs, postgresClient.GetDB(), redisClient)
 
 	// Initialize gateway with API key support
-	userGW := gateway.NewUserGWWithAPIKey(natsClient, configs.Services.MatchServiceURL, configs.Services.RidesServiceURL, &configs.APIKey)
+	userGW := gateway.NewUserGW(natsClient, configs.Services.MatchServiceURL, configs.Services.RidesServiceURL, &configs.APIKey)
 
 	// Initialize usecase
 	userUC := usecase.NewUserUC(userRepo, userGW, configs)

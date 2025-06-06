@@ -62,16 +62,30 @@ func NewNATSHealthChecker(client *nats.Client) *NATSHealthChecker {
 	return &NATSHealthChecker{client: client}
 }
 
-// CheckHealth checks if NATS is healthy
+// CheckHealth checks if NATS and JetStream are healthy
 func (n *NATSHealthChecker) CheckHealth(ctx context.Context) error {
 	if n.client == nil {
 		return nil // Skip if no NATS client
 	}
-	// Simple check to see if connection is still alive
+
+	// Check basic NATS connection
 	conn := n.client.GetConn()
 	if conn == nil || !conn.IsConnected() {
 		return echo.NewHTTPError(http.StatusServiceUnavailable, "NATS not connected")
 	}
+
+	// Check JetStream availability
+	js := n.client.GetJetStream()
+	if js == nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "JetStream not available")
+	}
+
+	// Verify we can list streams (basic JetStream health check)
+	_, err := n.client.ListStreams()
+	if err != nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "JetStream streams not accessible: "+err.Error())
+	}
+
 	return nil
 }
 

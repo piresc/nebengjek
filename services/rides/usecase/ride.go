@@ -34,7 +34,8 @@ func NewRideUC(
 
 // CreateRide creates a new ride from a confirmed match
 func (uc *rideUC) CreateRide(ctx context.Context, mp models.MatchProposal) error {
-	logger.Info("Creating ride",
+	logger.Info("Creating ride from match proposal",
+		logger.String("match_id", mp.ID),
 		logger.String("driver_id", mp.DriverID),
 		logger.String("passenger_id", mp.PassengerID))
 
@@ -46,22 +47,41 @@ func (uc *rideUC) CreateRide(ctx context.Context, mp models.MatchProposal) error
 		TotalCost:   0,                             // This will be calculated later
 	}
 
+	logger.Info("Creating ride in database",
+		logger.String("driver_id", ride.DriverID.String()),
+		logger.String("passenger_id", ride.PassengerID.String()),
+		logger.String("status", string(ride.Status)))
+
 	// Delegate to repository
 	createdRide, err := uc.ridesRepo.CreateRide(ride)
 	if err != nil {
-		logger.Error("Failed to create ride",
-			logger.ErrorField(err))
-		return err
-	}
-	err = uc.ridesGW.PublishRidePickup(context.Background(), createdRide)
-	if err != nil {
-		logger.Error("Failed to publish ride started event",
+		logger.Error("Failed to create ride in database",
+			logger.String("driver_id", mp.DriverID),
+			logger.String("passenger_id", mp.PassengerID),
 			logger.ErrorField(err))
 		return err
 	}
 
-	logger.Info("Successfully created ride",
-		logger.String("ride_id", createdRide.RideID.String()))
+	logger.Info("Ride created successfully in database, publishing pickup event",
+		logger.String("ride_id", createdRide.RideID.String()),
+		logger.String("driver_id", createdRide.DriverID.String()),
+		logger.String("passenger_id", createdRide.PassengerID.String()),
+		logger.String("status", string(createdRide.Status)))
+
+	err = uc.ridesGW.PublishRidePickup(context.Background(), createdRide)
+	if err != nil {
+		logger.Error("Failed to publish ride pickup event to NATS",
+			logger.String("ride_id", createdRide.RideID.String()),
+			logger.String("driver_id", createdRide.DriverID.String()),
+			logger.String("passenger_id", createdRide.PassengerID.String()),
+			logger.ErrorField(err))
+		return err
+	}
+
+	logger.Info("Successfully created ride and published pickup event",
+		logger.String("ride_id", createdRide.RideID.String()),
+		logger.String("driver_id", createdRide.DriverID.String()),
+		logger.String("passenger_id", createdRide.PassengerID.String()))
 	return nil
 }
 

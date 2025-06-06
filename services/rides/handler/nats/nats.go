@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
-	"github.com/piresc/nebengjek/internal/pkg/constants"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
@@ -21,7 +21,7 @@ type RidesHandler struct {
 	cfg        *models.Config
 }
 
-// NewNatsHandler creates a new rides NATS handler
+// NewRidesHandler creates a new rides NATS handler
 func NewRidesHandler(
 	ridesUC rides.RideUC,
 	client *natspkg.Client,
@@ -35,52 +35,119 @@ func NewRidesHandler(
 	}
 }
 
-// InitNATSConsumers initializes all NATS consumers for the rides service
+// InitNATSConsumers initializes all JetStream consumers for the rides service
 func (h *RidesHandler) InitNATSConsumers() error {
-	// Initialize match accepted consumer
-	sub, err := h.natsClient.Subscribe(constants.SubjectMatchAccepted, func(msg *nats.Msg) {
-		if err := h.handleMatchAccepted(msg.Data); err != nil {
-			logger.Error("Error handling match accepted event", logger.ErrorField(err))
-		}
-	})
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to match accepted events: %w", err)
-	}
-	h.subs = append(h.subs, sub)
+	logger.Info("Initializing JetStream consumers for rides service")
 
-	// Initialize location aggregate consumer
-	sub, err = h.natsClient.Subscribe(constants.SubjectLocationAggregate, func(msg *nats.Msg) {
-		if err := h.handleLocationAggregate(msg.Data); err != nil {
-			logger.Error("Error handling location aggregate", logger.ErrorField(err))
-		}
-	})
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to location aggregates: %w", err)
-	}
-	h.subs = append(h.subs, sub)
+	// Create JetStream consumers for rides service
+	consumerConfigs := natspkg.DefaultConsumerConfigs()
 
+	// Create match accepted consumer (using service-specific naming pattern)
+	matchAcceptedConfig := consumerConfigs["match_accepted_rides"]
+	logger.Info("Creating match accepted consumer for rides service",
+		logger.String("stream", matchAcceptedConfig.StreamName),
+		logger.String("consumer", matchAcceptedConfig.ConsumerName),
+		logger.String("filter_subject", matchAcceptedConfig.FilterSubject))
+
+	if err := h.natsClient.CreateConsumer(matchAcceptedConfig); err != nil {
+		logger.Error("Failed to create match accepted consumer for rides service",
+			logger.String("consumer", matchAcceptedConfig.ConsumerName),
+			logger.ErrorField(err))
+		return fmt.Errorf("failed to create match accepted consumer: %w", err)
+	}
+
+	// Start consuming match accepted events
+	logger.Info("Starting to consume match accepted events for rides service",
+		logger.String("stream", "MATCH_STREAM"),
+		logger.String("consumer", "match_accepted_rides"))
+
+	if err := h.natsClient.ConsumeMessages("MATCH_STREAM", "match_accepted_rides", h.handleMatchAcceptedJS); err != nil {
+		logger.Error("Failed to start consuming match accepted events for rides service",
+			logger.ErrorField(err))
+		return fmt.Errorf("failed to start consuming match accepted events: %w", err)
+	}
+
+	// Create location aggregate consumer
+	locationAggregateConfig := consumerConfigs["location_aggregate_rides"]
+	logger.Info("Creating location aggregate consumer for rides service",
+		logger.String("stream", locationAggregateConfig.StreamName),
+		logger.String("consumer", locationAggregateConfig.ConsumerName))
+
+	if err := h.natsClient.CreateConsumer(locationAggregateConfig); err != nil {
+		logger.Error("Failed to create location aggregate consumer for rides service",
+			logger.ErrorField(err))
+		return fmt.Errorf("failed to create location aggregate consumer: %w", err)
+	}
+
+	// Start consuming location aggregate events
+	if err := h.natsClient.ConsumeMessages("LOCATION_STREAM", "location_aggregate_rides", h.handleLocationAggregateJS); err != nil {
+		logger.Error("Failed to start consuming location aggregate events for rides service",
+			logger.ErrorField(err))
+		return fmt.Errorf("failed to start consuming location aggregate events: %w", err)
+	}
+
+	logger.Info("Successfully initialized JetStream consumers for rides service")
 	return nil
+}
+
+// JetStream message handlers with proper acknowledgment
+
+// handleMatchAcceptedJS processes match accepted events from JetStream
+func (h *RidesHandler) handleMatchAcceptedJS(msg jetstream.Msg) error {
+	logger.InfoCtx(context.Background(), "Received match accepted event from JetStream",
+		logger.String("subject", msg.Subject()))
+
+	if err := h.handleMatchAccepted(msg.Data()); err != nil {
+		logger.ErrorCtx(context.Background(), "Error handling match accepted event", logger.Err(err))
+		return err // Return error to trigger NAK and retry
+	}
+
+	return nil // Success - message will be ACKed automatically
+}
+
+// handleLocationAggregateJS processes location aggregate events from JetStream
+func (h *RidesHandler) handleLocationAggregateJS(msg jetstream.Msg) error {
+	logger.InfoCtx(context.Background(), "Received location aggregate event from JetStream",
+		logger.String("subject", msg.Subject()))
+
+	if err := h.handleLocationAggregate(msg.Data()); err != nil {
+		logger.ErrorCtx(context.Background(), "Error handling location aggregate event", logger.Err(err))
+		return err // Return error to trigger NAK and retry
+	}
+
+	return nil // Success - message will be ACKed automatically
 }
 
 // handleMatchAccepted processes match acceptance events to create rides
 func (h *RidesHandler) handleMatchAccepted(msg []byte) error {
+	logger.InfoCtx(context.Background(), "Processing match accepted event from JetStream",
+		logger.String("message_size", fmt.Sprintf("%d bytes", len(msg))))
+
 	var matchProposal models.MatchProposal
 	if err := json.Unmarshal(msg, &matchProposal); err != nil {
-		logger.ErrorCtx(context.Background(), "Failed to unmarshal match proposal", logger.ErrorField(err))
+		logger.ErrorCtx(context.Background(), "Failed to unmarshal match proposal",
+			logger.String("raw_message", string(msg)),
+			logger.ErrorField(err))
 		return err
 	}
 
-	logger.InfoCtx(context.Background(), "Received match accepted event",
+	logger.InfoCtx(context.Background(), "Successfully parsed match accepted event, creating ride",
 		logger.String("match_id", matchProposal.ID),
 		logger.String("driver_id", matchProposal.DriverID),
 		logger.String("passenger_id", matchProposal.PassengerID))
 
 	// Create a ride from the match proposal
 	if err := h.ridesUC.CreateRide(context.Background(), matchProposal); err != nil {
-		logger.ErrorCtx(context.Background(), "Failed to create ride from match", logger.ErrorField(err))
+		logger.ErrorCtx(context.Background(), "Failed to create ride from match proposal",
+			logger.String("match_id", matchProposal.ID),
+			logger.String("driver_id", matchProposal.DriverID),
+			logger.String("passenger_id", matchProposal.PassengerID),
+			logger.ErrorField(err))
 		return err
 	}
 
+	logger.InfoCtx(context.Background(), "Successfully processed match accepted event and created ride",
+		logger.String("match_id", matchProposal.ID))
 	return nil
 }
 

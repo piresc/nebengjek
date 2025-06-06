@@ -15,16 +15,8 @@ type RideClient struct {
 	apiClient *httpclient.APIKeyClient
 }
 
-// NewRideClient creates a new enhanced ride HTTP client
-func NewRideClient(rideServiceURL string) *RideClient {
-	return &RideClient{
-		client:    httpclient.NewClient(rideServiceURL, 10*time.Second),
-		apiClient: nil, // No API key client for basic version
-	}
-}
-
-// NewRideClientWithAPIKey creates a new enhanced ride HTTP client with API key authentication
-func NewRideClientWithAPIKey(rideServiceURL string, config *models.APIKeyConfig) *RideClient {
+// NewRideClient creates a new enhanced ride HTTP client with API key authentication
+func NewRideClient(rideServiceURL string, config *models.APIKeyConfig) *RideClient {
 	return &RideClient{
 		client:    httpclient.NewClient(rideServiceURL, 10*time.Second),
 		apiClient: httpclient.NewAPIKeyClient(config, "rides-service", rideServiceURL),
