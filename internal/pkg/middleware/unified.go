@@ -16,27 +16,27 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/observability"
 )
 
-// UnifiedConfig holds configuration for the unified middleware
-type UnifiedConfig struct {
+// Config holds configuration for the middleware
+type Config struct {
 	Logger      *slog.Logger
 	Tracer      observability.Tracer
 	APIKeys     map[string]string
 	ServiceName string
 }
 
-// UnifiedMiddleware combines multiple middleware into a single, efficient handler
+// Middleware combines multiple middleware into a single, efficient handler
 // This replaces: PanicRecovery, RequestID, RequestContext, Logger, and APM middleware
-type UnifiedMiddleware struct {
-	config UnifiedConfig
+type Middleware struct {
+	config Config
 }
 
-// NewUnifiedMiddleware creates a new unified middleware instance
-func NewUnifiedMiddleware(config UnifiedConfig) *UnifiedMiddleware {
-	return &UnifiedMiddleware{config: config}
+// NewMiddleware creates a new middleware instance
+func NewMiddleware(config Config) *Middleware {
+	return &Middleware{config: config}
 }
 
 // Handler returns the main middleware handler that combines all functionality
-func (m *UnifiedMiddleware) Handler() echo.MiddlewareFunc {
+func (m *Middleware) Handler() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			start := time.Now()
@@ -60,9 +60,12 @@ func (m *UnifiedMiddleware) Handler() echo.MiddlewareFunc {
 				defer txn.End()
 				txn.SetWebRequest(c.Request())
 
-				// Add transaction context
+				// Add transaction context - this ensures New Relic context is available for logging
 				ctx = txn.GetContext()
 				c.SetRequest(c.Request().WithContext(ctx))
+
+				// Store transaction in Echo context for easy access
+				c.Set("nr_txn", txn)
 			}
 
 			// 4. Wrap response writer to capture response body for error logging
@@ -97,7 +100,7 @@ func (m *UnifiedMiddleware) Handler() echo.MiddlewareFunc {
 }
 
 // APIKeyHandler returns middleware for API key validation
-func (m *UnifiedMiddleware) APIKeyHandler(allowedServices ...string) echo.MiddlewareFunc {
+func (m *Middleware) APIKeyHandler(allowedServices ...string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			apiKey := c.Request().Header.Get("X-API-Key")
@@ -125,7 +128,7 @@ func (m *UnifiedMiddleware) APIKeyHandler(allowedServices ...string) echo.Middle
 }
 
 // handlePanic handles panic recovery with enhanced diagnostic logging
-func (m *UnifiedMiddleware) handlePanic(c echo.Context, r interface{}, requestID string, txn observability.Transaction) {
+func (m *Middleware) handlePanic(c echo.Context, r interface{}, requestID string, txn observability.Transaction) {
 	stack := debug.Stack()
 
 	// Enhanced diagnostic logging for WebSocket hijack failures
@@ -181,7 +184,7 @@ func (m *UnifiedMiddleware) handlePanic(c echo.Context, r interface{}, requestID
 			args[i*2+1] = attr.Value
 		}
 
-		m.config.Logger.Error("Panic recovered", args...)
+		m.config.Logger.ErrorContext(c.Request().Context(), "Panic recovered", args...)
 	}
 
 	// Report to APM if enabled
@@ -200,7 +203,7 @@ func (m *UnifiedMiddleware) handlePanic(c echo.Context, r interface{}, requestID
 }
 
 // logRequest logs the HTTP request with essential information
-func (m *UnifiedMiddleware) logRequest(c echo.Context, requestID string, duration time.Duration, err error, responseBody []byte) {
+func (m *Middleware) logRequest(c echo.Context, requestID string, duration time.Duration, err error, responseBody []byte) {
 	if m.config.Logger == nil {
 		return
 	}
@@ -209,7 +212,7 @@ func (m *UnifiedMiddleware) logRequest(c echo.Context, requestID string, duratio
 
 	// Handle cases where we have a Go error
 	if err != nil {
-		m.config.Logger.Error("Request failed",
+		m.config.Logger.ErrorContext(c.Request().Context(), "Request failed",
 			slog.String("request_id", requestID),
 			slog.String("method", c.Request().Method),
 			slog.String("path", c.Request().URL.Path),
@@ -227,40 +230,63 @@ func (m *UnifiedMiddleware) logRequest(c echo.Context, requestID string, duratio
 		// Try to extract error details from response body
 		errorDetails := m.extractErrorFromResponse(responseBody, status)
 
-		logLevel := m.config.Logger.Warn
 		logMessage := "Request completed with error"
 
 		// Use Error level for 5xx status codes
 		if status >= 500 {
-			logLevel = m.config.Logger.Error
 			logMessage = "Request failed with server error"
 		}
 
 		if errorDetails != "" {
-			logLevel(logMessage,
-				slog.String("request_id", requestID),
-				slog.String("method", c.Request().Method),
-				slog.String("path", c.Request().URL.Path),
-				slog.Int("status", status),
-				slog.Duration("duration", duration),
-				slog.String("ip", c.RealIP()),
-				slog.Int64("bytes_out", c.Response().Size),
-				slog.String("error_details", errorDetails),
-			)
+			if status >= 500 {
+				m.config.Logger.ErrorContext(c.Request().Context(), logMessage,
+					slog.String("request_id", requestID),
+					slog.String("method", c.Request().Method),
+					slog.String("path", c.Request().URL.Path),
+					slog.Int("status", status),
+					slog.Duration("duration", duration),
+					slog.String("ip", c.RealIP()),
+					slog.Int64("bytes_out", c.Response().Size),
+					slog.String("error_details", errorDetails),
+				)
+			} else {
+				m.config.Logger.WarnContext(c.Request().Context(), logMessage,
+					slog.String("request_id", requestID),
+					slog.String("method", c.Request().Method),
+					slog.String("path", c.Request().URL.Path),
+					slog.Int("status", status),
+					slog.Duration("duration", duration),
+					slog.String("ip", c.RealIP()),
+					slog.Int64("bytes_out", c.Response().Size),
+					slog.String("error_details", errorDetails),
+				)
+			}
 		} else {
-			logLevel(logMessage,
-				slog.String("request_id", requestID),
-				slog.String("method", c.Request().Method),
-				slog.String("path", c.Request().URL.Path),
-				slog.Int("status", status),
-				slog.Duration("duration", duration),
-				slog.String("ip", c.RealIP()),
-				slog.Int64("bytes_out", c.Response().Size),
-			)
+			if status >= 500 {
+				m.config.Logger.ErrorContext(c.Request().Context(), logMessage,
+					slog.String("request_id", requestID),
+					slog.String("method", c.Request().Method),
+					slog.String("path", c.Request().URL.Path),
+					slog.Int("status", status),
+					slog.Duration("duration", duration),
+					slog.String("ip", c.RealIP()),
+					slog.Int64("bytes_out", c.Response().Size),
+				)
+			} else {
+				m.config.Logger.WarnContext(c.Request().Context(), logMessage,
+					slog.String("request_id", requestID),
+					slog.String("method", c.Request().Method),
+					slog.String("path", c.Request().URL.Path),
+					slog.Int("status", status),
+					slog.Duration("duration", duration),
+					slog.String("ip", c.RealIP()),
+					slog.Int64("bytes_out", c.Response().Size),
+				)
+			}
 		}
 	} else {
 		// Log successful requests at debug level to reduce noise
-		m.config.Logger.Debug("Request completed",
+		m.config.Logger.DebugContext(c.Request().Context(), "Request completed",
 			slog.String("request_id", requestID),
 			slog.String("method", c.Request().Method),
 			slog.String("path", c.Request().URL.Path),
@@ -300,7 +326,7 @@ func (r *responseBodyCapture) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 }
 
 // extractErrorFromResponse attempts to extract error details from the response body
-func (m *UnifiedMiddleware) extractErrorFromResponse(responseBody []byte, status int) string {
+func (m *Middleware) extractErrorFromResponse(responseBody []byte, status int) string {
 	if len(responseBody) == 0 {
 		switch {
 		case status >= 500:

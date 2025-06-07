@@ -16,7 +16,7 @@ type MatchGW struct {
 	httpGateway *HTTPGateway
 }
 
-// NewMatchGW creates a new unified gateway instance with NATS and HTTP clients with API key authentication
+// NewMatchGW creates a new  gateway instance with NATS and HTTP clients with API key authentication
 func NewMatchGW(natsClient *natspkg.Client, locationServiceURL string, config *models.APIKeyConfig, tracer observability.Tracer, logger *slog.Logger) match.MatchGW {
 	return &MatchGW{
 		natsGateway: gateway_nats.NewNATSGateway(natsClient),

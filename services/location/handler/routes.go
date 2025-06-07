@@ -32,9 +32,9 @@ func NewHTTPHandler(
 }
 
 // RegisterRoutes registers all HTTP routes
-func (h *HTTPHandler) RegisterRoutes(e *echo.Echo, unifiedMiddleware *middleware.UnifiedMiddleware) {
+func (h *HTTPHandler) RegisterRoutes(e *echo.Echo, Middleware *middleware.Middleware) {
 	// Internal routes for service-to-service communication (API key required)
-	internal := e.Group("/internal", unifiedMiddleware.APIKeyHandler("match-service"))
+	internal := e.Group("/internal", Middleware.APIKeyHandler("match-service"))
 
 	// Driver routes
 	internal.POST("/drivers/:id/available", h.locationHTTP.AddAvailableDriver)

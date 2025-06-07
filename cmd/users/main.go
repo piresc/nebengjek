@@ -120,8 +120,8 @@ func main() {
 	// Initialize Echo server
 	e := echo.New()
 
-	// Use unified middleware with slog and tracer
-	unifiedMW := middleware.NewUnifiedMiddleware(middleware.UnifiedConfig{
+	// Use  middleware with slog and tracer
+	MW := middleware.NewMiddleware(middleware.Config{
 		Logger: slogLogger,
 		Tracer: tracer,
 		APIKeys: map[string]string{
@@ -133,7 +133,7 @@ func main() {
 		ServiceName: appName,
 	})
 
-	e.Use(unifiedMW.Handler())
+	e.Use(MW.Handler())
 
 	// Initialize enhanced health service
 	healthService := health.NewHealthService(slogLogger)
@@ -145,7 +145,7 @@ func main() {
 	health.RegisterEnhancedHealthEndpoints(e, appName, configs.App.Version, healthService)
 
 	// Register service routes
-	Handler.RegisterRoutes(e, unifiedMW)
+	Handler.RegisterRoutes(e, MW)
 
 	// Start server in goroutine
 	go func() {

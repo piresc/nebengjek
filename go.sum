@@ -68,6 +68,8 @@ github.com/nats-io/nuid v1.0.1/go.mod h1:19wcPz3Ph3q0Jbyiqsd0kePYG7A95tJPxeL+1OS
 github.com/newrelic/go-agent/v3 v3.3.0/go.mod h1:H28zDNUC0U/b7kLoY4EFOhuth10Xu/9dchozUiOseQQ=
 github.com/newrelic/go-agent/v3 v3.39.0 h1:VVhsJR422oOxU/sJ1HZrop/OC7G1GTClIviVJxeJrK8=
 github.com/newrelic/go-agent/v3 v3.39.0/go.mod h1:4QXvru0vVy/iu7mfkNHT7T2+9TC9zPGO8aUEdKqY138=
+github.com/newrelic/go-agent/v3/integrations/logcontext-v2/nrslog v1.5.0 h1:NsFyz7QBI9FIvt3vlQeulX6CASkdoE2baSZv8lnz0Sc=
+github.com/newrelic/go-agent/v3/integrations/logcontext-v2/nrslog v1.5.0/go.mod h1:TIJUltnl+eUHy/Q+bVoJTxJiv+pohfATfI+3Fk4+5IQ=
 github.com/newrelic/go-agent/v3/integrations/nrecho-v4 v1.1.2 h1:eGz53UYAOJJeirioQq0J5V2ZmucZh4o+UGZAs7I5UKM=
 github.com/newrelic/go-agent/v3/integrations/nrecho-v4 v1.1.2/go.mod h1:nSDnTXhoJA7Nb4NO03amTIyr2M57/a79I635hHuqX6c=
 github.com/newrelic/go-agent/v3/integrations/nrpq v1.1.1 h1:HlVcLXw7ZZPjeRx3lQUAN8qfpJVDmuq4L237M1+PS8A=

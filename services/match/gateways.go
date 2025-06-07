@@ -8,7 +8,7 @@ import (
 
 //go:generate mockgen -destination=mocks/mock_gateway.go -package=mocks github.com/piresc/nebengjek/services/match MatchGW
 
-// MatchGW defines the unified match gateway interface that includes both NATS and location operations
+// MatchGW defines the  match gateway interface that includes both NATS and location operations
 type MatchGW interface {
 	// NATS Gateway operations
 	PublishMatchFound(ctx context.Context, matchProp models.MatchProposal) error

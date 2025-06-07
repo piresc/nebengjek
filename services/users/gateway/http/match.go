@@ -12,14 +12,14 @@ import (
 
 // MatchClient is an HTTP client for communicating with the match service
 type MatchClient struct {
-	client *httpclient.UnifiedClient
+	client *httpclient.Client
 	tracer observability.Tracer
 }
 
 // NewMatchClient creates a new match HTTP client with API key authentication
 func NewMatchClient(matchServiceURL string, config *models.APIKeyConfig, tracer observability.Tracer) *MatchClient {
 	return &MatchClient{
-		client: httpclient.NewUnifiedClient(httpclient.UnifiedConfig{
+		client: httpclient.NewClient(httpclient.Config{
 			APIKey:  config.MatchService,
 			BaseURL: matchServiceURL,
 			Timeout: 30 * time.Second,

@@ -12,14 +12,14 @@ import (
 
 // RideClient is a simplified HTTP client for communicating with the ride service
 type RideClient struct {
-	client *httpclient.UnifiedClient
+	client *httpclient.Client
 	tracer observability.Tracer
 }
 
 // NewRideClient creates a new simplified ride HTTP client with API key authentication
 func NewRideClient(rideServiceURL string, config *models.APIKeyConfig, tracer observability.Tracer) *RideClient {
 	return &RideClient{
-		client: httpclient.NewUnifiedClient(httpclient.UnifiedConfig{
+		client: httpclient.NewClient(httpclient.Config{
 			APIKey:  config.RidesService,
 			BaseURL: rideServiceURL,
 			Timeout: 30 * time.Second,

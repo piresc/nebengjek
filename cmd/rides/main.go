@@ -111,8 +111,8 @@ func main() {
 	// Initialize Echo server
 	e := echo.New()
 
-	// Use unified middleware
-	unifiedMW := middleware.NewUnifiedMiddleware(middleware.UnifiedConfig{
+	// Use  middleware
+	MW := middleware.NewMiddleware(middleware.Config{
 		Logger: slogLogger,
 		Tracer: tracer,
 		APIKeys: map[string]string{
@@ -124,7 +124,7 @@ func main() {
 		ServiceName: appName,
 	})
 
-	e.Use(unifiedMW.Handler())
+	e.Use(MW.Handler())
 
 	// Initialize enhanced health service
 	healthService := health.NewHealthService(nil) // Pass nil for old logger since we're using slog
@@ -136,10 +136,10 @@ func main() {
 	health.RegisterEnhancedHealthEndpoints(e, appName, configs.App.Version, healthService)
 
 	// Create the old API key middleware for compatibility
-	// Use unified middleware instead of separate API key middleware
+	// Use  middleware instead of separate API key middleware
 
 	// Register service routes
-	rideHandler.RegisterRoutes(e, unifiedMW)
+	rideHandler.RegisterRoutes(e, MW)
 
 	// Start server in goroutine
 	go func() {

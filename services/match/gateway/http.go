@@ -17,7 +17,7 @@ type HTTPGateway struct {
 
 // LocationClient is a simplified HTTP client for communicating with the location service
 type LocationClient struct {
-	client  *httpclient.UnifiedClient
+	client  *httpclient.Client
 	tracer  observability.Tracer
 	logger  *slog.Logger
 	baseURL string
@@ -26,7 +26,7 @@ type LocationClient struct {
 // NewHTTPGateway creates a new HTTP gateway with location client
 func NewHTTPGateway(locationServiceURL string, config *models.APIKeyConfig, tracer observability.Tracer, logger *slog.Logger) *HTTPGateway {
 	locationClient := &LocationClient{
-		client: httpclient.NewUnifiedClient(httpclient.UnifiedConfig{
+		client: httpclient.NewClient(httpclient.Config{
 			APIKey:  config.MatchService,
 			BaseURL: locationServiceURL,
 			Timeout: 30 * 1000000000, // 30 seconds in nanoseconds

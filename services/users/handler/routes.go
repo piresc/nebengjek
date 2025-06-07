@@ -115,7 +115,7 @@ func (h *Handler) GetWebSocketJWTMiddleware() echo.MiddlewareFunc {
 }
 
 // RegisterRoutes registers all protocol handlers and their routes
-func (h *Handler) RegisterRoutes(e *echo.Echo, unifiedMiddleware *middleware.UnifiedMiddleware) {
+func (h *Handler) RegisterRoutes(e *echo.Echo, Middleware *middleware.Middleware) {
 	// Public routes (no authentication required)
 	authGroup := e.Group("/auth")
 	authGroup.POST("/otp/generate", h.authHandler.GenerateOTP)

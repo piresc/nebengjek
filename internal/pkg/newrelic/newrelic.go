@@ -20,6 +20,10 @@ func InitNewRelic(configs *models.Config) *newrelic.Application {
 		newrelic.ConfigAppName(configs.NewRelic.AppName),
 		newrelic.ConfigLicense(configs.NewRelic.LicenseKey),
 		newrelic.ConfigDistributedTracerEnabled(true),
+		// Enable Application Logs in Context for log forwarding
+		newrelic.ConfigAppLogForwardingEnabled(true),
+		newrelic.ConfigAppLogDecoratingEnabled(true),
+		newrelic.ConfigAppLogMetricsEnabled(true),
 	)
 	if err != nil {
 		logger.Warn("Failed to initialize New Relic, continuing without New Relic",

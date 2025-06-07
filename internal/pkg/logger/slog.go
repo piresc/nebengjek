@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/newrelic/go-agent/v3/integrations/logcontext-v2/nrslog"
 	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
@@ -14,12 +15,6 @@ type SlogConfig struct {
 	ServiceName string
 	NewRelic    *newrelic.Application
 	Format      string // "json" or "text"
-}
-
-// NewRelicHandler wraps slog.Handler to integrate with New Relic
-type NewRelicHandler struct {
-	handler slog.Handler
-	app     *newrelic.Application
 }
 
 // NewSlogLogger creates a new slog logger with New Relic integration
@@ -41,7 +36,11 @@ func NewSlogLogger(config SlogConfig) *slog.Logger {
 
 	// Wrap with New Relic handler if available
 	if config.NewRelic != nil {
-		handler = &NewRelicHandler{
+		// First wrap with nrslog for context enhancement
+		handler = nrslog.WrapHandler(config.NewRelic, handler)
+
+		// Then wrap with our custom forwarder for actual log forwarding
+		handler = &NewRelicLogForwarder{
 			handler: handler,
 			app:     config.NewRelic,
 		}
@@ -57,60 +56,61 @@ func NewSlogLogger(config SlogConfig) *slog.Logger {
 	return slog.New(handler)
 }
 
-// Handle implements slog.Handler interface
-func (h *NewRelicHandler) Handle(ctx context.Context, record slog.Record) error {
-	// Send to New Relic if it's an error
-	if record.Level >= slog.LevelError && h.app != nil {
-		// Try to get transaction from context
-		if txn := newrelic.FromContext(ctx); txn != nil {
-			// Create error from log message
-			err := &LogError{
-				Message: record.Message,
-				Level:   record.Level.String(),
-			}
-			txn.NoticeError(err)
+// NewRelicLogForwarder forwards logs to New Relic Application Logs
+type NewRelicLogForwarder struct {
+	handler slog.Handler
+	app     *newrelic.Application
+}
 
-			// Add log attributes to transaction
-			record.Attrs(func(attr slog.Attr) bool {
-				txn.AddAttribute("log."+attr.Key, attr.Value.Any())
-				return true
-			})
+// Handle implements slog.Handler interface and forwards logs to New Relic
+func (h *NewRelicLogForwarder) Handle(ctx context.Context, record slog.Record) error {
+	// Forward to New Relic Application Logs for ERROR level and above
+	if record.Level >= slog.LevelError && h.app != nil {
+		// Create log data for New Relic
+		logData := map[string]interface{}{
+			"message":   record.Message,
+			"level":     record.Level.String(),
+			"timestamp": record.Time.UnixMilli(),
 		}
+
+		// Add all log attributes
+		record.Attrs(func(attr slog.Attr) bool {
+			logData[attr.Key] = attr.Value.Any()
+			return true
+		})
+
+		// Send to New Relic Application Logs
+		h.app.RecordLog(newrelic.LogData{
+			Message:    record.Message,
+			Severity:   record.Level.String(),
+			Timestamp:  record.Time.UnixMilli(),
+			Attributes: logData,
+		})
 	}
 
-	// Pass to underlying handler
+	// Pass to underlying handler (for console output)
 	return h.handler.Handle(ctx, record)
 }
 
 // WithAttrs implements slog.Handler interface
-func (h *NewRelicHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return &NewRelicHandler{
+func (h *NewRelicLogForwarder) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &NewRelicLogForwarder{
 		handler: h.handler.WithAttrs(attrs),
 		app:     h.app,
 	}
 }
 
 // WithGroup implements slog.Handler interface
-func (h *NewRelicHandler) WithGroup(name string) slog.Handler {
-	return &NewRelicHandler{
+func (h *NewRelicLogForwarder) WithGroup(name string) slog.Handler {
+	return &NewRelicLogForwarder{
 		handler: h.handler.WithGroup(name),
 		app:     h.app,
 	}
 }
 
 // Enabled implements slog.Handler interface
-func (h *NewRelicHandler) Enabled(ctx context.Context, level slog.Level) bool {
+func (h *NewRelicLogForwarder) Enabled(ctx context.Context, level slog.Level) bool {
 	return h.handler.Enabled(ctx, level)
-}
-
-// LogError implements error interface for New Relic
-type LogError struct {
-	Message string
-	Level   string
-}
-
-func (e *LogError) Error() string {
-	return e.Message
 }
 
 // ContextLogger provides context-aware logging helpers

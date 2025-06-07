@@ -18,6 +18,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/nats-io/nats.go v1.41.0
 	github.com/newrelic/go-agent/v3 v3.39.0
+	github.com/newrelic/go-agent/v3/integrations/logcontext-v2/nrslog v1.5.0
 	github.com/newrelic/go-agent/v3/integrations/nrecho-v4 v1.1.2
 	github.com/newrelic/go-agent/v3/integrations/nrpq v1.1.1
 	github.com/stretchr/testify v1.10.0
