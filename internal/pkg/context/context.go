@@ -63,6 +63,19 @@ func GetTraceID(ctx context.Context) string {
 	return ""
 }
 
+// WithServiceName adds a service name to the context
+func WithServiceName(ctx context.Context, serviceName string) context.Context {
+	return context.WithValue(ctx, ServiceNameKey, serviceName)
+}
+
+// GetServiceName retrieves the service name from context
+func GetServiceName(ctx context.Context) string {
+	if serviceName, ok := ctx.Value(ServiceNameKey).(string); ok {
+		return serviceName
+	}
+	return ""
+}
+
 // WithTimeout creates a context with timeout for operations
 func WithTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, timeout)

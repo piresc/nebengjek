@@ -706,7 +706,7 @@ func TestRideStart_Success(t *testing.T) {
 		TotalCost:   0,
 	}
 
-	mockGW.EXPECT().StartRide(request).Return(expectedRide, nil)
+	mockGW.EXPECT().StartRide(gomock.Any(), request).Return(expectedRide, nil)
 
 	// Act
 	ride, err := uc.RideStart(context.Background(), request)
@@ -742,7 +742,7 @@ func TestRideStart_GatewayError(t *testing.T) {
 	}
 
 	expectedError := errors.New("gateway error")
-	mockGW.EXPECT().StartRide(request).Return(nil, expectedError)
+	mockGW.EXPECT().StartRide(gomock.Any(), request).Return(nil, expectedError)
 
 	// Act
 	ride, err := uc.RideStart(context.Background(), request)
@@ -787,7 +787,7 @@ func TestProcessPayment_Success(t *testing.T) {
 		Status:       models.PaymentStatusAccepted,
 	}
 
-	mockGW.EXPECT().ProcessPayment(paymentReq).Return(expectedPayment, nil)
+	mockGW.EXPECT().ProcessPayment(gomock.Any(), paymentReq).Return(expectedPayment, nil)
 
 	// Act
 	payment, err := uc.ProcessPayment(context.Background(), paymentReq)
@@ -823,7 +823,7 @@ func TestProcessPayment_GatewayError(t *testing.T) {
 	}
 
 	expectedError := errors.New("payment gateway error")
-	mockGW.EXPECT().ProcessPayment(paymentReq).Return(nil, expectedError)
+	mockGW.EXPECT().ProcessPayment(gomock.Any(), paymentReq).Return(nil, expectedError)
 
 	// Act
 	payment, err := uc.ProcessPayment(context.Background(), paymentReq)

@@ -10,19 +10,19 @@ import (
 
 // Handler handles NATS events for the user service
 type NatsHandler struct {
-	wsManager  *websocket.WebSocketManager
-	natsClient *natspkg.Client
-	subs       []*nats.Subscription
+	echoWSHandler *websocket.EchoWebSocketHandler
+	natsClient    *natspkg.Client
+	subs          []*nats.Subscription
 }
 
-// NewHandler creates a new NATS handler
+// NewNatsHandler creates a new NATS handler
 func NewNatsHandler(
-	wsManager *websocket.WebSocketManager,
+	echoWSHandler *websocket.EchoWebSocketHandler,
 	natsClient *natspkg.Client,
 ) *NatsHandler {
 	return &NatsHandler{
-		wsManager:  wsManager,
-		natsClient: natsClient,
+		echoWSHandler: echoWSHandler,
+		natsClient:    natsClient,
 	}
 }
 

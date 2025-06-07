@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"testing"
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/rides/mocks"
@@ -29,7 +31,8 @@ func TestNewRidesHandler(t *testing.T) {
 	}
 
 	// Act
-	handler := NewRidesHandler(mockRidesUC, mockClient, cfg)
+	mockNRApp := &newrelic.Application{}
+	handler := NewRidesHandler(mockRidesUC, mockClient, cfg, mockNRApp)
 
 	// Assert
 	assert.NotNil(t, handler)
@@ -52,7 +55,8 @@ func TestRidesHandler_handleMatchAccepted_Success(t *testing.T) {
 		},
 	}
 
-	handler := NewRidesHandler(mockRidesUC, nil, cfg)
+	mockNRApp := &newrelic.Application{}
+	handler := NewRidesHandler(mockRidesUC, nil, cfg, mockNRApp)
 
 	matchProposal := models.MatchProposal{
 		ID:          uuid.New().String(),
@@ -67,7 +71,7 @@ func TestRidesHandler_handleMatchAccepted_Success(t *testing.T) {
 	matchData, err := json.Marshal(matchProposal)
 	require.NoError(t, err)
 
-	err = handler.handleMatchAccepted(matchData)
+	err = handler.handleMatchAccepted(context.Background(), matchData)
 
 	// Assert
 	require.NoError(t, err)
@@ -86,11 +90,12 @@ func TestRidesHandler_handleMatchAccepted_InvalidJSON(t *testing.T) {
 		},
 	}
 
-	handler := NewRidesHandler(mockRidesUC, nil, cfg)
+	mockNRApp := &newrelic.Application{}
+	handler := NewRidesHandler(mockRidesUC, nil, cfg, mockNRApp)
 
 	// Act
 	invalidJSON := []byte("{invalid json}")
-	err := handler.handleMatchAccepted(invalidJSON)
+	err := handler.handleMatchAccepted(context.Background(), invalidJSON)
 
 	// Assert
 	require.Error(t, err)
@@ -110,7 +115,8 @@ func TestRidesHandler_handleMatchAccepted_CreateRideError(t *testing.T) {
 		},
 	}
 
-	handler := NewRidesHandler(mockRidesUC, nil, cfg)
+	mockNRApp := &newrelic.Application{}
+	handler := NewRidesHandler(mockRidesUC, nil, cfg, mockNRApp)
 
 	matchProposal := models.MatchProposal{
 		ID:          uuid.New().String(),
@@ -126,7 +132,7 @@ func TestRidesHandler_handleMatchAccepted_CreateRideError(t *testing.T) {
 	matchData, err := json.Marshal(matchProposal)
 	require.NoError(t, err)
 
-	err = handler.handleMatchAccepted(matchData)
+	err = handler.handleMatchAccepted(context.Background(), matchData)
 
 	// Assert
 	require.Error(t, err)
@@ -146,7 +152,8 @@ func TestRidesHandler_handleLocationAggregate_Success(t *testing.T) {
 		},
 	}
 
-	handler := NewRidesHandler(mockRidesUC, nil, cfg)
+	mockNRApp := &newrelic.Application{}
+	handler := NewRidesHandler(mockRidesUC, nil, cfg, mockNRApp)
 
 	rideID := uuid.New()
 	locationAggregate := models.LocationAggregate{
@@ -167,7 +174,7 @@ func TestRidesHandler_handleLocationAggregate_Success(t *testing.T) {
 	locationData, err := json.Marshal(locationAggregate)
 	require.NoError(t, err)
 
-	err = handler.handleLocationAggregate(locationData)
+	err = handler.handleLocationAggregate(context.Background(), locationData)
 
 	// Assert
 	require.NoError(t, err)
@@ -186,7 +193,8 @@ func TestRidesHandler_handleLocationAggregate_BelowMinDistance(t *testing.T) {
 		},
 	}
 
-	handler := NewRidesHandler(mockRidesUC, nil, cfg)
+	mockNRApp := &newrelic.Application{}
+	handler := NewRidesHandler(mockRidesUC, nil, cfg, mockNRApp)
 
 	rideID := uuid.New()
 	locationAggregate := models.LocationAggregate{
@@ -200,7 +208,7 @@ func TestRidesHandler_handleLocationAggregate_BelowMinDistance(t *testing.T) {
 	locationData, err := json.Marshal(locationAggregate)
 	require.NoError(t, err)
 
-	err = handler.handleLocationAggregate(locationData)
+	err = handler.handleLocationAggregate(context.Background(), locationData)
 
 	// Assert
 	require.NoError(t, err)
@@ -219,11 +227,12 @@ func TestRidesHandler_handleLocationAggregate_InvalidJSON(t *testing.T) {
 		},
 	}
 
-	handler := NewRidesHandler(mockRidesUC, nil, cfg)
+	mockNRApp := &newrelic.Application{}
+	handler := NewRidesHandler(mockRidesUC, nil, cfg, mockNRApp)
 
 	// Act
 	invalidJSON := []byte("{invalid json}")
-	err := handler.handleLocationAggregate(invalidJSON)
+	err := handler.handleLocationAggregate(context.Background(), invalidJSON)
 
 	// Assert
 	require.Error(t, err)
@@ -243,7 +252,8 @@ func TestRidesHandler_handleLocationAggregate_InvalidRideID(t *testing.T) {
 		},
 	}
 
-	handler := NewRidesHandler(mockRidesUC, nil, cfg)
+	mockNRApp := &newrelic.Application{}
+	handler := NewRidesHandler(mockRidesUC, nil, cfg, mockNRApp)
 
 	locationAggregate := models.LocationAggregate{
 		RideID:   "invalid-uuid",
@@ -254,7 +264,7 @@ func TestRidesHandler_handleLocationAggregate_InvalidRideID(t *testing.T) {
 	locationData, err := json.Marshal(locationAggregate)
 	require.NoError(t, err)
 
-	err = handler.handleLocationAggregate(locationData)
+	err = handler.handleLocationAggregate(context.Background(), locationData)
 
 	// Assert
 	require.Error(t, err)
@@ -274,7 +284,8 @@ func TestRidesHandler_handleLocationAggregate_ProcessBillingError(t *testing.T) 
 		},
 	}
 
-	handler := NewRidesHandler(mockRidesUC, nil, cfg)
+	mockNRApp := &newrelic.Application{}
+	handler := NewRidesHandler(mockRidesUC, nil, cfg, mockNRApp)
 
 	rideID := uuid.New()
 	locationAggregate := models.LocationAggregate{
@@ -296,7 +307,7 @@ func TestRidesHandler_handleLocationAggregate_ProcessBillingError(t *testing.T) 
 	locationData, err := json.Marshal(locationAggregate)
 	require.NoError(t, err)
 
-	err = handler.handleLocationAggregate(locationData)
+	err = handler.handleLocationAggregate(context.Background(), locationData)
 
 	// Assert
 	require.Error(t, err)

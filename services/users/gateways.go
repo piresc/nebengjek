@@ -18,7 +18,7 @@ type UserGW interface {
 
 	// HTTP Gateway
 	MatchConfirm(ctx context.Context, req *models.MatchConfirmRequest) (*models.MatchProposal, error)
-	StartRide(req *models.RideStartRequest) (*models.Ride, error)
+	StartRide(ctx context.Context, req *models.RideStartRequest) (*models.Ride, error)
 	RideArrived(ctx context.Context, event *models.RideArrivalReq) (*models.PaymentRequest, error)
-	ProcessPayment(paymentReq *models.PaymentProccessRequest) (*models.Payment, error)
+	ProcessPayment(ctx context.Context, paymentReq *models.PaymentProccessRequest) (*models.Payment, error)
 }

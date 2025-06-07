@@ -7,20 +7,24 @@ import (
 
 	httpclient "github.com/piresc/nebengjek/internal/pkg/http"
 	"github.com/piresc/nebengjek/internal/pkg/models"
-	nrpkg "github.com/piresc/nebengjek/internal/pkg/newrelic"
+	"github.com/piresc/nebengjek/internal/pkg/observability"
 )
 
 // MatchClient is an HTTP client for communicating with the match service
 type MatchClient struct {
-	client    *httpclient.Client
-	apiClient *httpclient.APIKeyClient
+	client *httpclient.UnifiedClient
+	tracer observability.Tracer
 }
 
 // NewMatchClient creates a new match HTTP client with API key authentication
-func NewMatchClient(matchServiceURL string, config *models.APIKeyConfig) *MatchClient {
+func NewMatchClient(matchServiceURL string, config *models.APIKeyConfig, tracer observability.Tracer) *MatchClient {
 	return &MatchClient{
-		client:    httpclient.NewClient(matchServiceURL, 10*time.Second),
-		apiClient: httpclient.NewAPIKeyClient(config, "match-service", matchServiceURL),
+		client: httpclient.NewUnifiedClient(httpclient.UnifiedConfig{
+			APIKey:  config.MatchService,
+			BaseURL: matchServiceURL,
+			Timeout: 30 * time.Second,
+		}),
+		tracer: tracer,
 	}
 }
 
@@ -31,26 +35,26 @@ type HTTPGateway struct {
 }
 
 // NewHTTPGateway creates a new HTTP gateway for the users service with API key authentication
-func NewHTTPGateway(matchServiceURL string, rideServiceURL string, config *models.APIKeyConfig) *HTTPGateway {
+func NewHTTPGateway(matchServiceURL string, rideServiceURL string, config *models.APIKeyConfig, tracer observability.Tracer) *HTTPGateway {
 	return &HTTPGateway{
-		matchClient: NewMatchClient(matchServiceURL, config),
-		rideClient:  NewRideClient(rideServiceURL, config),
+		matchClient: NewMatchClient(matchServiceURL, config, tracer),
+		rideClient:  NewRideClient(rideServiceURL, config, tracer),
 	}
 }
 
-// MatchAccept sends a match confirmation request to the match service
+// MatchConfirm sends a match confirmation request to the match service
 func (g *HTTPGateway) MatchConfirm(ctx context.Context, req *models.MatchConfirmRequest) (*models.MatchProposal, error) {
 	endpoint := fmt.Sprintf("/internal/matches/%s/confirm", req.ID)
 
-	// Ensure API key client is available
-	if g.matchClient.apiClient == nil {
-		return nil, fmt.Errorf("API key client not configured for match service")
+	// Start APM segment if tracer is available
+	var endSegment func()
+	if g.matchClient.tracer != nil {
+		ctx, endSegment = g.matchClient.tracer.StartSegment(ctx, "External/match-service/confirm")
+		defer endSegment()
 	}
 
 	var matchProposal models.MatchProposal
-	err := nrpkg.InstrumentServiceCall(ctx, "match-service", endpoint, func() error {
-		return g.matchClient.apiClient.PostJSON(ctx, endpoint, req, &matchProposal)
-	})
+	err := g.matchClient.client.PostJSON(ctx, endpoint, req, &matchProposal)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send match confirmation request: %w", err)
 	}

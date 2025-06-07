@@ -2,6 +2,7 @@ package health
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -92,14 +93,14 @@ func (n *NATSHealthChecker) CheckHealth(ctx context.Context) error {
 // HealthService manages health checks for multiple dependencies
 type HealthService struct {
 	checkers map[string]HealthChecker
-	logger   *logger.ZapLogger
+	logger   *slog.Logger
 }
 
 // NewHealthService creates a new health service
-func NewHealthService(zapLogger *logger.ZapLogger) *HealthService {
+func NewHealthService(slogLogger *slog.Logger) *HealthService {
 	return &HealthService{
 		checkers: make(map[string]HealthChecker),
-		logger:   zapLogger,
+		logger:   slogLogger,
 	}
 }
 

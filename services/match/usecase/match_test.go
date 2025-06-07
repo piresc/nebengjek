@@ -20,7 +20,6 @@ func TestHandleBeaconEvent_Success_Driver(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockMatchRepo(ctrl)
-	mockLocationGW := mocks.NewMockLocationGW(ctrl)
 	mockGW := mocks.NewMockMatchGW(ctrl)
 	cfg := &models.Config{
 		Match: models.MatchConfig{
@@ -28,7 +27,7 @@ func TestHandleBeaconEvent_Success_Driver(t *testing.T) {
 		},
 	}
 
-	uc := NewMatchUC(cfg, mockRepo, mockLocationGW, mockGW)
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
 
 	userID := uuid.New().String()
 	event := models.BeaconEvent{
@@ -49,7 +48,7 @@ func TestHandleBeaconEvent_Success_Driver(t *testing.T) {
 		Times(1)
 
 	// The implementation calls AddAvailableDriver after active ride check
-	mockLocationGW.EXPECT().
+	mockGW.EXPECT().
 		AddAvailableDriver(gomock.Any(), userID, gomock.Any()).
 		DoAndReturn(func(_ context.Context, id string, loc *models.Location) error {
 			assert.Equal(t, userID, id)
@@ -57,12 +56,6 @@ func TestHandleBeaconEvent_Success_Driver(t *testing.T) {
 			assert.Equal(t, event.Location.Longitude, loc.Longitude)
 			return nil
 		})
-
-	// Need to mock GetPassengerLocation as it's called by the handler
-	mockLocationGW.EXPECT().
-		GetPassengerLocation(gomock.Any(), gomock.Any()).
-		Return(models.Location{Latitude: -6.175392, Longitude: 106.827153}, nil).
-		AnyTimes()
 
 	// Act
 	err := uc.HandleBeaconEvent(context.Background(), event)
@@ -77,7 +70,6 @@ func TestHandleFinderEvent_Success_Passenger(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockMatchRepo(ctrl)
-	mockLocationGW := mocks.NewMockLocationGW(ctrl)
 	mockGW := mocks.NewMockMatchGW(ctrl)
 	cfg := &models.Config{
 		Match: models.MatchConfig{
@@ -85,7 +77,7 @@ func TestHandleFinderEvent_Success_Passenger(t *testing.T) {
 		},
 	}
 
-	uc := NewMatchUC(cfg, mockRepo, mockLocationGW, mockGW)
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
 
 	userID := uuid.New().String()
 	event := models.FinderEvent{
@@ -111,12 +103,12 @@ func TestHandleFinderEvent_Success_Passenger(t *testing.T) {
 		Times(1)
 
 	// Mock required calls
-	mockLocationGW.EXPECT().
+	mockGW.EXPECT().
 		AddAvailablePassenger(gomock.Any(), userID, gomock.Any()).
 		Return(nil)
 
 	// Need to mock FindNearbyDrivers as it's called by the handler
-	mockLocationGW.EXPECT().
+	mockGW.EXPECT().
 		FindNearbyDrivers(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return([]*models.NearbyUser{}, nil) // Return empty array to avoid further processing
 
@@ -133,7 +125,6 @@ func TestHandleBeaconEvent_Inactive(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockMatchRepo(ctrl)
-	mockLocationGW := mocks.NewMockLocationGW(ctrl)
 	mockGW := mocks.NewMockMatchGW(ctrl)
 	cfg := &models.Config{
 		Match: models.MatchConfig{
@@ -141,7 +132,7 @@ func TestHandleBeaconEvent_Inactive(t *testing.T) {
 		},
 	}
 
-	uc := NewMatchUC(cfg, mockRepo, mockLocationGW, mockGW)
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
 
 	userID := uuid.New().String()
 	event := models.BeaconEvent{
@@ -156,7 +147,7 @@ func TestHandleBeaconEvent_Inactive(t *testing.T) {
 	}
 
 	// Set up expectations
-	mockLocationGW.EXPECT().
+	mockGW.EXPECT().
 		RemoveAvailableDriver(gomock.Any(), userID).
 		Return(nil)
 
@@ -173,7 +164,6 @@ func TestHandleBeaconEvent_RepositoryError(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockMatchRepo(ctrl)
-	mockLocationGW := mocks.NewMockLocationGW(ctrl)
 	mockGW := mocks.NewMockMatchGW(ctrl)
 	cfg := &models.Config{
 		Match: models.MatchConfig{
@@ -181,7 +171,7 @@ func TestHandleBeaconEvent_RepositoryError(t *testing.T) {
 		},
 	}
 
-	uc := NewMatchUC(cfg, mockRepo, mockLocationGW, mockGW)
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
 
 	userID := uuid.New().String()
 	event := models.BeaconEvent{
@@ -204,7 +194,7 @@ func TestHandleBeaconEvent_RepositoryError(t *testing.T) {
 		Times(1)
 
 	// Set up expectations
-	mockLocationGW.EXPECT().
+	mockGW.EXPECT().
 		AddAvailableDriver(gomock.Any(), userID, gomock.Any()).
 		Return(expectedError)
 
@@ -222,7 +212,6 @@ func TestHandleBeaconEvent_DriverWithActiveRide(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockMatchRepo(ctrl)
-	mockLocationGW := mocks.NewMockLocationGW(ctrl)
 	mockGW := mocks.NewMockMatchGW(ctrl)
 	cfg := &models.Config{
 		Match: models.MatchConfig{
@@ -230,7 +219,7 @@ func TestHandleBeaconEvent_DriverWithActiveRide(t *testing.T) {
 		},
 	}
 
-	uc := NewMatchUC(cfg, mockRepo, mockLocationGW, mockGW)
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
 
 	userID := uuid.New().String()
 	event := models.BeaconEvent{
@@ -265,7 +254,6 @@ func TestHandleFinderEvent_PassengerWithActiveRide(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockMatchRepo(ctrl)
-	mockLocationGW := mocks.NewMockLocationGW(ctrl)
 	mockGW := mocks.NewMockMatchGW(ctrl)
 	cfg := &models.Config{
 		Match: models.MatchConfig{
@@ -273,7 +261,7 @@ func TestHandleFinderEvent_PassengerWithActiveRide(t *testing.T) {
 		},
 	}
 
-	uc := NewMatchUC(cfg, mockRepo, mockLocationGW, mockGW)
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
 
 	userID := uuid.New().String()
 	event := models.FinderEvent{
@@ -313,7 +301,6 @@ func TestHandleBeaconEvent_ActiveRideCheckError(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockMatchRepo(ctrl)
-	mockLocationGW := mocks.NewMockLocationGW(ctrl)
 	mockGW := mocks.NewMockMatchGW(ctrl)
 	cfg := &models.Config{
 		Match: models.MatchConfig{
@@ -321,7 +308,7 @@ func TestHandleBeaconEvent_ActiveRideCheckError(t *testing.T) {
 		},
 	}
 
-	uc := NewMatchUC(cfg, mockRepo, mockLocationGW, mockGW)
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
 
 	userID := uuid.New().String()
 	event := models.BeaconEvent{
@@ -342,14 +329,9 @@ func TestHandleBeaconEvent_ActiveRideCheckError(t *testing.T) {
 		Times(1)
 
 	// Should still try to add to pool on error to avoid blocking the system
-	mockLocationGW.EXPECT().
+	mockGW.EXPECT().
 		AddAvailableDriver(gomock.Any(), userID, gomock.Any()).
 		Return(nil)
-
-	mockLocationGW.EXPECT().
-		GetPassengerLocation(gomock.Any(), gomock.Any()).
-		Return(models.Location{Latitude: -6.175392, Longitude: 106.827153}, nil).
-		AnyTimes()
 
 	// Act
 	err := uc.HandleBeaconEvent(context.Background(), event)
@@ -364,7 +346,6 @@ func TestHandleFinderEvent_ActiveRideCheckError(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockMatchRepo(ctrl)
-	mockLocationGW := mocks.NewMockLocationGW(ctrl)
 	mockGW := mocks.NewMockMatchGW(ctrl)
 	cfg := &models.Config{
 		Match: models.MatchConfig{
@@ -372,7 +353,7 @@ func TestHandleFinderEvent_ActiveRideCheckError(t *testing.T) {
 		},
 	}
 
-	uc := NewMatchUC(cfg, mockRepo, mockLocationGW, mockGW)
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
 
 	userID := uuid.New().String()
 	event := models.FinderEvent{
@@ -398,11 +379,11 @@ func TestHandleFinderEvent_ActiveRideCheckError(t *testing.T) {
 		Times(1)
 
 	// Should still try to add to pool on error to avoid blocking the system
-	mockLocationGW.EXPECT().
+	mockGW.EXPECT().
 		AddAvailablePassenger(gomock.Any(), userID, gomock.Any()).
 		Return(nil)
 
-	mockLocationGW.EXPECT().
+	mockGW.EXPECT().
 		FindNearbyDrivers(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return([]*models.NearbyUser{}, nil)
 
@@ -419,7 +400,6 @@ func TestConfirmMatchStatus_AcceptSuccess(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockMatchRepo(ctrl)
-	mockLocationGW := mocks.NewMockLocationGW(ctrl)
 	mockGW := mocks.NewMockMatchGW(ctrl)
 	cfg := &models.Config{
 		Match: models.MatchConfig{
@@ -427,7 +407,7 @@ func TestConfirmMatchStatus_AcceptSuccess(t *testing.T) {
 		},
 	}
 
-	uc := NewMatchUC(cfg, mockRepo, mockLocationGW, mockGW)
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
 
 	matchID := "match-123"
 	driverID := uuid.New()
@@ -494,7 +474,6 @@ func TestConfirmMatchStatus_RejectSuccess(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockMatchRepo(ctrl)
-	mockLocationGW := mocks.NewMockLocationGW(ctrl)
 	mockGW := mocks.NewMockMatchGW(ctrl)
 	cfg := &models.Config{
 		Match: models.MatchConfig{
@@ -502,7 +481,7 @@ func TestConfirmMatchStatus_RejectSuccess(t *testing.T) {
 		},
 	}
 
-	uc := NewMatchUC(cfg, mockRepo, mockLocationGW, mockGW)
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
 
 	matchID := "match-123"
 	driverID := uuid.New()
@@ -554,7 +533,6 @@ func TestConfirmMatchStatus_GetMatchError(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockMatchRepo(ctrl)
-	mockLocationGW := mocks.NewMockLocationGW(ctrl)
 	mockGW := mocks.NewMockMatchGW(ctrl)
 
 	cfg := &models.Config{
@@ -563,7 +541,7 @@ func TestConfirmMatchStatus_GetMatchError(t *testing.T) {
 		},
 	}
 
-	uc := NewMatchUC(cfg, mockRepo, mockLocationGW, mockGW)
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
 
 	matchID := "match-123"
 	driverID := uuid.New().String()
@@ -595,7 +573,6 @@ func TestCreateMatch_DatabaseError(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockMatchRepo(ctrl)
-	mockLocationGW := mocks.NewMockLocationGW(ctrl)
 	mockGW := mocks.NewMockMatchGW(ctrl)
 
 	cfg := &models.Config{
@@ -604,7 +581,7 @@ func TestCreateMatch_DatabaseError(t *testing.T) {
 		},
 	}
 
-	uc := NewMatchUC(cfg, mockRepo, mockLocationGW, mockGW)
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
 
 	driverID := uuid.New()
 	passengerID := uuid.New()
@@ -637,11 +614,10 @@ func TestHasActiveRide_DriverHasActiveRide(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockMatchRepo(ctrl)
-	mockLocationGW := mocks.NewMockLocationGW(ctrl)
 	mockGW := mocks.NewMockMatchGW(ctrl)
 	cfg := &models.Config{}
 
-	uc := NewMatchUC(cfg, mockRepo, mockLocationGW, mockGW)
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
 
 	userID := "driver-123"
 	rideID := "ride-456"
@@ -666,11 +642,10 @@ func TestHasActiveRide_DriverNoActiveRide(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockMatchRepo(ctrl)
-	mockLocationGW := mocks.NewMockLocationGW(ctrl)
 	mockGW := mocks.NewMockMatchGW(ctrl)
 	cfg := &models.Config{}
 
-	uc := NewMatchUC(cfg, mockRepo, mockLocationGW, mockGW)
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
 
 	userID := "driver-123"
 
@@ -694,11 +669,10 @@ func TestHasActiveRide_PassengerHasActiveRide(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockMatchRepo(ctrl)
-	mockLocationGW := mocks.NewMockLocationGW(ctrl)
 	mockGW := mocks.NewMockMatchGW(ctrl)
 	cfg := &models.Config{}
 
-	uc := NewMatchUC(cfg, mockRepo, mockLocationGW, mockGW)
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
 
 	userID := "passenger-123"
 	rideID := "ride-456"
@@ -723,11 +697,10 @@ func TestHasActiveRide_PassengerNoActiveRide(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockMatchRepo(ctrl)
-	mockLocationGW := mocks.NewMockLocationGW(ctrl)
 	mockGW := mocks.NewMockMatchGW(ctrl)
 	cfg := &models.Config{}
 
-	uc := NewMatchUC(cfg, mockRepo, mockLocationGW, mockGW)
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
 
 	userID := "passenger-123"
 
@@ -751,11 +724,10 @@ func TestSetActiveRide_Success(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockMatchRepo(ctrl)
-	mockLocationGW := mocks.NewMockLocationGW(ctrl)
 	mockGW := mocks.NewMockMatchGW(ctrl)
 	cfg := &models.Config{}
 
-	uc := NewMatchUC(cfg, mockRepo, mockLocationGW, mockGW)
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
 
 	rideID := "ride-123"
 	driverID := "driver-456"
@@ -780,11 +752,10 @@ func TestRemoveActiveRide_Success(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mocks.NewMockMatchRepo(ctrl)
-	mockLocationGW := mocks.NewMockLocationGW(ctrl)
 	mockGW := mocks.NewMockMatchGW(ctrl)
 	cfg := &models.Config{}
 
-	uc := NewMatchUC(cfg, mockRepo, mockLocationGW, mockGW)
+	uc := NewMatchUC(cfg, mockRepo, mockGW)
 
 	driverID := "driver-456"
 	passengerID := "passenger-789"

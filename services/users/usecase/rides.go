@@ -21,7 +21,7 @@ func (u *UserUC) RideArrived(ctx context.Context, event *models.RideArrivalReq) 
 // ProcessPayment processes the payment for a completed ride
 func (u *UserUC) ProcessPayment(ctx context.Context, paymentReq *models.PaymentProccessRequest) (*models.Payment, error) {
 	// Call the ride service to process the payment
-	payment, err := u.UserGW.ProcessPayment(paymentReq)
+	payment, err := u.UserGW.ProcessPayment(ctx, paymentReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process payment: %w", err)
 	}
@@ -39,7 +39,7 @@ func (u *UserUC) RideStart(ctx context.Context, event *models.RideStartRequest) 
 	}
 
 	// Make HTTP call to rides service
-	resp, err := u.UserGW.StartRide(req)
+	resp, err := u.UserGW.StartRide(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start ride via HTTP: %w", err)
 	}

@@ -151,8 +151,8 @@ func (h *NatsHandler) handleMatchAcceptedEvent(msg []byte) error {
 
 	// Notify both driver and passenger that their match is confirmed and they're locked
 	// Use a specific event type for match acceptance notification
-	h.wsManager.NotifyClient(matchProposal.DriverID, constants.EventMatchConfirm, matchProposal)
-	h.wsManager.NotifyClient(matchProposal.PassengerID, constants.EventMatchConfirm, matchProposal)
+	h.echoWSHandler.NotifyClient(matchProposal.DriverID, constants.EventMatchConfirm, matchProposal)
+	h.echoWSHandler.NotifyClient(matchProposal.PassengerID, constants.EventMatchConfirm, matchProposal)
 
 	return nil
 }
@@ -183,8 +183,8 @@ func (h *NatsHandler) handleRidePickupEvent(msg []byte) error {
 		logger.String("event_type", constants.EventRidePickup))
 
 	// Notify both driver and passenger with correct WebSocket event type
-	h.wsManager.NotifyClient(ridePickup.DriverID, constants.EventRidePickup, ridePickup)
-	h.wsManager.NotifyClient(ridePickup.PassengerID, constants.EventRidePickup, ridePickup)
+	h.echoWSHandler.NotifyClient(ridePickup.DriverID, constants.EventRidePickup, ridePickup)
+	h.echoWSHandler.NotifyClient(ridePickup.PassengerID, constants.EventRidePickup, ridePickup)
 
 	logger.InfoCtx(context.Background(), "Successfully processed ride pickup event and sent WebSocket notifications",
 		logger.String("ride_id", ridePickup.RideID))
@@ -205,8 +205,8 @@ func (h *NatsHandler) handleRideStartEvent(msg []byte) error {
 
 	// Notify both driver and passenger that their match is confirmed and they're locked
 	// Use a specific event type for match acceptance notification
-	h.wsManager.NotifyClient(rideStarted.DriverID, constants.EventRideStarted, rideStarted)
-	h.wsManager.NotifyClient(rideStarted.PassengerID, constants.EventRideStarted, rideStarted)
+	h.echoWSHandler.NotifyClient(rideStarted.DriverID, constants.EventRideStarted, rideStarted)
+	h.echoWSHandler.NotifyClient(rideStarted.PassengerID, constants.EventRideStarted, rideStarted)
 
 	return nil
 }
@@ -224,8 +224,8 @@ func (h *NatsHandler) handleRideCompletedEvent(msg []byte) error {
 		logger.String("passenger_id", rideComplete.Ride.PassengerID.String()))
 
 	// Notify driver and passenger about the ride completion
-	h.wsManager.NotifyClient(rideComplete.Ride.DriverID.String(), constants.EventRideCompleted, rideComplete)
-	h.wsManager.NotifyClient(rideComplete.Ride.PassengerID.String(), constants.EventRideCompleted, rideComplete)
+	h.echoWSHandler.NotifyClient(rideComplete.Ride.DriverID.String(), constants.EventRideCompleted, rideComplete)
+	h.echoWSHandler.NotifyClient(rideComplete.Ride.PassengerID.String(), constants.EventRideCompleted, rideComplete)
 
 	return nil
 }

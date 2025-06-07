@@ -123,34 +123,6 @@ func (mr *MockMatchUCMockRecorder) HasActiveRide(arg0, arg1, arg2 interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasActiveRide", reflect.TypeOf((*MockMatchUC)(nil).HasActiveRide), arg0, arg1, arg2)
 }
 
-// ReleaseDriver mocks base method.
-func (m *MockMatchUC) ReleaseDriver(arg0 context.Context, arg1 string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReleaseDriver", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ReleaseDriver indicates an expected call of ReleaseDriver.
-func (mr *MockMatchUCMockRecorder) ReleaseDriver(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleaseDriver", reflect.TypeOf((*MockMatchUC)(nil).ReleaseDriver), arg0, arg1)
-}
-
-// ReleasePassenger mocks base method.
-func (m *MockMatchUC) ReleasePassenger(arg0 context.Context, arg1 string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReleasePassenger", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ReleasePassenger indicates an expected call of ReleasePassenger.
-func (mr *MockMatchUCMockRecorder) ReleasePassenger(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleasePassenger", reflect.TypeOf((*MockMatchUC)(nil).ReleasePassenger), arg0, arg1)
-}
-
 // RemoveActiveRide mocks base method.
 func (m *MockMatchUC) RemoveActiveRide(arg0 context.Context, arg1, arg2 string) error {
 	m.ctrl.T.Helper()

@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,15 +17,15 @@ import (
 // GracefulServer wraps Echo server with graceful shutdown capabilities
 type GracefulServer struct {
 	echo   *echo.Echo
-	logger *logger.ZapLogger
+	logger *slog.Logger
 	port   int
 }
 
 // NewGracefulServer creates a new server with graceful shutdown
-func NewGracefulServer(e *echo.Echo, zapLogger *logger.ZapLogger, port int) *GracefulServer {
+func NewGracefulServer(e *echo.Echo, slogLogger *slog.Logger, port int) *GracefulServer {
 	return &GracefulServer{
 		echo:   e,
-		logger: zapLogger,
+		logger: slogLogger,
 		port:   port,
 	}
 }
@@ -37,7 +38,8 @@ func (s *GracefulServer) Start() error {
 		s.logger.Info("Starting HTTP server", logger.String("address", addr))
 
 		if err := s.echo.Start(addr); err != nil && err != http.ErrServerClosed {
-			s.logger.Fatal("Failed to start server", logger.Err(err))
+			s.logger.Error("Failed to start server", logger.Err(err))
+			os.Exit(1)
 		}
 	}()
 
@@ -75,14 +77,14 @@ func (s *GracefulServer) Shutdown() error {
 
 // ShutdownComponents provides a way to register cleanup functions
 type ShutdownManager struct {
-	logger    *logger.ZapLogger
+	logger    *slog.Logger
 	functions []func(context.Context) error
 }
 
 // NewShutdownManager creates a new shutdown manager
-func NewShutdownManager(zapLogger *logger.ZapLogger) *ShutdownManager {
+func NewShutdownManager(slogLogger *slog.Logger) *ShutdownManager {
 	return &ShutdownManager{
-		logger:    zapLogger,
+		logger:    slogLogger,
 		functions: make([]func(context.Context) error, 0),
 	}
 }

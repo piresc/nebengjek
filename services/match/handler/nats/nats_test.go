@@ -1,6 +1,7 @@
 package nats
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/match/mocks"
@@ -22,14 +24,16 @@ func TestMatchHandler_Constructor(t *testing.T) {
 
 	mockMatchUC := mocks.NewMockMatchUC(ctrl)
 	mockNATSClient := &natspkg.Client{}
+	mockNRApp := &newrelic.Application{}
 
 	// Act
-	handler := NewMatchHandler(mockMatchUC, mockNATSClient)
+	handler := NewMatchHandler(mockMatchUC, mockNATSClient, mockNRApp)
 
 	// Assert
 	assert.NotNil(t, handler)
 	assert.Equal(t, mockMatchUC, handler.matchUC)
 	assert.Equal(t, mockNATSClient, handler.natsClient)
+	assert.Equal(t, mockNRApp, handler.nrApp)
 	assert.NotNil(t, handler.subs)
 	assert.Empty(t, handler.subs)
 }
@@ -102,10 +106,11 @@ func TestMatchHandler_handleBeaconEvent(t *testing.T) {
 			tt.setupMock(mockMatchUC)
 
 			mockNATSClient := &natspkg.Client{}
-			handler := NewMatchHandler(mockMatchUC, mockNATSClient)
+			mockNRApp := &newrelic.Application{}
+			handler := NewMatchHandler(mockMatchUC, mockNATSClient, mockNRApp)
 
 			// Act
-			err := handler.handleBeaconEvent(tt.eventData)
+			err := handler.handleBeaconEvent(context.Background(), tt.eventData)
 
 			// Assert
 			if tt.expectError {
@@ -195,10 +200,11 @@ func TestMatchHandler_handleFinderEvent(t *testing.T) {
 			tt.setupMock(mockMatchUC)
 
 			mockNATSClient := &natspkg.Client{}
-			handler := NewMatchHandler(mockMatchUC, mockNATSClient)
+			mockNRApp := &newrelic.Application{}
+			handler := NewMatchHandler(mockMatchUC, mockNATSClient, mockNRApp)
 
 			// Act
-			err := handler.handleFinderEvent(tt.eventData)
+			err := handler.handleFinderEvent(context.Background(), tt.eventData)
 
 			// Assert
 			if tt.expectError {
@@ -302,10 +308,11 @@ func TestMatchHandler_handleRidePickup(t *testing.T) {
 			tt.setupMock(mockMatchUC)
 
 			mockNATSClient := &natspkg.Client{}
-			handler := NewMatchHandler(mockMatchUC, mockNATSClient)
+			mockNRApp := &newrelic.Application{}
+			handler := NewMatchHandler(mockMatchUC, mockNATSClient, mockNRApp)
 
 			// Act
-			err := handler.handleRidePickup(tt.eventData)
+			err := handler.handleRidePickup(context.Background(), tt.eventData)
 
 			// Assert
 			if tt.expectError {
@@ -356,8 +363,6 @@ func TestMatchHandler_handleRideCompleted(t *testing.T) {
 			expectError: false,
 			setupMock: func(m *mocks.MockMatchUC) {
 				m.EXPECT().RemoveActiveRide(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
-				m.EXPECT().ReleaseDriver(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-				m.EXPECT().ReleasePassenger(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 			},
 		},
 		{
@@ -397,8 +402,6 @@ func TestMatchHandler_handleRideCompleted(t *testing.T) {
 			expectError: false,
 			setupMock: func(m *mocks.MockMatchUC) {
 				m.EXPECT().RemoveActiveRide(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
-				m.EXPECT().ReleaseDriver(gomock.Any(), gomock.Any()).Return(errors.New("driver release failed")).Times(1)
-				m.EXPECT().ReleasePassenger(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 			},
 		},
 		{
@@ -432,8 +435,6 @@ func TestMatchHandler_handleRideCompleted(t *testing.T) {
 			expectError: false,
 			setupMock: func(m *mocks.MockMatchUC) {
 				m.EXPECT().RemoveActiveRide(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
-				m.EXPECT().ReleaseDriver(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-				m.EXPECT().ReleasePassenger(gomock.Any(), gomock.Any()).Return(errors.New("passenger release failed")).Times(1)
 			},
 		},
 	}
@@ -448,10 +449,11 @@ func TestMatchHandler_handleRideCompleted(t *testing.T) {
 			tt.setupMock(mockMatchUC)
 
 			mockNATSClient := &natspkg.Client{}
-			handler := NewMatchHandler(mockMatchUC, mockNATSClient)
+			mockNRApp := &newrelic.Application{}
+			handler := NewMatchHandler(mockMatchUC, mockNATSClient, mockNRApp)
 
 			// Act
-			err := handler.handleRideCompleted(tt.eventData)
+			err := handler.handleRideCompleted(context.Background(), tt.eventData)
 
 			// Assert
 			if tt.expectError {

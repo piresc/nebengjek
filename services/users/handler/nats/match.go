@@ -131,8 +131,8 @@ func (h *NatsHandler) handleMatchEvent(msg []byte) error {
 	}
 
 	// Notify both driver and passenger
-	h.wsManager.NotifyClient(event.DriverID, constants.SubjectMatchFound, event)
-	h.wsManager.NotifyClient(event.PassengerID, constants.SubjectMatchFound, event)
+	h.echoWSHandler.NotifyClient(event.DriverID, constants.SubjectMatchFound, event)
+	h.echoWSHandler.NotifyClient(event.PassengerID, constants.SubjectMatchFound, event)
 	return nil
 }
 
@@ -144,8 +144,8 @@ func (h *NatsHandler) handleMatchAccEvent(msg []byte) error {
 	}
 
 	// Notify both driver and passenger
-	h.wsManager.NotifyClient(event.DriverID, constants.SubjectMatchAccepted, event)
-	h.wsManager.NotifyClient(event.PassengerID, constants.SubjectMatchAccepted, event)
+	h.echoWSHandler.NotifyClient(event.DriverID, constants.SubjectMatchAccepted, event)
+	h.echoWSHandler.NotifyClient(event.PassengerID, constants.SubjectMatchAccepted, event)
 	return nil
 }
 
@@ -157,6 +157,6 @@ func (h *NatsHandler) handleMatchRejectedEvent(msg []byte) error {
 	}
 
 	// Only notify the driver whose match was rejected
-	h.wsManager.NotifyClient(event.DriverID, constants.EventMatchRejected, event)
+	h.echoWSHandler.NotifyClient(event.DriverID, constants.EventMatchRejected, event)
 	return nil
 }

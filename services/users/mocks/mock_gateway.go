@@ -51,18 +51,18 @@ func (mr *MockUserGWMockRecorder) MatchConfirm(arg0, arg1 interface{}) *gomock.C
 }
 
 // ProcessPayment mocks base method.
-func (m *MockUserGW) ProcessPayment(arg0 *models.PaymentProccessRequest) (*models.Payment, error) {
+func (m *MockUserGW) ProcessPayment(arg0 context.Context, arg1 *models.PaymentProccessRequest) (*models.Payment, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProcessPayment", arg0)
+	ret := m.ctrl.Call(m, "ProcessPayment", arg0, arg1)
 	ret0, _ := ret[0].(*models.Payment)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ProcessPayment indicates an expected call of ProcessPayment.
-func (mr *MockUserGWMockRecorder) ProcessPayment(arg0 interface{}) *gomock.Call {
+func (mr *MockUserGWMockRecorder) ProcessPayment(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessPayment", reflect.TypeOf((*MockUserGW)(nil).ProcessPayment), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessPayment", reflect.TypeOf((*MockUserGW)(nil).ProcessPayment), arg0, arg1)
 }
 
 // PublishBeaconEvent mocks base method.
@@ -137,16 +137,16 @@ func (mr *MockUserGWMockRecorder) RideArrived(arg0, arg1 interface{}) *gomock.Ca
 }
 
 // StartRide mocks base method.
-func (m *MockUserGW) StartRide(arg0 *models.RideStartRequest) (*models.Ride, error) {
+func (m *MockUserGW) StartRide(arg0 context.Context, arg1 *models.RideStartRequest) (*models.Ride, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StartRide", arg0)
+	ret := m.ctrl.Call(m, "StartRide", arg0, arg1)
 	ret0, _ := ret[0].(*models.Ride)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // StartRide indicates an expected call of StartRide.
-func (mr *MockUserGWMockRecorder) StartRide(arg0 interface{}) *gomock.Call {
+func (mr *MockUserGWMockRecorder) StartRide(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartRide", reflect.TypeOf((*MockUserGW)(nil).StartRide), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartRide", reflect.TypeOf((*MockUserGW)(nil).StartRide), arg0, arg1)
 }

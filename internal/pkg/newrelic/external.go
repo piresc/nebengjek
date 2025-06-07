@@ -19,9 +19,10 @@ func StartExternalSegment(ctx context.Context, request *http.Request) *newrelic.
 }
 
 // InstrumentHTTPRequest wraps an HTTP request with New Relic external segment instrumentation
-// Usage: resp, err := InstrumentHTTPRequest(ctx, req, func() (*http.Response, error) {
-//   return client.Do(req)
-// })
+//
+//	Usage: resp, err := InstrumentHTTPRequest(ctx, req, func() (*http.Response, error) {
+//	  return client.Do(req)
+//	})
 func InstrumentHTTPRequest(ctx context.Context, req *http.Request, doFunc func() (*http.Response, error)) (*http.Response, error) {
 	segment := StartExternalSegment(ctx, req)
 	if segment != nil {
@@ -29,7 +30,7 @@ func InstrumentHTTPRequest(ctx context.Context, req *http.Request, doFunc func()
 	}
 
 	resp, err := doFunc()
-	
+
 	// Add response details to segment if available
 	if segment != nil && resp != nil {
 		segment.Response = resp

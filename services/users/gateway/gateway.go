@@ -12,18 +12,18 @@ func (g *UserGW) MatchConfirm(ctx context.Context, req *models.MatchConfirmReque
 }
 
 // StartRide implements the UserGW interface method for starting a trip
-func (g *UserGW) StartRide(req *models.RideStartRequest) (*models.Ride, error) {
-	return g.httpGateway.StartRide(req)
+func (g *UserGW) StartRide(ctx context.Context, req *models.RideStartRequest) (*models.Ride, error) {
+	return g.httpGateway.StartRide(ctx, req)
 }
 
-// StartRide implements the UserGW interface method for starting a trip
-func (g *UserGW) ProcessPayment(req *models.PaymentProccessRequest) (*models.Payment, error) {
-	return g.httpGateway.ProcessPayment(req)
+// ProcessPayment implements the UserGW interface method for processing payment
+func (g *UserGW) ProcessPayment(ctx context.Context, req *models.PaymentProccessRequest) (*models.Payment, error) {
+	return g.httpGateway.ProcessPayment(ctx, req)
 }
 
 // RideArrived implements the UserGW interface method for ride arrival
 func (g *UserGW) RideArrived(ctx context.Context, event *models.RideArrivalReq) (*models.PaymentRequest, error) {
-	return g.httpGateway.RideArrived(event)
+	return g.httpGateway.RideArrived(ctx, event)
 }
 
 // PublishBeaconEvent forwards to the NATS gateway implementation

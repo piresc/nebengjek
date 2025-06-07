@@ -124,7 +124,7 @@ func TestHTTPGateway_MatchConfirm(t *testing.T) {
 				MatchService: "test-api-key",
 				RidesService: "test-api-key",
 			}
-			gateway := NewHTTPGateway(server.URL, "", config)
+			gateway := NewHTTPGateway(server.URL, "", config, nil)
 
 			// Execute test
 			result, err := gateway.MatchConfirm(context.Background(), tt.request)
@@ -171,7 +171,7 @@ func TestHTTPGateway_MatchConfirm_NetworkError(t *testing.T) {
 		MatchService: "test-api-key",
 		RidesService: "test-api-key",
 	}
-	gateway := NewHTTPGateway(server.URL, "", config)
+	gateway := NewHTTPGateway(server.URL, "", config, nil)
 	request := &models.MatchConfirmRequest{
 		ID:     "match-123",
 		UserID: "user-456",
@@ -196,7 +196,7 @@ func TestHTTPGateway_MatchConfirm_InvalidResponseJSON(t *testing.T) {
 		MatchService: "test-api-key",
 		RidesService: "test-api-key",
 	}
-	gateway := NewHTTPGateway(server.URL, "", config)
+	gateway := NewHTTPGateway(server.URL, "", config, nil)
 	request := &models.MatchConfirmRequest{
 		ID:     "match-123",
 		UserID: "user-456",
@@ -221,7 +221,7 @@ func TestHTTPGateway_MatchConfirm_EmptyResponse(t *testing.T) {
 		MatchService: "test-api-key",
 		RidesService: "test-api-key",
 	}
-	gateway := NewHTTPGateway(server.URL, "", config)
+	gateway := NewHTTPGateway(server.URL, "", config, nil)
 	request := &models.MatchConfirmRequest{
 		ID:     "match-123",
 		UserID: "user-456",
@@ -255,7 +255,7 @@ func TestNewHTTPGateway(t *testing.T) {
 		RidesService: "test-api-key",
 	}
 
-	gateway := NewHTTPGateway(matchURL, rideURL, config)
+	gateway := NewHTTPGateway(matchURL, rideURL, config, nil)
 
 	assert.NotNil(t, gateway)
 	assert.NotNil(t, gateway.matchClient)

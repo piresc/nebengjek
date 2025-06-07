@@ -64,8 +64,8 @@ func TestHTTPGateway_StartRide(t *testing.T) {
 				MatchService: "test-api-key",
 				RidesService: "test-api-key",
 			}
-			gateway := NewHTTPGateway("", server.URL, config)
-			result, err := gateway.StartRide(tt.request)
+			gateway := NewHTTPGateway("", server.URL, config, nil)
+			result, err := gateway.StartRide(context.Background(), tt.request)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -132,8 +132,8 @@ func TestHTTPGateway_RideArrived(t *testing.T) {
 				MatchService: "test-api-key",
 				RidesService: "test-api-key",
 			}
-			gateway := NewHTTPGateway("", server.URL, config)
-			result, err := gateway.RideArrived(tt.request)
+			gateway := NewHTTPGateway("", server.URL, config, nil)
+			result, err := gateway.RideArrived(context.Background(), tt.request)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -204,8 +204,8 @@ func TestHTTPGateway_ProcessPayment(t *testing.T) {
 				MatchService: "test-api-key",
 				RidesService: "test-api-key",
 			}
-			gateway := NewHTTPGateway("", server.URL, config)
-			result, err := gateway.ProcessPayment(tt.request)
+			gateway := NewHTTPGateway("", server.URL, config, nil)
+			result, err := gateway.ProcessPayment(context.Background(), tt.request)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -324,8 +324,8 @@ func TestHTTPGateway_StartRide_ErrorScenarios(t *testing.T) {
 				MatchService: "test-api-key",
 				RidesService: "test-api-key",
 			}
-			gateway := NewHTTPGateway("", server.URL, config)
-			result, err := gateway.StartRide(tt.request)
+			gateway := NewHTTPGateway("", server.URL, config, nil)
+			result, err := gateway.StartRide(context.Background(), tt.request)
 
 			assert.Error(t, err)
 			assert.Nil(t, result)
@@ -412,8 +412,8 @@ func TestHTTPGateway_RideArrived_ErrorScenarios(t *testing.T) {
 				MatchService: "test-api-key",
 				RidesService: "test-api-key",
 			}
-			gateway := NewHTTPGateway("", server.URL, config)
-			result, err := gateway.RideArrived(tt.request)
+			gateway := NewHTTPGateway("", server.URL, config, nil)
+			result, err := gateway.RideArrived(context.Background(), tt.request)
 
 			assert.Error(t, err)
 			assert.Nil(t, result)
@@ -505,8 +505,8 @@ func TestHTTPGateway_ProcessPayment_ErrorScenarios(t *testing.T) {
 				MatchService: "test-api-key",
 				RidesService: "test-api-key",
 			}
-			gateway := NewHTTPGateway("", server.URL, config)
-			result, err := gateway.ProcessPayment(tt.request)
+			gateway := NewHTTPGateway("", server.URL, config, nil)
+			result, err := gateway.ProcessPayment(context.Background(), tt.request)
 
 			assert.Error(t, err)
 			assert.Nil(t, result)
@@ -558,7 +558,7 @@ func TestHTTPGateway_RequestBodyValidation(t *testing.T) {
 			MatchService: "test-api-key",
 			RidesService: "test-api-key",
 		}
-		gateway := NewHTTPGateway("", server.URL, config)
+		gateway := NewHTTPGateway("", server.URL, config, nil)
 		request := &models.RideStartRequest{
 			RideID: "ride-123",
 			DriverLocation: &models.Location{
@@ -571,7 +571,7 @@ func TestHTTPGateway_RequestBodyValidation(t *testing.T) {
 			},
 		}
 
-		result, err := gateway.StartRide(request)
+		result, err := gateway.StartRide(context.Background(), request)
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, uuid.MustParse("550e8400-e29b-41d4-a716-446655440000"), result.RideID)
@@ -606,13 +606,13 @@ func TestHTTPGateway_RequestBodyValidation(t *testing.T) {
 			MatchService: "test-api-key",
 			RidesService: "test-api-key",
 		}
-		gateway := NewHTTPGateway("", server.URL, config)
+		gateway := NewHTTPGateway("", server.URL, config, nil)
 		request := &models.RideArrivalReq{
 			RideID:           "ride-123",
 			AdjustmentFactor: 0.9,
 		}
 
-		result, err := gateway.RideArrived(request)
+		result, err := gateway.RideArrived(context.Background(), request)
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, "payment-123", result.RideID)
@@ -649,14 +649,14 @@ func TestHTTPGateway_RequestBodyValidation(t *testing.T) {
 			MatchService: "test-api-key",
 			RidesService: "test-api-key",
 		}
-		gateway := NewHTTPGateway("", server.URL, config)
+		gateway := NewHTTPGateway("", server.URL, config, nil)
 		request := &models.PaymentProccessRequest{
 			RideID:    "ride-123",
 			TotalCost: 25000,
 			Status:    models.PaymentStatusAccepted,
 		}
 
-		result, err := gateway.ProcessPayment(request)
+		result, err := gateway.ProcessPayment(context.Background(), request)
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, uuid.MustParse("550e8400-e29b-41d4-a716-446655440000"), result.PaymentID)

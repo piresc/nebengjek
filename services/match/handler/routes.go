@@ -29,9 +29,9 @@ func NewHandler(
 }
 
 // RegisterRoutes registers all HTTP routes
-func (h *Handler) RegisterRoutes(e *echo.Echo, apiKeyMiddleware *middleware.APIKeyMiddleware) {
+func (h *Handler) RegisterRoutes(e *echo.Echo, unifiedMiddleware *middleware.UnifiedMiddleware) {
 	// Internal routes for service-to-service communication (API key required)
-	internal := e.Group("/internal", apiKeyMiddleware.ValidateAPIKey("match-service"))
+	internal := e.Group("/internal", unifiedMiddleware.APIKeyHandler("match-service"))
 
 	// Internal match endpoints
 	internalMatchGroup := internal.Group("/matches")

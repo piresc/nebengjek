@@ -3,6 +3,7 @@ package gateway
 import (
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
+	"github.com/piresc/nebengjek/internal/pkg/observability"
 	"github.com/piresc/nebengjek/services/users"
 	gateaway_http "github.com/piresc/nebengjek/services/users/gateway/http"
 	gateway_nats "github.com/piresc/nebengjek/services/users/gateway/nats"
@@ -15,9 +16,9 @@ type UserGW struct {
 }
 
 // NewUserGW creates a new gateway instance with NATS and HTTP clients with API key authentication
-func NewUserGW(natsClient *natspkg.Client, matchServiceURL string, rideServiceURL string, config *models.APIKeyConfig) users.UserGW {
+func NewUserGW(natsClient *natspkg.Client, matchServiceURL string, rideServiceURL string, config *models.APIKeyConfig, tracer observability.Tracer) users.UserGW {
 	return &UserGW{
 		natsGateway: gateway_nats.NewNATSGateway(natsClient),
-		httpGateway: gateaway_http.NewHTTPGateway(matchServiceURL, rideServiceURL, config),
+		httpGateway: gateaway_http.NewHTTPGateway(matchServiceURL, rideServiceURL, config, tracer),
 	}
 }
