@@ -7,6 +7,7 @@ import (
 
 	httpclient "github.com/piresc/nebengjek/internal/pkg/http"
 	"github.com/piresc/nebengjek/internal/pkg/models"
+	nrpkg "github.com/piresc/nebengjek/internal/pkg/newrelic"
 )
 
 // MatchClient is an HTTP client for communicating with the match service
@@ -47,7 +48,9 @@ func (g *HTTPGateway) MatchConfirm(ctx context.Context, req *models.MatchConfirm
 	}
 
 	var matchProposal models.MatchProposal
-	err := g.matchClient.apiClient.PostJSON(ctx, endpoint, req, &matchProposal)
+	err := nrpkg.InstrumentServiceCall(ctx, "match-service", endpoint, func() error {
+		return g.matchClient.apiClient.PostJSON(ctx, endpoint, req, &matchProposal)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to send match confirmation request: %w", err)
 	}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/piresc/nebengjek/internal/pkg/circuitbreaker"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
+	nrpkg "github.com/piresc/nebengjek/internal/pkg/newrelic"
 	"github.com/piresc/nebengjek/internal/pkg/retry"
 )
 
@@ -45,9 +46,12 @@ func (c *EnhancedClient) Do(ctx context.Context, req *http.Request) (*http.Respo
 
 	// Execute with circuit breaker protection
 	err = c.circuitManager.Execute(ctx, serviceName, func(ctx context.Context) error {
-		// Execute with retry logic
+		// Execute with retry logic within New Relic external segment
 		return c.retrier.Execute(ctx, func(ctx context.Context) error {
-			resp, err = c.client.Do(req.WithContext(ctx))
+			// Instrument the actual HTTP call with New Relic
+			resp, err = nrpkg.InstrumentHTTPRequest(ctx, req, func() (*http.Response, error) {
+				return c.client.Do(req.WithContext(ctx))
+			})
 			if err != nil {
 				return err
 			}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
@@ -219,7 +220,7 @@ func (h *RidesHandler) handleLocationAggregate(ctx context.Context, msg []byte) 
 		}
 
 		// Calculate cost at 3000 IDR per km
-		cost := int(update.Distance * 3000)
+		cost := int(math.Round(update.Distance * 3000))
 
 		// Add billing attributes to transaction
 		if txn := nrpkg.FromContext(ctx); txn != nil {

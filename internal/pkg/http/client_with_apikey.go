@@ -11,6 +11,7 @@ import (
 
 	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
+	nrpkg "github.com/piresc/nebengjek/internal/pkg/newrelic"
 	"github.com/piresc/nebengjek/internal/utils"
 )
 
@@ -200,7 +201,10 @@ func (c *APIKeyClient) doRequest(ctx context.Context, method, endpoint string, b
 		logger.String("service", c.serviceName),
 		logger.Bool("has_api_key", c.apiKey != ""))
 
-	resp, err := c.client.Do(req)
+	// Instrument HTTP request with New Relic external segment
+	resp, err := nrpkg.InstrumentHTTPRequest(ctx, req, func() (*nethttp.Response, error) {
+		return c.client.Do(req)
+	})
 	if err != nil {
 		logger.Error("HTTP request failed",
 			logger.String("method", method),

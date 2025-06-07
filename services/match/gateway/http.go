@@ -7,6 +7,7 @@ import (
 	httpclient "github.com/piresc/nebengjek/internal/pkg/http"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
+	nrpkg "github.com/piresc/nebengjek/internal/pkg/newrelic"
 )
 
 // HTTPGateway wraps the location client for HTTP operations
@@ -40,7 +41,9 @@ func (gw *LocationClient) AddAvailableDriver(ctx context.Context, driverID strin
 	}
 
 	var response map[string]string
-	err := gw.apiClient.PostJSON(ctx, endpoint, request, &response)
+	err := nrpkg.InstrumentServiceCall(ctx, "location-service", gw.baseURL+endpoint, func() error {
+		return gw.apiClient.PostJSON(ctx, endpoint, request, &response)
+	})
 	if err != nil {
 		logger.Error("Failed to add available driver",
 			logger.String("driver_id", driverID),
@@ -55,13 +58,16 @@ func (gw *LocationClient) AddAvailableDriver(ctx context.Context, driverID strin
 func (gw *LocationClient) RemoveAvailableDriver(ctx context.Context, driverID string) error {
 	endpoint := fmt.Sprintf("/internal/drivers/%s/available", driverID)
 
-	resp, err := gw.apiClient.Delete(ctx, endpoint)
-	if err == nil {
-		defer resp.Body.Close()
-		if resp.StatusCode >= 400 {
-			err = fmt.Errorf("HTTP error: %d %s", resp.StatusCode, resp.Status)
+	err := nrpkg.InstrumentServiceCall(ctx, "location-service", gw.baseURL+endpoint, func() error {
+		resp, err := gw.apiClient.Delete(ctx, endpoint)
+		if err == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode >= 400 {
+				err = fmt.Errorf("HTTP error: %d %s", resp.StatusCode, resp.Status)
+			}
 		}
-	}
+		return err
+	})
 	if err != nil {
 		logger.Error("Failed to remove available driver",
 			logger.String("driver_id", driverID),
@@ -81,7 +87,9 @@ func (gw *LocationClient) AddAvailablePassenger(ctx context.Context, passengerID
 	}
 
 	var response map[string]string
-	err := gw.apiClient.PostJSON(ctx, endpoint, request, &response)
+	err := nrpkg.InstrumentServiceCall(ctx, "location-service", gw.baseURL+endpoint, func() error {
+		return gw.apiClient.PostJSON(ctx, endpoint, request, &response)
+	})
 	if err != nil {
 		logger.Error("Failed to add available passenger",
 			logger.String("passenger_id", passengerID),
@@ -96,13 +104,16 @@ func (gw *LocationClient) AddAvailablePassenger(ctx context.Context, passengerID
 func (gw *LocationClient) RemoveAvailablePassenger(ctx context.Context, passengerID string) error {
 	endpoint := fmt.Sprintf("/internal/passengers/%s/available", passengerID)
 
-	resp, err := gw.apiClient.Delete(ctx, endpoint)
-	if err == nil {
-		defer resp.Body.Close()
-		if resp.StatusCode >= 400 {
-			err = fmt.Errorf("HTTP error: %d %s", resp.StatusCode, resp.Status)
+	err := nrpkg.InstrumentServiceCall(ctx, "location-service", gw.baseURL+endpoint, func() error {
+		resp, err := gw.apiClient.Delete(ctx, endpoint)
+		if err == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode >= 400 {
+				err = fmt.Errorf("HTTP error: %d %s", resp.StatusCode, resp.Status)
+			}
 		}
-	}
+		return err
+	})
 	if err != nil {
 		logger.Error("Failed to remove available passenger",
 			logger.String("passenger_id", passengerID),
@@ -119,7 +130,9 @@ func (gw *LocationClient) FindNearbyDrivers(ctx context.Context, location *model
 		location.Latitude, location.Longitude, radiusKm)
 
 	var nearbyDrivers []*models.NearbyUser
-	err := gw.apiClient.GetJSON(ctx, endpoint, &nearbyDrivers)
+	err := nrpkg.InstrumentServiceCall(ctx, "location-service", gw.baseURL+endpoint, func() error {
+		return gw.apiClient.GetJSON(ctx, endpoint, &nearbyDrivers)
+	})
 	if err != nil {
 		logger.Error("Failed to find nearby drivers", logger.ErrorField(err))
 		return nil, fmt.Errorf("failed to find nearby drivers: %w", err)
@@ -133,7 +146,9 @@ func (gw *LocationClient) GetDriverLocation(ctx context.Context, driverID string
 	endpoint := fmt.Sprintf("/internal/drivers/%s/location", driverID)
 
 	var location models.Location
-	err := gw.apiClient.GetJSON(ctx, endpoint, &location)
+	err := nrpkg.InstrumentServiceCall(ctx, "location-service", gw.baseURL+endpoint, func() error {
+		return gw.apiClient.GetJSON(ctx, endpoint, &location)
+	})
 	if err != nil {
 		logger.Error("Failed to get driver location",
 			logger.String("driver_id", driverID),
@@ -186,7 +201,9 @@ func (gw *LocationClient) GetPassengerLocation(ctx context.Context, passengerID 
 	endpoint := fmt.Sprintf("/internal/passengers/%s/location", passengerID)
 
 	var location models.Location
-	err := gw.apiClient.GetJSON(ctx, endpoint, &location)
+	err := nrpkg.InstrumentServiceCall(ctx, "location-service", gw.baseURL+endpoint, func() error {
+		return gw.apiClient.GetJSON(ctx, endpoint, &location)
+	})
 	if err != nil {
 		logger.Error("Failed to get passenger location",
 			logger.String("passenger_id", passengerID),

@@ -7,6 +7,7 @@ import (
 
 	httpclient "github.com/piresc/nebengjek/internal/pkg/http"
 	"github.com/piresc/nebengjek/internal/pkg/models"
+	nrpkg "github.com/piresc/nebengjek/internal/pkg/newrelic"
 )
 
 // RideClient is an enhanced HTTP client for communicating with the ride service
@@ -34,7 +35,9 @@ func (g *HTTPGateway) StartRide(req *models.RideStartRequest) (*models.Ride, err
 	}
 
 	var ride models.Ride
-	err := g.rideClient.apiClient.PostJSON(ctx, endpoint, req, &ride)
+	err := nrpkg.InstrumentServiceCall(ctx, "rides-service", endpoint, func() error {
+		return g.rideClient.apiClient.PostJSON(ctx, endpoint, req, &ride)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to start ride: %w", err)
 	}
@@ -52,7 +55,9 @@ func (g *HTTPGateway) RideArrived(req *models.RideArrivalReq) (*models.PaymentRe
 	}
 
 	var paymentRequest models.PaymentRequest
-	err := g.rideClient.apiClient.PostJSON(ctx, endpoint, req, &paymentRequest)
+	err := nrpkg.InstrumentServiceCall(ctx, "rides-service", endpoint, func() error {
+		return g.rideClient.apiClient.PostJSON(ctx, endpoint, req, &paymentRequest)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to process ride arrival: %w", err)
 	}
@@ -70,7 +75,9 @@ func (g *HTTPGateway) ProcessPayment(paymentReq *models.PaymentProccessRequest) 
 	}
 
 	var payment models.Payment
-	err := g.rideClient.apiClient.PostJSON(ctx, endpoint, paymentReq, &payment)
+	err := nrpkg.InstrumentServiceCall(ctx, "rides-service", endpoint, func() error {
+		return g.rideClient.apiClient.PostJSON(ctx, endpoint, paymentReq, &payment)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to process payment: %w", err)
 	}
