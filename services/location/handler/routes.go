@@ -2,6 +2,7 @@ package handler
 
 import (
 	"github.com/labstack/echo/v4"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/piresc/nebengjek/internal/pkg/middleware"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
@@ -21,10 +22,11 @@ func NewHTTPHandler(
 	locationUC location.LocationUC,
 	natsClient *natspkg.Client,
 	cfg *models.Config,
+	nrApp *newrelic.Application,
 ) *HTTPHandler {
 	return &HTTPHandler{
 		locationHTTP: httpHandler.NewLocationHandler(locationUC),
-		locationNATS: NewLocationHandler(locationUC, natsClient), // Use existing NATS handler
+		locationNATS: NewLocationHandler(locationUC, natsClient, nrApp), // Use existing NATS handler
 		cfg:          cfg,
 	}
 }

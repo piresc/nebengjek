@@ -7,8 +7,8 @@ import (
 )
 
 // MatchAccept implements the UserGW interface method for match acceptance
-func (g *UserGW) MatchConfirm(req *models.MatchConfirmRequest) (*models.MatchProposal, error) {
-	return g.httpGateway.MatchConfirm(req)
+func (g *UserGW) MatchConfirm(ctx context.Context, req *models.MatchConfirmRequest) (*models.MatchProposal, error) {
+	return g.httpGateway.MatchConfirm(ctx, req)
 }
 
 // StartRide implements the UserGW interface method for starting a trip

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/newrelic/go-agent/v3/integrations/nrecho-v4"
 	"github.com/piresc/nebengjek/internal/pkg/config"
 	"github.com/piresc/nebengjek/internal/pkg/database"
 	"github.com/piresc/nebengjek/internal/pkg/health"
@@ -30,7 +31,7 @@ import (
 
 func main() {
 	appName := "users-service"
-	configPath := "config/users.env"
+	configPath := "/Users/pirescerullo/GitHub/assessment/nebengjek/config/users.env"
 	configs := config.InitConfig(configPath)
 
 	// Initialize New Relic and Zap logger
@@ -113,9 +114,11 @@ func main() {
 	// Initialize Echo server
 	e := echo.New()
 
-	// Add middlewares (panic recovery should be first)
+	// Add middlewares in standard order
 	e.Use(middleware.PanicRecoveryWithZapMiddleware(zapLogger))
+	e.Use(nrecho.Middleware(nrApp))
 	e.Use(middleware.RequestIDMiddleware())
+	e.Use(middleware.RequestContextMiddleware(appName))
 	e.Use(logger.ZapEchoMiddleware(zapLogger))
 
 	// Initialize API key middleware for internal routes only

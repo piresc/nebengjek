@@ -8,11 +8,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	_ "github.com/newrelic/go-agent/v3/integrations/nrpq"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
 // GetUserByMSISDN retrieves a user by MSISDN
 func (r *UserRepo) GetUserByMSISDN(ctx context.Context, msisdn string) (*models.User, error) {
+	txn := newrelic.FromContext(ctx)
+	dbCtx := newrelic.NewContext(ctx, txn)
+
 	query := `
 		SELECT id, msisdn, fullname, role, created_at, updated_at, is_active
 		FROM users
@@ -20,7 +25,7 @@ func (r *UserRepo) GetUserByMSISDN(ctx context.Context, msisdn string) (*models.
 	`
 
 	var user models.User
-	err := r.db.QueryRowContext(ctx, query, msisdn).Scan(
+	err := r.db.QueryRowContext(dbCtx, query, msisdn).Scan(
 		&user.ID,
 		&user.MSISDN,
 		&user.FullName,
@@ -40,7 +45,7 @@ func (r *UserRepo) GetUserByMSISDN(ctx context.Context, msisdn string) (*models.
 	// Check if user is a driver
 	if user.Role == "driver" {
 		// Get driver info
-		driver, err := r.getDriverInfo(ctx, user.ID)
+		driver, err := r.getDriverInfo(dbCtx, user.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -66,9 +71,9 @@ func (r *UserRepo) CreateUser(ctx context.Context, user *models.User) error {
 
 	// Insert user
 	query := `
-		INSERT INTO users (id, msisdn, fullname, role, 
+		INSERT INTO users (id, msisdn, fullname, role,
 			created_at, updated_at, is_active
-		) VALUES (:id, :msisdn, :fullname, :role, 
+		) VALUES (:id, :msisdn, :fullname, :role,
 			:created_at, :updated_at, :is_active)
 	`
 	_, err = tx.NamedExecContext(ctx, query, user)
@@ -86,12 +91,15 @@ func (r *UserRepo) CreateUser(ctx context.Context, user *models.User) error {
 
 // getUserByField is a helper function to get a user by a specific field
 func (r *UserRepo) getUserByField(ctx context.Context, field, value string) (*models.User, error) {
+	txn := newrelic.FromContext(ctx)
+	dbCtx := newrelic.NewContext(ctx, txn)
+
 	query := fmt.Sprintf(`
 		SELECT * FROM users WHERE %s = $1
 	`, field)
 
 	var user models.User
-	err := r.db.GetContext(ctx, &user, query, value)
+	err := r.db.GetContext(dbCtx, &user, query, value)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("user not found")
@@ -101,7 +109,7 @@ func (r *UserRepo) getUserByField(ctx context.Context, field, value string) (*mo
 
 	// If user is a driver, get driver info
 	if user.Role == "driver" {
-		driver, err := r.getDriverInfo(ctx, user.ID)
+		driver, err := r.getDriverInfo(dbCtx, user.ID)
 		if err != nil {
 			return nil, err
 		}

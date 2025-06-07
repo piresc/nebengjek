@@ -60,7 +60,7 @@ func TestMatchHandler_handleBeaconEvent(t *testing.T) {
 			}(),
 			expectError: false,
 			setupMock: func(m *mocks.MockMatchUC) {
-				m.EXPECT().HandleBeaconEvent(gomock.Any()).Return(nil).Times(1)
+				m.EXPECT().HandleBeaconEvent(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 			},
 		},
 		{
@@ -87,7 +87,7 @@ func TestMatchHandler_handleBeaconEvent(t *testing.T) {
 			}(),
 			expectError: true,
 			setupMock: func(m *mocks.MockMatchUC) {
-				m.EXPECT().HandleBeaconEvent(gomock.Any()).Return(errors.New("usecase error")).Times(1)
+				m.EXPECT().HandleBeaconEvent(gomock.Any(), gomock.Any()).Return(errors.New("usecase error")).Times(1)
 			},
 		},
 	}
@@ -148,7 +148,7 @@ func TestMatchHandler_handleFinderEvent(t *testing.T) {
 			}(),
 			expectError: false,
 			setupMock: func(m *mocks.MockMatchUC) {
-				m.EXPECT().HandleFinderEvent(gomock.Any()).Return(nil).Times(1)
+				m.EXPECT().HandleFinderEvent(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 			},
 		},
 		{
@@ -180,7 +180,7 @@ func TestMatchHandler_handleFinderEvent(t *testing.T) {
 			}(),
 			expectError: true,
 			setupMock: func(m *mocks.MockMatchUC) {
-				m.EXPECT().HandleFinderEvent(gomock.Any()).Return(errors.New("usecase error")).Times(1)
+				m.EXPECT().HandleFinderEvent(gomock.Any(), gomock.Any()).Return(errors.New("usecase error")).Times(1)
 			},
 		},
 	}
@@ -356,8 +356,8 @@ func TestMatchHandler_handleRideCompleted(t *testing.T) {
 			expectError: false,
 			setupMock: func(m *mocks.MockMatchUC) {
 				m.EXPECT().RemoveActiveRide(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
-				m.EXPECT().ReleaseDriver(gomock.Any()).Return(nil).Times(1)
-				m.EXPECT().ReleasePassenger(gomock.Any()).Return(nil).Times(1)
+				m.EXPECT().ReleaseDriver(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+				m.EXPECT().ReleasePassenger(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 			},
 		},
 		{
@@ -397,8 +397,8 @@ func TestMatchHandler_handleRideCompleted(t *testing.T) {
 			expectError: false,
 			setupMock: func(m *mocks.MockMatchUC) {
 				m.EXPECT().RemoveActiveRide(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
-				m.EXPECT().ReleaseDriver(gomock.Any()).Return(errors.New("driver release failed")).Times(1)
-				m.EXPECT().ReleasePassenger(gomock.Any()).Return(nil).Times(1)
+				m.EXPECT().ReleaseDriver(gomock.Any(), gomock.Any()).Return(errors.New("driver release failed")).Times(1)
+				m.EXPECT().ReleasePassenger(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 			},
 		},
 		{
@@ -432,8 +432,8 @@ func TestMatchHandler_handleRideCompleted(t *testing.T) {
 			expectError: false,
 			setupMock: func(m *mocks.MockMatchUC) {
 				m.EXPECT().RemoveActiveRide(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
-				m.EXPECT().ReleaseDriver(gomock.Any()).Return(nil).Times(1)
-				m.EXPECT().ReleasePassenger(gomock.Any()).Return(errors.New("passenger release failed")).Times(1)
+				m.EXPECT().ReleaseDriver(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+				m.EXPECT().ReleasePassenger(gomock.Any(), gomock.Any()).Return(errors.New("passenger release failed")).Times(1)
 			},
 		},
 	}

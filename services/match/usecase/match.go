@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/piresc/nebengjek/internal/pkg/converter"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
@@ -13,7 +14,7 @@ import (
 // addDriverToPool adds a driver to the available pool without creating matches
 func (uc *MatchUC) addDriverToPool(ctx context.Context, driverID string, location *models.Location) error {
 	// Add driver to available pool
-	if err := uc.locationGW.AddAvailableDriver(ctx, driverID, location); err != nil {
+	if err := uc.matchGW.AddAvailableDriver(ctx, driverID, location); err != nil {
 		logger.Error("Failed to add available driver",
 			logger.String("driver_id", driverID),
 			logger.ErrorField(err))
@@ -24,7 +25,7 @@ func (uc *MatchUC) addDriverToPool(ctx context.Context, driverID string, locatio
 
 // createMatchesWithNearbyDrivers finds nearby drivers and creates match proposals
 func (uc *MatchUC) createMatchesWithNearbyDrivers(ctx context.Context, passengerID string, passengerLocation, targetLocation *models.Location) error {
-	nearbyDrivers, err := uc.locationGW.FindNearbyDrivers(ctx, passengerLocation, uc.cfg.Match.SearchRadiusKm) // Configurable radius
+	nearbyDrivers, err := uc.matchGW.FindNearbyDrivers(ctx, passengerLocation, uc.cfg.Match.SearchRadiusKm) // Configurable radius
 	if err != nil {
 		logger.Error("Failed to find nearby drivers",
 			logger.String("passenger_id", passengerID),
@@ -69,7 +70,7 @@ func (uc *MatchUC) buildMatch(driverID, passengerID string, driverLocation, pass
 }
 
 func (uc *MatchUC) handleActivePassengerWithTarget(ctx context.Context, event models.FinderEvent, location *models.Location, targetLocation *models.Location) error {
-	if err := uc.locationGW.AddAvailablePassenger(ctx, event.UserID, location); err != nil {
+	if err := uc.matchGW.AddAvailablePassenger(ctx, event.UserID, location); err != nil {
 		logger.Error("Failed to add available passenger",
 			logger.String("passenger_id", event.UserID),
 			logger.ErrorField(err))
@@ -83,9 +84,9 @@ func (uc *MatchUC) handleActivePassengerWithTarget(ctx context.Context, event mo
 func (uc *MatchUC) handleInactiveUser(ctx context.Context, userID string, role string) error {
 	var err error
 	if role == "driver" {
-		err = uc.locationGW.RemoveAvailableDriver(ctx, userID)
+		err = uc.matchGW.RemoveAvailableDriver(ctx, userID)
 	} else {
-		err = uc.locationGW.RemoveAvailablePassenger(ctx, userID)
+		err = uc.matchGW.RemoveAvailablePassenger(ctx, userID)
 	}
 
 	if err != nil {
@@ -99,8 +100,7 @@ func (uc *MatchUC) handleInactiveUser(ctx context.Context, userID string, role s
 }
 
 // HandleBeaconEvent processes beacon events from NATS for drivers
-func (uc *MatchUC) HandleBeaconEvent(event models.BeaconEvent) error {
-	ctx := context.Background()
+func (uc *MatchUC) HandleBeaconEvent(ctx context.Context, event models.BeaconEvent) error {
 
 	location := &models.Location{
 		Latitude:  event.Location.Latitude,
@@ -128,8 +128,7 @@ func (uc *MatchUC) HandleBeaconEvent(event models.BeaconEvent) error {
 }
 
 // HandleFinderEvent processes finder events from NATS for passengers
-func (uc *MatchUC) HandleFinderEvent(event models.FinderEvent) error {
-	ctx := context.Background()
+func (uc *MatchUC) HandleFinderEvent(ctx context.Context, event models.FinderEvent) error {
 
 	location := &models.Location{
 		Latitude:  event.Location.Latitude,
@@ -208,8 +207,8 @@ func (uc *MatchUC) updateMatchConfirmation(ctx context.Context, match *models.Ma
 			logger.String("match_id", match.ID.String()))
 
 		// Remove users from available pools when fully confirmed
-		uc.locationGW.RemoveAvailableDriver(ctx, match.DriverID.String())
-		uc.locationGW.RemoveAvailablePassenger(ctx, match.PassengerID.String())
+		uc.matchGW.RemoveAvailableDriver(ctx, match.DriverID.String())
+		uc.matchGW.RemoveAvailablePassenger(ctx, match.PassengerID.String())
 	} else if match.DriverConfirmed {
 		match.Status = models.MatchStatusDriverConfirmed
 		// Match confirmed by driver, waiting for passenger
@@ -237,7 +236,7 @@ func (uc *MatchUC) handleMatchAcceptance(ctx context.Context, match *models.Matc
 	// If match is fully accepted, handle auto-rejection asynchronously
 	if updatedMatch.Status == models.MatchStatusAccepted {
 		uc.startAsyncAutoRejection(updatedMatch)
-		uc.PublishMatchAccepted(updatedMatch)
+		uc.PublishMatchAccepted(ctx, updatedMatch)
 	}
 
 	responseEvent := uc.buildMatchProposal(updatedMatch)
@@ -246,7 +245,7 @@ func (uc *MatchUC) handleMatchAcceptance(ctx context.Context, match *models.Matc
 	return responseEvent, nil
 }
 
-func (uc *MatchUC) PublishMatchAccepted(match *models.Match) {
+func (uc *MatchUC) PublishMatchAccepted(ctx context.Context, match *models.Match) {
 	// Create match proposal for accepted match
 	PublishMatchAccepted := models.MatchProposal{
 		ID:             match.ID.String(),
@@ -257,7 +256,8 @@ func (uc *MatchUC) PublishMatchAccepted(match *models.Match) {
 		TargetLocation: match.TargetLocation,
 		MatchStatus:    match.Status,
 	}
-	if err := uc.matchGW.PublishMatchAccepted(context.Background(), PublishMatchAccepted); err != nil {
+
+	if err := uc.matchGW.PublishMatchAccepted(ctx, PublishMatchAccepted); err != nil {
 		logger.Error("Failed to publish match accepted event",
 			logger.String("match_id", PublishMatchAccepted.ID),
 			logger.ErrorField(err))
@@ -435,8 +435,13 @@ func (uc *MatchUC) handleMatchRejection(ctx context.Context, match *models.Match
 }
 
 // ConfirmMatchStatus handles match confirmation from either driver or passenger
-func (uc *MatchUC) ConfirmMatchStatus(req *models.MatchConfirmRequest) (models.MatchProposal, error) {
-	ctx := context.Background()
+func (uc *MatchUC) ConfirmMatchStatus(ctx context.Context, req *models.MatchConfirmRequest) (models.MatchProposal, error) {
+	// Extract transaction from standard context
+	txn := newrelic.FromContext(ctx)
+	if txn != nil {
+		segment := txn.StartSegment("MatchUC.ConfirmMatchStatus")
+		defer segment.End()
+	}
 
 	// Get the match from database
 	match, err := uc.matchRepo.GetMatch(ctx, req.ID)
@@ -450,7 +455,8 @@ func (uc *MatchUC) ConfirmMatchStatus(req *models.MatchConfirmRequest) (models.M
 	case string(models.MatchStatusRejected):
 		return uc.handleMatchRejection(ctx, match)
 	default:
-		return models.MatchProposal{}, fmt.Errorf("unsupported match status: %s", req.Status)
+		err := fmt.Errorf("unsupported match status: %s", req.Status)
+		return models.MatchProposal{}, err
 	}
 }
 
@@ -476,36 +482,12 @@ func (uc *MatchUC) GetPendingMatch(ctx context.Context, matchID string) (*models
 	return nil, fmt.Errorf("match is not in pending state")
 }
 
-// ReleaseDriver releases a driver from the ride lock after a ride completes
-// The driver will be available for matching again when they send their next beacon event
-func (uc *MatchUC) ReleaseDriver(driverID string) error {
-	// The locking system only needs to track that the driver is no longer in an active ride
-	// The driver will be added back to the available pool when they send their next beacon event
-	// with their current location, so we don't need to add them back here
-
-	logger.Info("Successfully released driver from ride lock",
-		logger.String("driver_id", driverID))
-	return nil
-}
-
-// ReleasePassenger releases a passenger from the ride lock after a ride completes
-// The passenger will be available for matching again when they send their next finder event
-func (uc *MatchUC) ReleasePassenger(passengerID string) error {
-	// The locking system only needs to track that the passenger is no longer in an active ride
-	// The passenger will be added back to the available pool when they send their next finder event
-	// with their current location, so we don't need to add them back here
-
-	logger.Info("Successfully released passenger from ride lock",
-		logger.String("passenger_id", passengerID))
-	return nil
-}
-
 // RemoveDriverFromPool removes a driver from the available pool (locks them)
 func (uc *MatchUC) RemoveDriverFromPool(ctx context.Context, driverID string) error {
 	// Locking driver (removing from available pool)
 
 	// Remove driver from available pool
-	if err := uc.locationGW.RemoveAvailableDriver(ctx, driverID); err != nil {
+	if err := uc.matchGW.RemoveAvailableDriver(ctx, driverID); err != nil {
 		logger.Error("Error removing driver from available pool",
 			logger.String("driver_id", driverID),
 			logger.ErrorField(err))
@@ -521,7 +503,7 @@ func (uc *MatchUC) RemovePassengerFromPool(ctx context.Context, passengerID stri
 	// Locking passenger (removing from available pool)
 
 	// Remove passenger from available pool
-	if err := uc.locationGW.RemoveAvailablePassenger(ctx, passengerID); err != nil {
+	if err := uc.matchGW.RemoveAvailablePassenger(ctx, passengerID); err != nil {
 		logger.Error("Error removing passenger from available pool",
 			logger.String("passenger_id", passengerID),
 			logger.ErrorField(err))

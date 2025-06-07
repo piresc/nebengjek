@@ -8,15 +8,20 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	_ "github.com/newrelic/go-agent/v3/integrations/nrpq"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
 // getDriverInfo retrieves driver information for a user
 func (r *UserRepo) getDriverInfo(ctx context.Context, userID uuid.UUID) (*models.Driver, error) {
+	txn := newrelic.FromContext(ctx)
+	dbCtx := newrelic.NewContext(ctx, txn)
+
 	query := `SELECT * FROM drivers WHERE user_id = $1`
 
 	var driver models.Driver
-	err := r.db.GetContext(ctx, &driver, query, userID)
+	err := r.db.GetContext(dbCtx, &driver, query, userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -71,7 +76,10 @@ func (r *UserRepo) UpdateToDriver(ctx context.Context, user *models.User) error 
 
 // GetUserByID retrieves a user by ID
 func (r *UserRepo) GetUserByID(ctx context.Context, id string) (*models.User, error) {
-	user, err := r.getUserByField(ctx, "id", id)
+	txn := newrelic.FromContext(ctx)
+	dbCtx := newrelic.NewContext(ctx, txn)
+
+	user, err := r.getUserByField(dbCtx, "id", id)
 	if err != nil {
 		return nil, err
 	}

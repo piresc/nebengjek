@@ -2,6 +2,7 @@ package handler
 
 import (
 	"github.com/labstack/echo/v4"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/piresc/nebengjek/internal/pkg/middleware"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/match"
@@ -19,10 +20,11 @@ type Handler struct {
 func NewHandler(
 	matchUC match.MatchUC,
 	natsClient *natspkg.Client,
+	nrApp *newrelic.Application,
 ) *Handler {
 	return &Handler{
 		matchHTTP: httpHandler.NewMatchHandler(matchUC),
-		matchNATS: natsHandler.NewMatchHandler(matchUC, natsClient),
+		matchNATS: natsHandler.NewMatchHandler(matchUC, natsClient, nrApp),
 	}
 }
 

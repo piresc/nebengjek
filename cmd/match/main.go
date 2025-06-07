@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/newrelic/go-agent/v3/integrations/nrecho-v4"
 	"github.com/piresc/nebengjek/internal/pkg/config"
 	"github.com/piresc/nebengjek/internal/pkg/database"
 	"github.com/piresc/nebengjek/internal/pkg/health"
@@ -81,15 +82,14 @@ func main() {
 	// Initialize repositories
 	matchRepo := repository.NewMatchRepository(configs, postgresClient.GetDB(), redisClient)
 
-	// Initialize gateways
-	matchGW := gateway.NewMatchGW(natsClient)
-	locationGW := gateway.NewLocationGW(configs.Services.LocationServiceURL, &configs.APIKey) // Location service URL with API key
+	// Initialize unified gateway
+	matchGW := gateway.NewMatchGW(natsClient, configs.Services.LocationServiceURL, &configs.APIKey)
 
 	// Initialize usecase
-	matchUC := usecase.NewMatchUC(configs, matchRepo, locationGW, matchGW)
+	matchUC := usecase.NewMatchUC(configs, matchRepo, matchGW)
 
 	// Initialize handlers
-	handler := handler.NewHandler(matchUC, natsClient)
+	handler := handler.NewHandler(matchUC, natsClient, nrApp)
 
 	// Initialize NATS consumers
 	if err := handler.InitNATSConsumers(); err != nil {
@@ -99,8 +99,9 @@ func main() {
 	// Initialize Echo server
 	e := echo.New()
 
-	// Add middlewares (panic recovery should be first)
+	// Add middlewares in standard order
 	e.Use(middleware.PanicRecoveryWithZapMiddleware(zapLogger))
+	e.Use(nrecho.Middleware(nrApp))
 	e.Use(middleware.RequestIDMiddleware())
 	e.Use(middleware.RequestContextMiddleware(appName))
 	e.Use(logger.ZapEchoMiddleware(zapLogger))

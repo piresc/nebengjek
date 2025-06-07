@@ -36,18 +36,18 @@ func (m *MockUserGW) EXPECT() *MockUserGWMockRecorder {
 }
 
 // MatchConfirm mocks base method.
-func (m *MockUserGW) MatchConfirm(arg0 *models.MatchConfirmRequest) (*models.MatchProposal, error) {
+func (m *MockUserGW) MatchConfirm(arg0 context.Context, arg1 *models.MatchConfirmRequest) (*models.MatchProposal, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MatchConfirm", arg0)
+	ret := m.ctrl.Call(m, "MatchConfirm", arg0, arg1)
 	ret0, _ := ret[0].(*models.MatchProposal)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // MatchConfirm indicates an expected call of MatchConfirm.
-func (mr *MockUserGWMockRecorder) MatchConfirm(arg0 interface{}) *gomock.Call {
+func (mr *MockUserGWMockRecorder) MatchConfirm(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MatchConfirm", reflect.TypeOf((*MockUserGW)(nil).MatchConfirm), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MatchConfirm", reflect.TypeOf((*MockUserGW)(nil).MatchConfirm), arg0, arg1)
 }
 
 // ProcessPayment mocks base method.

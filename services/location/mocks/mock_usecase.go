@@ -137,15 +137,15 @@ func (mr *MockLocationUCMockRecorder) RemoveAvailablePassenger(arg0, arg1 interf
 }
 
 // StoreLocation mocks base method.
-func (m *MockLocationUC) StoreLocation(arg0 models.LocationUpdate) error {
+func (m *MockLocationUC) StoreLocation(arg0 context.Context, arg1 models.LocationUpdate) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StoreLocation", arg0)
+	ret := m.ctrl.Call(m, "StoreLocation", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // StoreLocation indicates an expected call of StoreLocation.
-func (mr *MockLocationUCMockRecorder) StoreLocation(arg0 interface{}) *gomock.Call {
+func (mr *MockLocationUCMockRecorder) StoreLocation(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreLocation", reflect.TypeOf((*MockLocationUC)(nil).StoreLocation), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreLocation", reflect.TypeOf((*MockLocationUC)(nil).StoreLocation), arg0, arg1)
 }

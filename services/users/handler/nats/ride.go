@@ -19,18 +19,19 @@ func (h *NatsHandler) initRideConsumers() error {
 	// Create JetStream consumers for ride events
 	consumerConfigs := natspkg.DefaultConsumerConfigs()
 
-	// Create ride pickup consumer
+	// Create ride pickup consumer - RECREATE to ensure DeliverNewPolicy is applied
 	ridePickupConfig := consumerConfigs["ride_pickup_users"]
-	logger.Info("Creating ride pickup consumer for users service",
+	logger.Info("Recreating ride pickup consumer for users service with DeliverNewPolicy",
 		logger.String("stream", ridePickupConfig.StreamName),
 		logger.String("consumer", ridePickupConfig.ConsumerName),
-		logger.String("filter_subject", ridePickupConfig.FilterSubject))
+		logger.String("filter_subject", ridePickupConfig.FilterSubject),
+		logger.String("deliver_policy", "DeliverNewPolicy"))
 
-	if err := h.natsClient.CreateConsumer(ridePickupConfig); err != nil {
-		logger.Error("Failed to create ride pickup consumer for users service",
+	if err := h.natsClient.RecreateConsumer(ridePickupConfig); err != nil {
+		logger.Error("Failed to recreate ride pickup consumer for users service",
 			logger.String("consumer", ridePickupConfig.ConsumerName),
 			logger.ErrorField(err))
-		return fmt.Errorf("failed to create ride pickup consumer: %w", err)
+		return fmt.Errorf("failed to recreate ride pickup consumer: %w", err)
 	}
 
 	// Start consuming ride pickup events
@@ -44,16 +45,17 @@ func (h *NatsHandler) initRideConsumers() error {
 		return fmt.Errorf("failed to start consuming ride pickup events: %w", err)
 	}
 
-	// Create ride started consumer
+	// Create ride started consumer - RECREATE to ensure DeliverNewPolicy is applied
 	rideStartedConfig := consumerConfigs["ride_started_users"]
-	logger.Info("Creating ride started consumer for users service",
+	logger.Info("Recreating ride started consumer for users service with DeliverNewPolicy",
 		logger.String("stream", rideStartedConfig.StreamName),
-		logger.String("consumer", rideStartedConfig.ConsumerName))
+		logger.String("consumer", rideStartedConfig.ConsumerName),
+		logger.String("deliver_policy", "DeliverNewPolicy"))
 
-	if err := h.natsClient.CreateConsumer(rideStartedConfig); err != nil {
-		logger.Error("Failed to create ride started consumer for users service",
+	if err := h.natsClient.RecreateConsumer(rideStartedConfig); err != nil {
+		logger.Error("Failed to recreate ride started consumer for users service",
 			logger.ErrorField(err))
-		return fmt.Errorf("failed to create ride started consumer: %w", err)
+		return fmt.Errorf("failed to recreate ride started consumer: %w", err)
 	}
 
 	// Start consuming ride started events
@@ -63,16 +65,17 @@ func (h *NatsHandler) initRideConsumers() error {
 		return fmt.Errorf("failed to start consuming ride started events: %w", err)
 	}
 
-	// Create ride completed consumer
+	// Create ride completed consumer - RECREATE to ensure DeliverNewPolicy is applied
 	rideCompletedConfig := consumerConfigs["ride_completed_users"]
-	logger.Info("Creating ride completed consumer for users service",
+	logger.Info("Recreating ride completed consumer for users service with DeliverNewPolicy",
 		logger.String("stream", rideCompletedConfig.StreamName),
-		logger.String("consumer", rideCompletedConfig.ConsumerName))
+		logger.String("consumer", rideCompletedConfig.ConsumerName),
+		logger.String("deliver_policy", "DeliverNewPolicy"))
 
-	if err := h.natsClient.CreateConsumer(rideCompletedConfig); err != nil {
-		logger.Error("Failed to create ride completed consumer for users service",
+	if err := h.natsClient.RecreateConsumer(rideCompletedConfig); err != nil {
+		logger.Error("Failed to recreate ride completed consumer for users service",
 			logger.ErrorField(err))
-		return fmt.Errorf("failed to create ride completed consumer: %w", err)
+		return fmt.Errorf("failed to recreate ride completed consumer: %w", err)
 	}
 
 	// Start consuming ride completed events
@@ -116,8 +119,15 @@ func (h *NatsHandler) handleRideStartEventJS(msg jetstream.Msg) error {
 
 // handleRideCompletedEventJS processes ride completed events from JetStream
 func (h *NatsHandler) handleRideCompletedEventJS(msg jetstream.Msg) error {
+	// DIAGNOSTIC: Log message metadata to understand replay behavior
+	metadata, _ := msg.Metadata()
 	logger.InfoCtx(context.Background(), "Received ride completed event from JetStream",
-		logger.String("subject", msg.Subject()))
+		logger.String("subject", msg.Subject()),
+		logger.String("stream_sequence", fmt.Sprintf("%d", metadata.Sequence.Stream)),
+		logger.String("consumer_sequence", fmt.Sprintf("%d", metadata.Sequence.Consumer)),
+		logger.String("timestamp", metadata.Timestamp.Format("2006-01-02T15:04:05Z07:00")),
+		logger.Int("num_delivered", int(metadata.NumDelivered)),
+		logger.String("is_replay", fmt.Sprintf("%t", metadata.NumDelivered > 1)))
 
 	if err := h.handleRideCompletedEvent(msg.Data()); err != nil {
 		logger.ErrorCtx(context.Background(), "Error handling ride completed event", logger.Err(err))
@@ -195,8 +205,8 @@ func (h *NatsHandler) handleRideStartEvent(msg []byte) error {
 
 	// Notify both driver and passenger that their match is confirmed and they're locked
 	// Use a specific event type for match acceptance notification
-	h.wsManager.NotifyClient(rideStarted.DriverID, constants.EventMatchConfirm, rideStarted)
-	h.wsManager.NotifyClient(rideStarted.PassengerID, constants.EventMatchConfirm, rideStarted)
+	h.wsManager.NotifyClient(rideStarted.DriverID, constants.EventRideStarted, rideStarted)
+	h.wsManager.NotifyClient(rideStarted.PassengerID, constants.EventRideStarted, rideStarted)
 
 	return nil
 }

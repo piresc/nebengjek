@@ -161,7 +161,7 @@ func TestRidesHandler_handleLocationAggregate_Success(t *testing.T) {
 		Cost:     expectedCost,
 	}
 
-	mockRidesUC.EXPECT().ProcessBillingUpdate(rideID.String(), expectedEntry).Return(nil)
+	mockRidesUC.EXPECT().ProcessBillingUpdate(gomock.Any(), rideID.String(), expectedEntry).Return(nil)
 
 	// Act
 	locationData, err := json.Marshal(locationAggregate)
@@ -290,7 +290,7 @@ func TestRidesHandler_handleLocationAggregate_ProcessBillingError(t *testing.T) 
 	}
 
 	expectedError := errors.New("billing update failed")
-	mockRidesUC.EXPECT().ProcessBillingUpdate(rideID.String(), expectedEntry).Return(expectedError)
+	mockRidesUC.EXPECT().ProcessBillingUpdate(gomock.Any(), rideID.String(), expectedEntry).Return(expectedError)
 
 	// Act
 	locationData, err := json.Marshal(locationAggregate)

@@ -26,8 +26,7 @@ func NewLocationUC(
 }
 
 // StoreLocation stores a location update and publishes aggregated data
-func (uc *locationUC) StoreLocation(update models.LocationUpdate) error {
-	ctx := context.Background()
+func (uc *locationUC) StoreLocation(ctx context.Context, update models.LocationUpdate) error {
 
 	// Processing location update for ride
 

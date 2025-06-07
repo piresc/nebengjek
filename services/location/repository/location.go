@@ -179,12 +179,18 @@ func (r *locationRepo) removeFromRedisGeo(ctx context.Context, geoKey, available
 
 // AddAvailableDriver adds a driver to the available drivers geo set
 func (r *locationRepo) AddAvailableDriver(ctx context.Context, driverID string, location *models.Location) error {
-	return r.addToRedisGeo(ctx,
+	err := r.addToRedisGeo(ctx,
 		constants.KeyDriverGeo,
 		constants.KeyAvailableDrivers,
 		constants.KeyDriverLocation,
 		driverID,
 		location)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // RemoveAvailableDriver removes a driver from the available drivers sets
@@ -254,7 +260,12 @@ func (r *locationRepo) findNearbyUsers(ctx context.Context, geoKey, availableKey
 
 // FindNearbyDrivers finds available drivers within the specified radius
 func (r *locationRepo) FindNearbyDrivers(ctx context.Context, location *models.Location, radiusKm float64) ([]*models.NearbyUser, error) {
-	return r.findNearbyUsers(ctx, constants.KeyDriverGeo, constants.KeyAvailableDrivers, location, radiusKm)
+	nearbyUsers, err := r.findNearbyUsers(ctx, constants.KeyDriverGeo, constants.KeyAvailableDrivers, location, radiusKm)
+	if err != nil {
+		return nil, err
+	}
+
+	return nearbyUsers, nil
 }
 
 // GetDriverLocation retrieves a driver's last known location
@@ -291,7 +302,8 @@ func (r *locationRepo) GetDriverLocation(ctx context.Context, driverID string) (
 	}
 
 	// If not in Redis, return error since location service doesn't have database access
-	return models.Location{}, fmt.Errorf("no location data found for driver %s", driverID)
+	locationErr := fmt.Errorf("no location data found for driver %s", driverID)
+	return models.Location{}, locationErr
 }
 
 // GetPassengerLocation retrieves a passenger's last known location

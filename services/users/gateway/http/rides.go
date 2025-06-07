@@ -26,7 +26,7 @@ func NewRideClient(rideServiceURL string, config *models.APIKeyConfig) *RideClie
 // StartRide sends a start trip request to the ride service with retry and circuit breaker
 func (g *HTTPGateway) StartRide(req *models.RideStartRequest) (*models.Ride, error) {
 	ctx := context.Background()
-	endpoint := fmt.Sprintf("/internal/rides/%s/confirm", req.RideID)
+	endpoint := fmt.Sprintf("/internal/rides/%s/start", req.RideID)
 
 	// Ensure API key client is available
 	if g.rideClient.apiClient == nil {

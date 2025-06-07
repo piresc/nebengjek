@@ -56,7 +56,7 @@ func TestConfirmMatch_Success(t *testing.T) {
 	}
 
 	mockRepo.EXPECT().GetUserByID(gomock.Any(), userID.String()).Return(expectedUser, nil)
-	mockGW.EXPECT().MatchConfirm(confirmation).Return(expectedMatch, nil)
+	mockGW.EXPECT().MatchConfirm(gomock.Any(), confirmation).Return(expectedMatch, nil)
 
 	// Act
 	match, err := uc.ConfirmMatch(context.Background(), confirmation)
@@ -104,7 +104,7 @@ func TestConfirmMatch_GatewayError(t *testing.T) {
 
 	expectedError := errors.New("gateway error")
 	mockRepo.EXPECT().GetUserByID(gomock.Any(), userID.String()).Return(expectedUser, nil)
-	mockGW.EXPECT().MatchConfirm(confirmation).Return(nil, expectedError)
+	mockGW.EXPECT().MatchConfirm(gomock.Any(), confirmation).Return(nil, expectedError)
 
 	// Act
 	match, err := uc.ConfirmMatch(context.Background(), confirmation)
@@ -231,7 +231,7 @@ func TestConfirmMatch_RejectMatch(t *testing.T) {
 	}
 
 	mockRepo.EXPECT().GetUserByID(gomock.Any(), userID.String()).Return(expectedUser, nil)
-	mockGW.EXPECT().MatchConfirm(confirmation).Return(expectedMatch, nil)
+	mockGW.EXPECT().MatchConfirm(gomock.Any(), confirmation).Return(expectedMatch, nil)
 
 	// Act
 	match, err := uc.ConfirmMatch(context.Background(), confirmation)

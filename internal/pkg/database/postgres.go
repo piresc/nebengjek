@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/jackc/pgx/v5/stdlib" // Standard library bindings for pgx
 	"github.com/jmoiron/sqlx"
+	_ "github.com/newrelic/go-agent/v3/integrations/nrpq"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
@@ -28,8 +28,8 @@ func NewPostgresClient(config models.DatabaseConfig) (*PostgresClient, error) {
 		config.SSLMode,
 	)
 
-	// Create connection with sqlx
-	db, err := sqlx.Connect("pgx", connString)
+	// Create connection with sqlx and New Relic integration
+	db, err := sqlx.Connect("nrpostgres", connString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to postgres: %w", err)
 	}

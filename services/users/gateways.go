@@ -17,7 +17,7 @@ type UserGW interface {
 	PublishRideStart(ctx context.Context, startTripEvent *models.RideStartTripEvent) error
 
 	// HTTP Gateway
-	MatchConfirm(req *models.MatchConfirmRequest) (*models.MatchProposal, error)
+	MatchConfirm(ctx context.Context, req *models.MatchConfirmRequest) (*models.MatchProposal, error)
 	StartRide(req *models.RideStartRequest) (*models.Ride, error)
 	RideArrived(ctx context.Context, event *models.RideArrivalReq) (*models.PaymentRequest, error)
 	ProcessPayment(paymentReq *models.PaymentProccessRequest) (*models.Payment, error)

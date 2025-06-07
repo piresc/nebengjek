@@ -10,7 +10,7 @@ import (
 
 // LocationUseCase defines the interface for location business logic
 type LocationUC interface {
-	StoreLocation(location models.LocationUpdate) error
+	StoreLocation(ctx context.Context, location models.LocationUpdate) error
 
 	// Geo-related methods
 	AddAvailableDriver(ctx context.Context, driverID string, location *models.Location) error

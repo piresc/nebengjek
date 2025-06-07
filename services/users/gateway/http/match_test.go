@@ -1,6 +1,7 @@
 package gateaway_http
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -126,7 +127,7 @@ func TestHTTPGateway_MatchConfirm(t *testing.T) {
 			gateway := NewHTTPGateway(server.URL, "", config)
 
 			// Execute test
-			result, err := gateway.MatchConfirm(tt.request)
+			result, err := gateway.MatchConfirm(context.Background(), tt.request)
 
 			// Verify results
 			if tt.expectError {
@@ -178,7 +179,7 @@ func TestHTTPGateway_MatchConfirm_NetworkError(t *testing.T) {
 		Status: "accepted",
 	}
 
-	result, err := gateway.MatchConfirm(request)
+	result, err := gateway.MatchConfirm(context.Background(), request)
 	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "failed to send match confirmation request")
@@ -203,7 +204,7 @@ func TestHTTPGateway_MatchConfirm_InvalidResponseJSON(t *testing.T) {
 		Status: "accepted",
 	}
 
-	result, err := gateway.MatchConfirm(request)
+	result, err := gateway.MatchConfirm(context.Background(), request)
 	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "failed to decode JSON response")
@@ -228,7 +229,7 @@ func TestHTTPGateway_MatchConfirm_EmptyResponse(t *testing.T) {
 		Status: "accepted",
 	}
 
-	result, err := gateway.MatchConfirm(request)
+	result, err := gateway.MatchConfirm(context.Background(), request)
 	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "failed to decode JSON response")

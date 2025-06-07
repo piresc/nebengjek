@@ -129,8 +129,17 @@ func (r *RideRepo) UpdateTotalCost(ctx context.Context, rideID string, additiona
 
 // GetRide gets a ride by ID
 func (r *RideRepo) GetRide(ctx context.Context, rideID string) (*models.Ride, error) {
+	logger.Info("Getting ride from database",
+		logger.String("ride_id", rideID))
+
 	var ride models.Ride
 	rideIDUUID, err := uuid.Parse(rideID)
+	if err != nil {
+		logger.Error("Invalid ride ID format",
+			logger.String("ride_id", rideID),
+			logger.ErrorField(err))
+		return nil, fmt.Errorf("invalid ride ID format: %w", err)
+	}
 
 	query := `
 		SELECT ride_id, driver_id, passenger_id, status, total_cost, created_at, updated_at
@@ -140,8 +149,18 @@ func (r *RideRepo) GetRide(ctx context.Context, rideID string) (*models.Ride, er
 
 	err = r.db.GetContext(ctx, &ride, query, rideIDUUID)
 	if err != nil {
+		logger.Error("Failed to get ride from database",
+			logger.String("ride_id", rideID),
+			logger.String("query", query),
+			logger.ErrorField(err))
 		return nil, fmt.Errorf("failed to get ride: %w", err)
 	}
+
+	logger.Info("Successfully retrieved ride from database",
+		logger.String("ride_id", rideID),
+		logger.String("status", string(ride.Status)),
+		logger.String("driver_id", ride.DriverID.String()),
+		logger.String("passenger_id", ride.PassengerID.String()))
 
 	return &ride, nil
 }
@@ -224,8 +243,12 @@ func (r *RideRepo) CreatePayment(ctx context.Context, payment *models.Payment) e
 
 // UpdateRideStatus updates the status of a ride
 func (r *RideRepo) UpdateRideStatus(ctx context.Context, rideID string, status models.RideStatus) error {
+	logger.Info("Updating ride status",
+		logger.String("ride_id", rideID),
+		logger.String("new_status", string(status)))
+
 	query := `
-		UPDATE rides 
+		UPDATE rides
 		SET status = $1,
 			updated_at = NOW()
 		WHERE ride_id = $2
@@ -233,17 +256,32 @@ func (r *RideRepo) UpdateRideStatus(ctx context.Context, rideID string, status m
 
 	result, err := r.db.ExecContext(ctx, query, status, rideID)
 	if err != nil {
+		logger.Error("Failed to update ride status in database",
+			logger.String("ride_id", rideID),
+			logger.String("new_status", string(status)),
+			logger.ErrorField(err))
 		return fmt.Errorf("failed to update ride status: %w", err)
 	}
 
 	rows, err := result.RowsAffected()
 	if err != nil {
+		logger.Error("Failed to get affected rows after status update",
+			logger.String("ride_id", rideID),
+			logger.ErrorField(err))
 		return fmt.Errorf("failed to get affected rows: %w", err)
 	}
 
 	if rows == 0 {
+		logger.Error("No rows affected - ride not found for status update",
+			logger.String("ride_id", rideID),
+			logger.String("new_status", string(status)))
 		return fmt.Errorf("ride not found: %s", rideID)
 	}
+
+	logger.Info("Successfully updated ride status",
+		logger.String("ride_id", rideID),
+		logger.String("new_status", string(status)),
+		logger.Int64("rows_affected", rows))
 
 	return nil
 }
@@ -252,6 +290,10 @@ func (r *RideRepo) UpdateRideStatus(ctx context.Context, rideID string, status m
 func (r *RideRepo) GetPaymentByRideID(ctx context.Context, rideID string) (*models.Payment, error) {
 	var payment models.Payment
 	rideIDUUID, err := uuid.Parse(rideID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid ride ID format: %w", err)
+	}
+
 	query := `
 		SELECT payment_id, ride_id, adjusted_cost, admin_fee, driver_payout, status, created_at
 		FROM payments

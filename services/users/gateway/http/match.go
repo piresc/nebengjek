@@ -38,8 +38,7 @@ func NewHTTPGateway(matchServiceURL string, rideServiceURL string, config *model
 }
 
 // MatchAccept sends a match confirmation request to the match service
-func (g *HTTPGateway) MatchConfirm(req *models.MatchConfirmRequest) (*models.MatchProposal, error) {
-	ctx := context.Background()
+func (g *HTTPGateway) MatchConfirm(ctx context.Context, req *models.MatchConfirmRequest) (*models.MatchProposal, error) {
 	endpoint := fmt.Sprintf("/internal/matches/%s/confirm", req.ID)
 
 	// Ensure API key client is available

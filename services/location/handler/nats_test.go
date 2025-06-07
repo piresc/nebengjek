@@ -60,7 +60,7 @@ func TestLocationHandler_handleLocationUpdate(t *testing.T) {
 			}(),
 			expectError: false,
 			setupMock: func(m *mocks.MockLocationUC) {
-				m.EXPECT().StoreLocation(gomock.Any()).Return(nil).Times(1)
+				m.EXPECT().StoreLocation(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 			},
 		},
 		{
@@ -87,7 +87,7 @@ func TestLocationHandler_handleLocationUpdate(t *testing.T) {
 			}(),
 			expectError: true,
 			setupMock: func(m *mocks.MockLocationUC) {
-				m.EXPECT().StoreLocation(gomock.Any()).Return(errors.New("usecase error")).Times(1)
+				m.EXPECT().StoreLocation(gomock.Any(), gomock.Any()).Return(errors.New("usecase error")).Times(1)
 			},
 		},
 	}

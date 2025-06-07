@@ -188,7 +188,7 @@ func TestProcessBillingUpdate_Success(t *testing.T) {
 		Return(nil)
 
 	// Act
-	err = uc.ProcessBillingUpdate(rideID, entry)
+	err = uc.ProcessBillingUpdate(context.Background(), rideID, entry)
 
 	// Assert
 	assert.NoError(t, err)
@@ -223,7 +223,7 @@ func TestProcessBillingUpdate_GetRideError(t *testing.T) {
 		Return(nil, expectedError)
 
 	// Act
-	err = uc.ProcessBillingUpdate(rideID, entry)
+	err = uc.ProcessBillingUpdate(context.Background(), rideID, entry)
 
 	// Assert
 	assert.Error(t, err)
@@ -263,7 +263,7 @@ func TestProcessBillingUpdate_InvalidRideStatus(t *testing.T) {
 		Return(ride, nil)
 
 	// Act
-	err = uc.ProcessBillingUpdate(rideID, entry)
+	err = uc.ProcessBillingUpdate(context.Background(), rideID, entry)
 
 	// Assert
 	assert.Error(t, err)

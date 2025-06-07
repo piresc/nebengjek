@@ -185,9 +185,36 @@ func (c *Client) CreateConsumer(config ConsumerConfig) error {
 	logger.Info("Consumer created successfully",
 		logger.String("stream", config.StreamName),
 		logger.String("consumer", config.ConsumerName),
-		logger.String("subject", config.FilterSubject))
+		logger.String("subject", config.FilterSubject),
+		logger.String("deliver_policy", fmt.Sprintf("%v", config.DeliverPolicy)))
 
 	return nil
+}
+
+// RecreateConsumer deletes and recreates a consumer with new configuration
+func (c *Client) RecreateConsumer(config ConsumerConfig) error {
+	stream, exists := c.streams[config.StreamName]
+	if !exists {
+		return fmt.Errorf("stream %s not found", config.StreamName)
+	}
+
+	// Try to delete existing consumer (ignore error if it doesn't exist)
+	if err := stream.DeleteConsumer(c.ctx, config.ConsumerName); err != nil {
+		logger.Info("Consumer not found for deletion (this is expected for new consumers)",
+			logger.String("consumer", config.ConsumerName),
+			logger.String("stream", config.StreamName))
+	} else {
+		logger.Info("Deleted existing consumer for recreation",
+			logger.String("consumer", config.ConsumerName),
+			logger.String("stream", config.StreamName))
+	}
+
+	// Remove from local cache
+	consumerKey := fmt.Sprintf("%s:%s", config.StreamName, config.ConsumerName)
+	delete(c.consumers, consumerKey)
+
+	// Create new consumer with updated configuration
+	return c.CreateConsumer(config)
 }
 
 // Publish publishes a message to JetStream with delivery guarantees

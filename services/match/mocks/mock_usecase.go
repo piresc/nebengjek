@@ -36,18 +36,18 @@ func (m *MockMatchUC) EXPECT() *MockMatchUCMockRecorder {
 }
 
 // ConfirmMatchStatus mocks base method.
-func (m *MockMatchUC) ConfirmMatchStatus(arg0 *models.MatchConfirmRequest) (models.MatchProposal, error) {
+func (m *MockMatchUC) ConfirmMatchStatus(arg0 context.Context, arg1 *models.MatchConfirmRequest) (models.MatchProposal, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ConfirmMatchStatus", arg0)
+	ret := m.ctrl.Call(m, "ConfirmMatchStatus", arg0, arg1)
 	ret0, _ := ret[0].(models.MatchProposal)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ConfirmMatchStatus indicates an expected call of ConfirmMatchStatus.
-func (mr *MockMatchUCMockRecorder) ConfirmMatchStatus(arg0 interface{}) *gomock.Call {
+func (mr *MockMatchUCMockRecorder) ConfirmMatchStatus(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConfirmMatchStatus", reflect.TypeOf((*MockMatchUC)(nil).ConfirmMatchStatus), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConfirmMatchStatus", reflect.TypeOf((*MockMatchUC)(nil).ConfirmMatchStatus), arg0, arg1)
 }
 
 // GetMatch mocks base method.
@@ -81,31 +81,31 @@ func (mr *MockMatchUCMockRecorder) GetPendingMatch(arg0, arg1 interface{}) *gomo
 }
 
 // HandleBeaconEvent mocks base method.
-func (m *MockMatchUC) HandleBeaconEvent(arg0 models.BeaconEvent) error {
+func (m *MockMatchUC) HandleBeaconEvent(arg0 context.Context, arg1 models.BeaconEvent) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HandleBeaconEvent", arg0)
+	ret := m.ctrl.Call(m, "HandleBeaconEvent", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // HandleBeaconEvent indicates an expected call of HandleBeaconEvent.
-func (mr *MockMatchUCMockRecorder) HandleBeaconEvent(arg0 interface{}) *gomock.Call {
+func (mr *MockMatchUCMockRecorder) HandleBeaconEvent(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleBeaconEvent", reflect.TypeOf((*MockMatchUC)(nil).HandleBeaconEvent), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleBeaconEvent", reflect.TypeOf((*MockMatchUC)(nil).HandleBeaconEvent), arg0, arg1)
 }
 
 // HandleFinderEvent mocks base method.
-func (m *MockMatchUC) HandleFinderEvent(arg0 models.FinderEvent) error {
+func (m *MockMatchUC) HandleFinderEvent(arg0 context.Context, arg1 models.FinderEvent) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HandleFinderEvent", arg0)
+	ret := m.ctrl.Call(m, "HandleFinderEvent", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // HandleFinderEvent indicates an expected call of HandleFinderEvent.
-func (mr *MockMatchUCMockRecorder) HandleFinderEvent(arg0 interface{}) *gomock.Call {
+func (mr *MockMatchUCMockRecorder) HandleFinderEvent(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleFinderEvent", reflect.TypeOf((*MockMatchUC)(nil).HandleFinderEvent), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleFinderEvent", reflect.TypeOf((*MockMatchUC)(nil).HandleFinderEvent), arg0, arg1)
 }
 
 // HasActiveRide mocks base method.
@@ -124,31 +124,31 @@ func (mr *MockMatchUCMockRecorder) HasActiveRide(arg0, arg1, arg2 interface{}) *
 }
 
 // ReleaseDriver mocks base method.
-func (m *MockMatchUC) ReleaseDriver(arg0 string) error {
+func (m *MockMatchUC) ReleaseDriver(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReleaseDriver", arg0)
+	ret := m.ctrl.Call(m, "ReleaseDriver", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // ReleaseDriver indicates an expected call of ReleaseDriver.
-func (mr *MockMatchUCMockRecorder) ReleaseDriver(arg0 interface{}) *gomock.Call {
+func (mr *MockMatchUCMockRecorder) ReleaseDriver(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleaseDriver", reflect.TypeOf((*MockMatchUC)(nil).ReleaseDriver), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleaseDriver", reflect.TypeOf((*MockMatchUC)(nil).ReleaseDriver), arg0, arg1)
 }
 
 // ReleasePassenger mocks base method.
-func (m *MockMatchUC) ReleasePassenger(arg0 string) error {
+func (m *MockMatchUC) ReleasePassenger(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReleasePassenger", arg0)
+	ret := m.ctrl.Call(m, "ReleasePassenger", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // ReleasePassenger indicates an expected call of ReleasePassenger.
-func (mr *MockMatchUCMockRecorder) ReleasePassenger(arg0 interface{}) *gomock.Call {
+func (mr *MockMatchUCMockRecorder) ReleasePassenger(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleasePassenger", reflect.TypeOf((*MockMatchUC)(nil).ReleasePassenger), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleasePassenger", reflect.TypeOf((*MockMatchUC)(nil).ReleasePassenger), arg0, arg1)
 }
 
 // RemoveActiveRide mocks base method.

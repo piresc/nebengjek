@@ -63,7 +63,7 @@ func TestStoreLocation_Success(t *testing.T) {
 		})
 
 	// Act
-	err := uc.StoreLocation(locationUpdate)
+	err := uc.StoreLocation(context.Background(), locationUpdate)
 
 	// Assert
 	assert.NoError(t, err)
@@ -101,7 +101,7 @@ func TestStoreLocation_FirstLocation(t *testing.T) {
 		Return(nil)
 
 	// Act
-	err := uc.StoreLocation(locationUpdate)
+	err := uc.StoreLocation(context.Background(), locationUpdate)
 
 	// Assert
 	assert.NoError(t, err)
@@ -142,7 +142,7 @@ func TestStoreLocation_GetLastLocationError(t *testing.T) {
 		Return(nil)
 
 	// Act
-	err := uc.StoreLocation(locationUpdate)
+	err := uc.StoreLocation(context.Background(), locationUpdate)
 
 	// Assert
 	assert.NoError(t, err)
@@ -182,7 +182,7 @@ func TestStoreLocation_StoreLocationError(t *testing.T) {
 		Return(expectedError)
 
 	// Act
-	err := uc.StoreLocation(locationUpdate)
+	err := uc.StoreLocation(context.Background(), locationUpdate)
 
 	// Assert
 	assert.Error(t, err)
@@ -234,7 +234,7 @@ func TestStoreLocation_PublishError(t *testing.T) {
 		Return(expectedError)
 
 	// Act
-	err := uc.StoreLocation(locationUpdate)
+	err := uc.StoreLocation(context.Background(), locationUpdate)
 
 	// Assert
 	assert.Error(t, err)
@@ -282,7 +282,7 @@ func TestStoreLocation_SecondaryStoreLocationError(t *testing.T) {
 		Return(expectedError)
 
 	// Act
-	err := uc.StoreLocation(locationUpdate)
+	err := uc.StoreLocation(context.Background(), locationUpdate)
 
 	// Assert
 	assert.Error(t, err)
@@ -340,7 +340,7 @@ func TestStoreLocation_ZeroDistance(t *testing.T) {
 		})
 
 	// Act
-	err := uc.StoreLocation(locationUpdate)
+	err := uc.StoreLocation(context.Background(), locationUpdate)
 
 	// Assert
 	assert.NoError(t, err)
@@ -379,7 +379,7 @@ func TestStoreLocation_InvalidRideID(t *testing.T) {
 		Return(nil)
 
 	// Act
-	err := uc.StoreLocation(locationUpdate)
+	err := uc.StoreLocation(context.Background(), locationUpdate)
 
 	// Assert
 	assert.NoError(t, err) // Current implementation doesn't validate ride ID
@@ -438,7 +438,7 @@ func TestStoreLocation_MaxDistanceCase(t *testing.T) {
 		})
 
 	// Act
-	err := uc.StoreLocation(locationUpdate)
+	err := uc.StoreLocation(context.Background(), locationUpdate)
 
 	// Assert
 	assert.NoError(t, err)

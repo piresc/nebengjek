@@ -46,7 +46,7 @@ func TestHTTPGateway_StartRide(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodPost, r.Method)
-				assert.Contains(t, r.URL.Path, "/rides/"+tt.request.RideID+"/confirm")
+				assert.Contains(t, r.URL.Path, "/rides/"+tt.request.RideID+"/start")
 				assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 
 				w.WriteHeader(tt.mockStatusCode)

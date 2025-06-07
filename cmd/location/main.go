@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/newrelic/go-agent/v3/integrations/nrecho-v4"
 	"github.com/piresc/nebengjek/internal/pkg/config"
 	"github.com/piresc/nebengjek/internal/pkg/database"
 	"github.com/piresc/nebengjek/internal/pkg/health"
@@ -81,7 +82,7 @@ func main() {
 	locationUC := usecase.NewLocationUC(locationRepo, locationGW)
 
 	// Initialize handlers
-	locationHandler := handler.NewHTTPHandler(locationUC, natsClient, configs)
+	locationHandler := handler.NewHTTPHandler(locationUC, natsClient, configs, nrApp)
 
 	// Initialize NATS consumers
 	if err := locationHandler.InitNATSConsumers(); err != nil {
@@ -91,8 +92,9 @@ func main() {
 	// Initialize Echo server
 	e := echo.New()
 
-	// Add middlewares (panic recovery should be first)
+	// Add middlewares in standard order
 	e.Use(middleware.PanicRecoveryWithZapMiddleware(zapLogger))
+	e.Use(nrecho.Middleware(nrApp))
 	e.Use(middleware.RequestIDMiddleware())
 	e.Use(middleware.RequestContextMiddleware(appName))
 	e.Use(logger.ZapEchoMiddleware(zapLogger))

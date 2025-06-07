@@ -65,7 +65,7 @@ func TestHandleBeaconEvent_Success_Driver(t *testing.T) {
 		AnyTimes()
 
 	// Act
-	err := uc.HandleBeaconEvent(event)
+	err := uc.HandleBeaconEvent(context.Background(), event)
 
 	// Assert
 	assert.NoError(t, err)
@@ -121,7 +121,7 @@ func TestHandleFinderEvent_Success_Passenger(t *testing.T) {
 		Return([]*models.NearbyUser{}, nil) // Return empty array to avoid further processing
 
 	// Act
-	err := uc.HandleFinderEvent(event)
+	err := uc.HandleFinderEvent(context.Background(), event)
 
 	// Assert
 	assert.NoError(t, err)
@@ -161,7 +161,7 @@ func TestHandleBeaconEvent_Inactive(t *testing.T) {
 		Return(nil)
 
 	// Act
-	err := uc.HandleBeaconEvent(event)
+	err := uc.HandleBeaconEvent(context.Background(), event)
 
 	// Assert
 	assert.NoError(t, err)
@@ -209,7 +209,7 @@ func TestHandleBeaconEvent_RepositoryError(t *testing.T) {
 		Return(expectedError)
 
 	// Act
-	err := uc.HandleBeaconEvent(event)
+	err := uc.HandleBeaconEvent(context.Background(), event)
 
 	// Assert
 	assert.Error(t, err)
@@ -253,7 +253,7 @@ func TestHandleBeaconEvent_DriverWithActiveRide(t *testing.T) {
 	// AddAvailableDriver should NOT be called since driver has active ride
 
 	// Act
-	err := uc.HandleBeaconEvent(event)
+	err := uc.HandleBeaconEvent(context.Background(), event)
 
 	// Assert
 	assert.NoError(t, err) // Should not return error, just skip adding to pool
@@ -301,7 +301,7 @@ func TestHandleFinderEvent_PassengerWithActiveRide(t *testing.T) {
 	// AddAvailablePassenger should NOT be called since passenger has active ride
 
 	// Act
-	err := uc.HandleFinderEvent(event)
+	err := uc.HandleFinderEvent(context.Background(), event)
 
 	// Assert
 	assert.NoError(t, err) // Should not return error, just skip adding to pool
@@ -352,7 +352,7 @@ func TestHandleBeaconEvent_ActiveRideCheckError(t *testing.T) {
 		AnyTimes()
 
 	// Act
-	err := uc.HandleBeaconEvent(event)
+	err := uc.HandleBeaconEvent(context.Background(), event)
 
 	// Assert
 	assert.NoError(t, err)
@@ -407,7 +407,7 @@ func TestHandleFinderEvent_ActiveRideCheckError(t *testing.T) {
 		Return([]*models.NearbyUser{}, nil)
 
 	// Act
-	err := uc.HandleFinderEvent(event)
+	err := uc.HandleFinderEvent(context.Background(), event)
 
 	// Assert
 	assert.NoError(t, err)
@@ -482,7 +482,7 @@ func TestConfirmMatchStatus_AcceptSuccess(t *testing.T) {
 		Role:   "driver",
 		Status: string(models.MatchStatusAccepted),
 	}
-	_, err := uc.ConfirmMatchStatus(req)
+	_, err := uc.ConfirmMatchStatus(context.Background(), req)
 
 	// Assert
 	assert.NoError(t, err)
@@ -542,7 +542,7 @@ func TestConfirmMatchStatus_RejectSuccess(t *testing.T) {
 		Role:   "driver",
 		Status: string(models.MatchStatusRejected),
 	}
-	_, err := uc.ConfirmMatchStatus(req)
+	_, err := uc.ConfirmMatchStatus(context.Background(), req)
 
 	// Assert
 	assert.NoError(t, err)
@@ -582,7 +582,7 @@ func TestConfirmMatchStatus_GetMatchError(t *testing.T) {
 		Role:   "driver",
 		Status: string(models.MatchStatusAccepted),
 	}
-	_, err := uc.ConfirmMatchStatus(req)
+	_, err := uc.ConfirmMatchStatus(context.Background(), req)
 
 	// Assert
 	assert.Error(t, err)

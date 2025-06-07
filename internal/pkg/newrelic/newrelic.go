@@ -13,24 +13,18 @@ func InitNewRelic(configs *models.Config) *newrelic.Application {
 		return nil
 	}
 
-	logger.Info("Initializing New Relic...")
-	logger.Info("New Relic enabled",
+	logger.Info("Initializing New Relic...",
 		logger.String("app_name", configs.NewRelic.AppName))
-	logger.Info("New Relic configuration",
-		logger.Bool("logs_enabled", configs.NewRelic.LogsEnabled))
 
-	// Configure New Relic application with proper log forwarding
 	nrApp, err := newrelic.NewApplication(
 		newrelic.ConfigAppName(configs.NewRelic.AppName),
 		newrelic.ConfigLicense(configs.NewRelic.LicenseKey),
 		newrelic.ConfigDistributedTracerEnabled(true),
-		newrelic.ConfigAppLogForwardingEnabled(configs.NewRelic.ForwardLogs),
-		newrelic.ConfigAppLogDecoratingEnabled(true), // Enable log decoration for correlation
 	)
 	if err != nil {
 		logger.Warn("Failed to initialize New Relic, continuing without New Relic",
 			logger.Err(err))
-		return nil // Continue without New Relic in development
+		return nil
 	}
 
 	return nrApp

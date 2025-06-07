@@ -2,6 +2,7 @@ package handler
 
 import (
 	"github.com/labstack/echo/v4"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/piresc/nebengjek/internal/pkg/middleware"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
@@ -22,10 +23,12 @@ func NewHandler(
 	ridesUC rides.RideUC,
 	natsClient *natspkg.Client,
 	cfg *models.Config,
+	nrApp *newrelic.Application,
 ) *Handler {
 	return &Handler{
 		ridesHTTP: httpHandler.NewRidesHandler(ridesUC),
-		ridesNATS: natsHandler.NewRidesHandler(ridesUC, natsClient, cfg),
+		ridesNATS: natsHandler.NewRidesHandler(ridesUC, natsClient, cfg, nrApp),
+		cfg:       cfg,
 	}
 }
 
@@ -36,7 +39,7 @@ func (h *Handler) RegisterRoutes(e *echo.Echo, apiKeyMiddleware *middleware.APIK
 
 	// Internal rides endpoints
 	internalRidesGroup := internal.Group("/rides")
-	internalRidesGroup.POST("/:rideID/confirm", h.ridesHTTP.StartRide)
+	internalRidesGroup.POST("/:rideID/start", h.ridesHTTP.StartRide)
 	internalRidesGroup.POST("/:rideID/arrive", h.ridesHTTP.RideArrived)
 	internalRidesGroup.POST("/:rideID/payment", h.ridesHTTP.ProcessPayment)
 }

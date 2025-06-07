@@ -23,5 +23,5 @@ func (uc *UserUC) ConfirmMatch(ctx context.Context, mp *models.MatchConfirmReque
 	mp.Role = user.Role
 
 	// Call the gateway to confirm the match
-	return uc.UserGW.MatchConfirm(mp)
+	return uc.UserGW.MatchConfirm(ctx, mp)
 }

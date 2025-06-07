@@ -9,6 +9,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
+	_ "github.com/newrelic/go-agent/v3/integrations/nrpq"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/database"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
@@ -127,8 +129,12 @@ func (r *MatchRepo) CreateMatch(ctx context.Context, match *models.Match) (*mode
 
 // GetMatch retrieves a match by ID
 func (r *MatchRepo) GetMatch(ctx context.Context, matchID string) (*models.Match, error) {
+	// Get New Relic transaction from context for database instrumentation
+	txn := newrelic.FromContext(ctx)
+	dbCtx := newrelic.NewContext(ctx, txn)
+
 	query := `
-		SELECT 
+		SELECT
 			id, driver_id, passenger_id,
 			(driver_location[0])::float8 as driver_longitude,
 			(driver_location[1])::float8 as driver_latitude,
@@ -143,7 +149,7 @@ func (r *MatchRepo) GetMatch(ctx context.Context, matchID string) (*models.Match
 	`
 
 	var dto models.MatchDTO
-	err := r.db.QueryRowContext(ctx, query, matchID).Scan(
+	err := r.db.QueryRowContext(dbCtx, query, matchID).Scan(
 		&dto.ID, &dto.DriverID, &dto.PassengerID,
 		&dto.DriverLongitude, &dto.DriverLatitude,
 		&dto.PassengerLongitude, &dto.PassengerLatitude,
@@ -264,7 +270,11 @@ func (r *MatchRepo) updateMatchConfirmationFlags(match *models.Match, isDriver b
 
 // ConfirmMatchByUser handles confirmation by either driver or passenger
 func (r *MatchRepo) ConfirmMatchByUser(ctx context.Context, matchID string, userID string, isDriver bool) (*models.Match, error) {
-	tx, err := r.db.BeginTxx(ctx, nil)
+	// Get New Relic transaction from context for database instrumentation
+	txn := newrelic.FromContext(ctx)
+	dbCtx := newrelic.NewContext(ctx, txn)
+
+	tx, err := r.db.BeginTxx(dbCtx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -272,7 +282,7 @@ func (r *MatchRepo) ConfirmMatchByUser(ctx context.Context, matchID string, user
 
 	// Get current match with lock
 	query := `
-		SELECT 
+		SELECT
 			id, driver_id, passenger_id,
 			(driver_location[0])::float8 as driver_longitude,
 			(driver_location[1])::float8 as driver_latitude,
@@ -288,7 +298,7 @@ func (r *MatchRepo) ConfirmMatchByUser(ctx context.Context, matchID string, user
 	`
 
 	var dto models.MatchDTO
-	err = tx.QueryRowContext(ctx, query, matchID).Scan(
+	err = tx.QueryRowContext(dbCtx, query, matchID).Scan(
 		&dto.ID, &dto.DriverID, &dto.PassengerID,
 		&dto.DriverLongitude, &dto.DriverLatitude,
 		&dto.PassengerLongitude, &dto.PassengerLatitude,
@@ -325,15 +335,15 @@ func (r *MatchRepo) ConfirmMatchByUser(ctx context.Context, matchID string, user
 	updatedDTO := match.ToDTO()
 
 	updateQuery := `
-		UPDATE matches 
-		SET status = :status, 
+		UPDATE matches
+		SET status = :status,
 		    driver_confirmed = :driver_confirmed,
 		    passenger_confirmed = :passenger_confirmed,
 		    updated_at = :updated_at
 		WHERE id = :id
 	`
 
-	result, err := tx.NamedExecContext(ctx, updateQuery, updatedDTO)
+	result, err := tx.NamedExecContext(dbCtx, updateQuery, updatedDTO)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update match: %w", err)
 	}
@@ -443,6 +453,9 @@ func (r *MatchRepo) BatchUpdateMatchStatus(ctx context.Context, matchIDs []strin
 
 // SetActiveRide stores active ride information for both driver and passenger
 func (r *MatchRepo) SetActiveRide(ctx context.Context, driverID, passengerID, rideID string) error {
+	txn := newrelic.FromContext(ctx)
+	redisCtx := newrelic.NewContext(ctx, txn)
+
 	// Get TTL from config, default to 24 hours if not configured
 	ttlHours := 24
 	if r.cfg != nil && r.cfg.Match.ActiveRideTTLHours > 0 {
@@ -452,13 +465,13 @@ func (r *MatchRepo) SetActiveRide(ctx context.Context, driverID, passengerID, ri
 
 	// Set active ride for driver with TTL
 	driverKey := fmt.Sprintf(constants.KeyActiveRideDriver, driverID)
-	if err := r.redisClient.Set(ctx, driverKey, rideID, ttl); err != nil {
+	if err := r.redisClient.Set(redisCtx, driverKey, rideID, ttl); err != nil {
 		return fmt.Errorf("failed to set active ride for driver: %w", err)
 	}
 
 	// Set active ride for passenger with TTL
 	passengerKey := fmt.Sprintf(constants.KeyActiveRidePassenger, passengerID)
-	if err := r.redisClient.Set(ctx, passengerKey, rideID, ttl); err != nil {
+	if err := r.redisClient.Set(redisCtx, passengerKey, rideID, ttl); err != nil {
 		return fmt.Errorf("failed to set active ride for passenger: %w", err)
 	}
 
@@ -472,9 +485,12 @@ func (r *MatchRepo) SetActiveRide(ctx context.Context, driverID, passengerID, ri
 
 // RemoveActiveRide removes active ride information for both driver and passenger
 func (r *MatchRepo) RemoveActiveRide(ctx context.Context, driverID, passengerID string) error {
+	txn := newrelic.FromContext(ctx)
+	redisCtx := newrelic.NewContext(ctx, txn)
+
 	// Remove active ride for driver
 	driverKey := fmt.Sprintf(constants.KeyActiveRideDriver, driverID)
-	if err := r.redisClient.Delete(ctx, driverKey); err != nil {
+	if err := r.redisClient.Delete(redisCtx, driverKey); err != nil {
 		logger.Warn("Failed to remove active ride for driver",
 			logger.String("driver_id", driverID),
 			logger.ErrorField(err))
@@ -483,7 +499,7 @@ func (r *MatchRepo) RemoveActiveRide(ctx context.Context, driverID, passengerID 
 
 	// Remove active ride for passenger
 	passengerKey := fmt.Sprintf(constants.KeyActiveRidePassenger, passengerID)
-	if err := r.redisClient.Delete(ctx, passengerKey); err != nil {
+	if err := r.redisClient.Delete(redisCtx, passengerKey); err != nil {
 		logger.Warn("Failed to remove active ride for passenger",
 			logger.String("passenger_id", passengerID),
 			logger.ErrorField(err))
@@ -498,8 +514,12 @@ func (r *MatchRepo) RemoveActiveRide(ctx context.Context, driverID, passengerID 
 
 // GetActiveRideByDriver retrieves the active ride ID for a driver
 func (r *MatchRepo) GetActiveRideByDriver(ctx context.Context, driverID string) (string, error) {
+	// Get New Relic transaction from context for Redis instrumentation
+	txn := newrelic.FromContext(ctx)
+	redisCtx := newrelic.NewContext(ctx, txn)
+
 	driverKey := fmt.Sprintf(constants.KeyActiveRideDriver, driverID)
-	rideID, err := r.redisClient.Get(ctx, driverKey)
+	rideID, err := r.redisClient.Get(redisCtx, driverKey)
 	if err != nil {
 		// If key doesn't exist, it's not an error - just means no active ride
 		if err == redis.Nil {
@@ -512,8 +532,12 @@ func (r *MatchRepo) GetActiveRideByDriver(ctx context.Context, driverID string) 
 
 // GetActiveRideByPassenger retrieves the active ride ID for a passenger
 func (r *MatchRepo) GetActiveRideByPassenger(ctx context.Context, passengerID string) (string, error) {
+	// Get New Relic transaction from context for Redis instrumentation
+	txn := newrelic.FromContext(ctx)
+	redisCtx := newrelic.NewContext(ctx, txn)
+
 	passengerKey := fmt.Sprintf(constants.KeyActiveRidePassenger, passengerID)
-	rideID, err := r.redisClient.Get(ctx, passengerKey)
+	rideID, err := r.redisClient.Get(redisCtx, passengerKey)
 	if err != nil {
 		// If key doesn't exist, it's not an error - just means no active ride
 		if err == redis.Nil {

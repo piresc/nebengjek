@@ -11,7 +11,7 @@ import (
 
 // RegisterUser registers a new user
 func (u *UserUC) RegisterUser(ctx context.Context, user *models.User) error {
-	// Validate user data
+	// Validate user data first
 	if err := validateUserData(user); err != nil {
 		return err
 	}
@@ -19,7 +19,8 @@ func (u *UserUC) RegisterUser(ctx context.Context, user *models.User) error {
 	// Validate MSISDN format
 	isValid, formattedMSISDN, err := utils.ValidateMSISDN(user.MSISDN)
 	if err != nil || !isValid {
-		return fmt.Errorf("invalid MSISDN format or not a Telkomsel number")
+		validationErr := fmt.Errorf("invalid MSISDN format or not a Telkomsel number")
+		return validationErr
 	}
 	user.MSISDN = formattedMSISDN
 	user.IsActive = true
@@ -30,7 +31,12 @@ func (u *UserUC) RegisterUser(ctx context.Context, user *models.User) error {
 	}
 
 	// Create user
-	return u.userRepo.CreateUser(ctx, user)
+	err = u.userRepo.CreateUser(ctx, user)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // GetUserByID retrieves a user by ID
@@ -45,11 +51,11 @@ func (u *UserUC) GetUserByID(ctx context.Context, id string) (*models.User, erro
 
 // RegisterDriver registers a new driver
 func (u *UserUC) RegisterDriver(ctx context.Context, userDriver *models.User) error {
-
 	// Validate MSISDN format
 	isValid, formattedMSISDN, err := utils.ValidateMSISDN(userDriver.MSISDN)
 	if err != nil || !isValid {
-		return fmt.Errorf("invalid MSISDN format or not a Telkomsel number")
+		validationErr := fmt.Errorf("invalid MSISDN format or not a Telkomsel number")
+		return validationErr
 	}
 	userDriver.MSISDN = formattedMSISDN
 
@@ -59,8 +65,10 @@ func (u *UserUC) RegisterDriver(ctx context.Context, userDriver *models.User) er
 	}
 
 	if user.Role == "driver" {
-		return fmt.Errorf("user is already registered as a driver")
+		existingDriverErr := fmt.Errorf("user is already registered as a driver")
+		return existingDriverErr
 	}
+
 	// Validate user data
 	if err := validateUserData(userDriver); err != nil {
 		return err
@@ -76,7 +84,12 @@ func (u *UserUC) RegisterDriver(ctx context.Context, userDriver *models.User) er
 	userDriver.ID = user.ID
 
 	// Register user
-	return u.userRepo.UpdateToDriver(ctx, userDriver)
+	err = u.userRepo.UpdateToDriver(ctx, userDriver)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func validateUserData(user *models.User) error {

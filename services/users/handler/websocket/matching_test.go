@@ -317,7 +317,7 @@ func TestHandleMatchConfirmation_Success(t *testing.T) {
 
 	matchConfirm := models.MatchConfirmRequest{
 		ID:     uuid.New().String(),
-		Status: "accept",
+		Status: "ACCEPTED",
 		UserID: client.UserID,
 	}
 
@@ -400,7 +400,7 @@ func TestHandleMatchConfirmation_UsecaseError(t *testing.T) {
 
 	matchConfirm := models.MatchConfirmRequest{
 		ID:     uuid.New().String(),
-		Status: "accept",
+		Status: "ACCEPTED",
 		UserID: client.UserID,
 	}
 

@@ -7,9 +7,11 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
+	nrpkg "github.com/piresc/nebengjek/internal/pkg/newrelic"
 	"github.com/piresc/nebengjek/services/location"
 )
 
@@ -17,17 +19,20 @@ type LocationHandler struct {
 	locationUC location.LocationUC
 	natsClient *natspkg.Client
 	subs       []*nats.Subscription
+	nrApp      *newrelic.Application
 }
 
 // NewLocationHandler creates a new location NATS handler
 func NewLocationHandler(
 	locationUC location.LocationUC,
 	client *natspkg.Client,
+	nrApp *newrelic.Application,
 ) *LocationHandler {
 	return &LocationHandler{
 		locationUC: locationUC,
 		natsClient: client,
 		subs:       make([]*nats.Subscription, 0),
+		nrApp:      nrApp,
 	}
 }
 
@@ -65,11 +70,24 @@ func (h *LocationHandler) InitNATSConsumers() error {
 
 // handleLocationUpdateJS processes location update events from JetStream
 func (h *LocationHandler) handleLocationUpdateJS(msg jetstream.Msg) error {
-	logger.InfoCtx(context.Background(), "Received location update event from JetStream",
+	// Create background transaction for NATS message processing
+	txn := h.nrApp.StartTransaction("NATS.Location.HandleLocationUpdate")
+	defer txn.End()
+
+	// Add message attributes
+	nrpkg.AddTransactionAttribute(txn, "message.subject", msg.Subject())
+	nrpkg.AddTransactionAttribute(txn, "message.size", len(msg.Data()))
+	nrpkg.AddTransactionAttribute(txn, "service", "location")
+
+	// Create context with transaction
+	ctx := newrelic.NewContext(context.Background(), txn)
+
+	logger.InfoCtx(ctx, "Received location update event from JetStream",
 		logger.String("subject", msg.Subject()))
 
-	if err := h.handleLocationUpdate(msg.Data()); err != nil {
-		logger.ErrorCtx(context.Background(), "Error handling location update event", logger.Err(err))
+	if err := h.handleLocationUpdate(ctx, msg.Data()); err != nil {
+		nrpkg.NoticeTransactionError(txn, err)
+		logger.ErrorCtx(ctx, "Error handling location update event", logger.Err(err))
 		return err // Return error to trigger NAK and retry
 	}
 
@@ -77,22 +95,29 @@ func (h *LocationHandler) handleLocationUpdateJS(msg jetstream.Msg) error {
 }
 
 // handleLocationUpdate processes location update events
-func (h *LocationHandler) handleLocationUpdate(msg []byte) error {
+func (h *LocationHandler) handleLocationUpdate(ctx context.Context, msg []byte) error {
 	var update models.LocationUpdate
 	if err := json.Unmarshal(msg, &update); err != nil {
-		logger.ErrorCtx(context.Background(), "Failed to unmarshal location update", logger.Err(err))
+		logger.ErrorCtx(ctx, "Failed to unmarshal location update", logger.Err(err))
 		return err
 	}
 
-	logger.InfoCtx(context.Background(), "Received location update",
+	// Add business attributes to transaction
+	if txn := nrpkg.FromContext(ctx); txn != nil {
+		nrpkg.AddTransactionAttribute(txn, "ride.id", update.RideID)
+		nrpkg.AddTransactionAttribute(txn, "location.latitude", update.Location.Latitude)
+		nrpkg.AddTransactionAttribute(txn, "location.longitude", update.Location.Longitude)
+	}
+
+	logger.InfoCtx(ctx, "Received location update",
 		logger.String("ride_id", update.RideID),
 		logger.Float64("latitude", update.Location.Latitude),
 		logger.Float64("longitude", update.Location.Longitude))
 
 	// Store location update
-	err := h.locationUC.StoreLocation(update)
+	err := h.locationUC.StoreLocation(ctx, update)
 	if err != nil {
-		logger.ErrorCtx(context.Background(), "Failed to store location update",
+		logger.ErrorCtx(ctx, "Failed to store location update",
 			logger.String("ride_id", update.RideID),
 			logger.Err(err))
 		return err

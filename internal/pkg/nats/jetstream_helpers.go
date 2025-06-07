@@ -262,14 +262,14 @@ func DefaultConsumerConfigs() map[string]ConsumerConfig {
 		// RIDE_STREAM consumers - ride.pickup (dual consumption: users + match)
 		"ride_pickup_users": NewConsumerConfigBuilder("RIDE_STREAM", "ride_pickup_users").
 			WithSubject("ride.pickup").
-			WithDeliverPolicy(jetstream.DeliverAllPolicy).
+			WithDeliverPolicy(jetstream.DeliverNewPolicy). // FIX: Only process new messages
 			WithAckPolicy(jetstream.AckExplicitPolicy).
 			WithMaxDeliver(5).
 			Build(),
 
 		"ride_pickup_match": NewConsumerConfigBuilder("RIDE_STREAM", "ride_pickup_match").
 			WithSubject("ride.pickup").
-			WithDeliverPolicy(jetstream.DeliverAllPolicy).
+			WithDeliverPolicy(jetstream.DeliverNewPolicy). // FIX: Only process new messages
 			WithAckPolicy(jetstream.AckExplicitPolicy).
 			WithMaxDeliver(5).
 			Build(),
@@ -277,7 +277,7 @@ func DefaultConsumerConfigs() map[string]ConsumerConfig {
 		// RIDE_STREAM consumers - ride.started (single consumption: users)
 		"ride_started_users": NewConsumerConfigBuilder("RIDE_STREAM", "ride_started_users").
 			WithSubject("ride.started").
-			WithDeliverPolicy(jetstream.DeliverAllPolicy).
+			WithDeliverPolicy(jetstream.DeliverNewPolicy). // FIX: Only process new messages
 			WithAckPolicy(jetstream.AckExplicitPolicy).
 			WithMaxDeliver(5).
 			Build(),
@@ -285,14 +285,14 @@ func DefaultConsumerConfigs() map[string]ConsumerConfig {
 		// RIDE_STREAM consumers - ride.completed (dual consumption: users + match)
 		"ride_completed_users": NewConsumerConfigBuilder("RIDE_STREAM", "ride_completed_users").
 			WithSubject("ride.completed").
-			WithDeliverPolicy(jetstream.DeliverAllPolicy).
+			WithDeliverPolicy(jetstream.DeliverNewPolicy). // FIX: Only process new messages, not old ones
 			WithAckPolicy(jetstream.AckExplicitPolicy).
 			WithMaxDeliver(3).
 			Build(),
 
 		"ride_completed_match": NewConsumerConfigBuilder("RIDE_STREAM", "ride_completed_match").
 			WithSubject("ride.completed").
-			WithDeliverPolicy(jetstream.DeliverAllPolicy).
+			WithDeliverPolicy(jetstream.DeliverNewPolicy). // FIX: Only process new messages, not old ones
 			WithAckPolicy(jetstream.AckExplicitPolicy).
 			WithMaxDeliver(3).
 			Build(),
