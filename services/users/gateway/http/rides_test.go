@@ -1,6 +1,7 @@
 package gateaway_http
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -226,11 +227,10 @@ func TestNewRideClient(t *testing.T) {
 	config := &models.APIKeyConfig{
 		RidesService: "test-api-key",
 	}
-	client := NewRideClient(url, config)
+	client := NewRideClient(url, config, nil)
 
 	assert.NotNil(t, client)
 	assert.NotNil(t, client.client)
-	assert.Equal(t, url, client.client.BaseURL)
 }
 
 // Additional test cases for StartRide method

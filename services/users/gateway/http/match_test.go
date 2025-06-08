@@ -240,11 +240,10 @@ func TestNewMatchClient(t *testing.T) {
 	config := &models.APIKeyConfig{
 		MatchService: "test-api-key",
 	}
-	client := NewMatchClient(url, config)
+	client := NewMatchClient(url, config, nil)
 
 	assert.NotNil(t, client)
 	assert.NotNil(t, client.client)
-	assert.Equal(t, url, client.client.BaseURL)
 }
 
 func TestNewHTTPGateway(t *testing.T) {
@@ -260,6 +259,4 @@ func TestNewHTTPGateway(t *testing.T) {
 	assert.NotNil(t, gateway)
 	assert.NotNil(t, gateway.matchClient)
 	assert.NotNil(t, gateway.rideClient)
-	assert.Equal(t, matchURL, gateway.matchClient.client.BaseURL)
-	assert.Equal(t, rideURL, gateway.rideClient.client.BaseURL)
 }

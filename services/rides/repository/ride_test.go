@@ -26,11 +26,12 @@ func TestCreateRide_Success(t *testing.T) {
 	repo := repository.NewRideRepository(&models.Config{}, db)
 
 	rideID := uuid.New()
-	r := &models.Ride{RideID: rideID, DriverID: uuid.New(), PassengerID: uuid.New(), Status: models.RideStatusPending, TotalCost: 0}
+	matchID := uuid.New()
+	r := &models.Ride{RideID: rideID, MatchID: matchID, DriverID: uuid.New(), PassengerID: uuid.New(), Status: models.RideStatusPending, TotalCost: 0}
 
 	// Expect insert
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO rides")).
-		WithArgs(r.RideID, r.DriverID, r.PassengerID, r.Status, r.TotalCost, sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WithArgs(r.RideID, r.MatchID, r.DriverID, r.PassengerID, r.Status, r.TotalCost, sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	created, err := repo.CreateRide(r)
@@ -246,15 +247,16 @@ func TestGetRide_Success(t *testing.T) {
 
 	rideID := uuid.New().String()
 	rideUUID := uuid.MustParse(rideID)
+	matchID := uuid.New()
 	driverID := uuid.New()
 	passengerID := uuid.New()
 	createdAt := time.Now()
 	updatedAt := time.Now()
 
-	rows := sqlmock.NewRows([]string{"ride_id", "driver_id", "passenger_id", "status", "total_cost", "created_at", "updated_at"}).
-		AddRow(rideUUID, driverID, passengerID, models.RideStatusOngoing, 10000, createdAt, updatedAt)
+	rows := sqlmock.NewRows([]string{"ride_id", "match_id", "driver_id", "passenger_id", "status", "total_cost", "created_at", "updated_at"}).
+		AddRow(rideUUID, matchID, driverID, passengerID, models.RideStatusOngoing, 10000, createdAt, updatedAt)
 
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT ride_id, driver_id, passenger_id")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT ride_id, match_id, driver_id, passenger_id")).
 		WithArgs(rideUUID).
 		WillReturnRows(rows)
 
@@ -262,6 +264,7 @@ func TestGetRide_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, ride)
 	assert.Equal(t, rideUUID, ride.RideID)
+	assert.Equal(t, matchID, ride.MatchID)
 	assert.Equal(t, driverID, ride.DriverID)
 	assert.Equal(t, passengerID, ride.PassengerID)
 	assert.Equal(t, models.RideStatusOngoing, ride.Status)
@@ -332,7 +335,7 @@ func TestCreateRide_Error(t *testing.T) {
 	db, mock := setupMockDB(t)
 	repo := repository.NewRideRepository(&models.Config{}, db)
 
-	ride := &models.Ride{DriverID: uuid.New(), PassengerID: uuid.New(), Status: models.RideStatusPending}
+	ride := &models.Ride{MatchID: uuid.New(), DriverID: uuid.New(), PassengerID: uuid.New(), Status: models.RideStatusPending}
 
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO rides")).
 		WillReturnError(assert.AnError)

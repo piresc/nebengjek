@@ -2,99 +2,89 @@
 
 ## Overview
 
-NebengJek implements comprehensive monitoring and observability through New Relic APM and Zap structured logging, providing end-to-end visibility into application performance, errors, and business metrics.
+NebengJek implements comprehensive monitoring and observability through New Relic APM and Go's native slog structured logging, providing end-to-end visibility into application performance, errors, and business metrics.
+
+## Current Architecture
+
+### Unified Middleware Integration
+
+**Implementation**: [`internal/pkg/middleware/unified.go`](../internal/pkg/middleware/unified.go)
+
+The unified middleware provides integrated observability:
+- Automatic New Relic transaction creation
+- Request ID generation and propagation
+- Structured logging with context correlation
+- Error tracking and panic recovery
+- Performance metrics collection
+
+```go
+func (m *Middleware) Handler() echo.MiddlewareFunc {
+    return func(next echo.HandlerFunc) echo.HandlerFunc {
+        return func(c echo.Context) error {
+            start := time.Now()
+            
+            // Request ID generation
+            requestID := generateOrExtractRequestID(c)
+            
+            // APM transaction setup
+            var txn observability.Transaction
+            if m.config.Tracer != nil {
+                txn = m.config.Tracer.StartTransaction(c.Request().URL.Path)
+                defer txn.End()
+                txn.SetWebRequest(c.Request())
+                c.Set("nr_txn", txn)
+            }
+            
+            // Execute with monitoring
+            err := next(c)
+            
+            // Log request with context
+            duration := time.Since(start)
+            m.logRequest(c, requestID, duration, err)
+            
+            return err
+        }
+    }
+}
+```
 
 ## New Relic APM Integration
 
-### Architecture and Components
+### Current Implementation
 
-#### 1. New Relic Middleware
-**File**: [`internal/pkg/middleware/newrelic.go`](../internal/pkg/middleware/newrelic.go)
+**Location**: [`internal/pkg/newrelic/newrelic.go`](../internal/pkg/newrelic/newrelic.go)
 
-The New Relic middleware provides:
-- Transaction creation for each HTTP request
-- Web request/response context setting
-- Transaction context propagation
-- Custom attribute helpers
-- Error reporting utilities
+New Relic integration provides:
+- Automatic transaction tracking
+- Database operation monitoring
+- External service call tracing
+- Error reporting and alerting
+- Custom business metrics
 
-```go
-// NewNewRelicMiddleware creates middleware instance
-func NewNewRelicMiddleware() echo.MiddlewareFunc {
-    return nrecho.Middleware(nrApp)
-}
-
-// Helper functions for custom attributes
-func AddCustomAttribute(txn *newrelic.Transaction, key string, value interface{}) {
-    txn.AddAttribute(key, value)
-}
-
-func NoticeError(txn *newrelic.Transaction, err error) {
-    txn.NoticeError(err)
-}
-```
-
-#### 2. Database Instrumentation
-**File**: [`internal/pkg/newrelic/helpers.go`](../internal/pkg/newrelic/helpers.go)
-
-Database operations are instrumented with datastore segments:
+### Service Configuration
 
 ```go
-// PostgreSQL instrumentation
-func StartDatastoreSegment(txn *newrelic.Transaction, operation, table string) *newrelic.DatastoreSegment {
-    return &newrelic.DatastoreSegment{
-        StartTime:  txn.StartSegmentNow(),
-        Product:    newrelic.DatastorePostgres,
-        Collection: table,
-        Operation:  operation,
-    }
-}
-
-// Redis instrumentation  
-func StartRedisSegment(txn *newrelic.Transaction, operation string) *newrelic.DatastoreSegment {
-    return &newrelic.DatastoreSegment{
-        StartTime:  txn.StartSegmentNow(),
-        Product:    newrelic.DatastoreRedis,
-        Operation:  operation,
-    }
-}
+// Service-specific New Relic setup
+nrApp, err := newrelic.NewApplication(
+    newrelic.ConfigAppName("nebengjek-users-service"),
+    newrelic.ConfigLicense(licenseKey),
+    newrelic.ConfigEnabled(true),
+    newrelic.ConfigDistributedTracerEnabled(true),
+)
 ```
 
-#### 3. HTTP Client Instrumentation
-**File**: [`internal/pkg/http/newrelic_client.go`](../internal/pkg/http/newrelic_client.go)
+### APM Transaction Tracking
 
-External service calls are tracked with distributed tracing:
-
-```go
-func (c *APIKeyClient) doRequest(ctx context.Context, method, endpoint string, body interface{}) (*http.Response, error) {
-    // Start external segment for distributed tracing
-    txn := newrelic.FromContext(ctx)
-    segment := newrelic.StartExternalSegment(txn, req)
-    defer segment.End()
-    
-    // Add distributed tracing headers
-    req.Header = http.Header{}
-    txn.InsertDistributedTraceHeaders(req.Header)
-    
-    return c.client.Do(req)
-}
-```
-
-### Service Integration
-
-#### Handler Layer Instrumentation
-**Example**: [`services/users/handler/http/user.go`](../services/users/handler/http/user.go)
-
+**Handler Level Integration**:
 ```go
 func (h *UserHandler) GetUser(c echo.Context) error {
-    // Extract New Relic transaction
-    txn := newrelic.FromContext(c.Request().Context())
+    // Transaction automatically created by unified middleware
+    txn := c.Get("nr_txn").(observability.Transaction)
     
     // Add business context
     txn.AddAttribute("operation", "get_user")
     txn.AddAttribute("user.id", userID)
     
-    // Call use case with context
     user, err := h.userUC.GetUser(c.Request().Context(), userID)
     if err != nil {
         txn.NoticeError(err)
@@ -105,276 +95,253 @@ func (h *UserHandler) GetUser(c echo.Context) error {
 }
 ```
 
-#### Use Case Layer Instrumentation
-**Example**: [`services/users/usecase/user.go`](../services/users/usecase/user.go)
+### Database Instrumentation
 
+**PostgreSQL Monitoring**:
 ```go
-func (uc *UserUC) GetUser(ctx context.Context, userID string) (*models.User, error) {
-    // Start business logic segment
-    txn := newrelic.FromContext(ctx)
-    segment := txn.StartSegment("GetUser.BusinessLogic")
-    defer segment.End()
-    
-    // Add operation-specific attributes
-    txn.AddAttribute("user.lookup_method", "by_id")
-    
-    // Call repository with instrumented context
-    user, err := uc.userRepo.GetByID(ctx, userID)
-    if err != nil {
-        txn.NoticeError(err)
-        return nil, err
-    }
-    
-    return user, nil
-}
-```
-
-#### Repository Layer Instrumentation
-**Example**: [`services/users/repository/user.go`](../services/users/repository/user.go)
-
-```go
+// Automatic database monitoring via pgx integration
 func (r *UserRepo) GetByID(ctx context.Context, userID string) (*models.User, error) {
-    // Start database segment
-    txn := newrelic.FromContext(ctx)
-    segment := &newrelic.DatastoreSegment{
-        StartTime:  txn.StartSegmentNow(),
-        Product:    newrelic.DatastorePostgres,
-        Collection: "users",
-        Operation:  "SELECT",
-    }
-    defer segment.End()
-    
-    // Add query-specific attributes
-    txn.AddAttribute("db.table", "users")
-    txn.AddAttribute("db.operation", "select")
-    
-    // Execute query
+    // Database operations automatically instrumented
     var user models.User
     err := r.db.GetContext(ctx, &user, "SELECT * FROM users WHERE id = $1", userID)
-    
     return &user, err
 }
 ```
 
-### Custom Attributes Reference
+## Structured Logging with slog
 
-#### Common Attributes
-| Attribute | Description | Example |
-|-----------|-------------|---------|
-| `operation` | Business operation type | `create_user`, `find_nearby_drivers` |
-| `user.id` | User identifier | `uuid-string` |
-| `user.role` | User role | `passenger`, `driver` |
-| `driver.id` | Driver identifier | `uuid-string` |
-| `ride.id` | Ride identifier | `uuid-string` |
-| `match.id` | Match identifier | `uuid-string` |
+### Current Implementation
 
-#### Database Attributes
-| Attribute | Description | Example |
-|-----------|-------------|---------|
-| `db.operation` | Database operation | `select`, `insert`, `update` |
-| `db.table` | Database table | `users`, `rides` |
-| `redis.operation` | Redis operation | `geoadd`, `hmset` |
+**Location**: [`internal/pkg/logger/slog.go`](../internal/pkg/logger/slog.go)
 
-#### HTTP Attributes
-| Attribute | Description | Example |
-|-----------|-------------|---------|
-| `http.method` | HTTP method | `GET`, `POST` |
-| `http.url` | Request URL | `/api/users/123` |
-| `http.status_code` | Response status | `200`, `404` |
-| `http.service` | Target service | `location-service` |
+Go's native slog provides:
+- High-performance structured logging
+- New Relic log forwarding
+- Context-aware log correlation
+- Configurable output formats
 
-#### Business Logic Attributes
-| Attribute | Description | Example |
-|-----------|-------------|---------|
-| `search.radius_km` | Search radius | `5.0` |
-| `drivers.found_count` | Number of drivers found | `3` |
-| `validation.error` | Validation error type | `msisdn_invalid` |
+### Logger Configuration
 
-### Configuration
-
-#### Environment Variables
-```bash
-# New Relic Configuration
-NEW_RELIC_ENABLED=true
-NEW_RELIC_LICENSE_KEY=your_license_key_here
-NEW_RELIC_APP_NAME=nebengjek-users-service
-NEW_RELIC_LOGS_ENABLED=true
-NEW_RELIC_FORWARD_LOGS=true
-```
-
-#### Service-Specific App Names
-- `nebengjek-users-service`
-- `nebengjek-match-service`
-- `nebengjek-location-service`
-- `nebengjek-rides-service`
-
-#### Configuration Structure
 ```go
-type NewRelicConfig struct {
-    LicenseKey   string `json:"license_key"`
-    AppName      string `json:"app_name"`
-    Enabled      bool   `json:"enabled"`
-    LogsEnabled  bool   `json:"logs_enabled"`
-    LogsEndpoint string `json:"logs_endpoint"`
-    LogsAPIKey   string `json:"logs_api_key"`
-    ForwardLogs  bool   `json:"forward_logs"`
+type SlogConfig struct {
+    Level       slog.Level
+    ServiceName string
+    NewRelic    *newrelic.Application
+    Format      string // "json" or "text"
+}
+
+func NewSlogLogger(config SlogConfig) *slog.Logger {
+    var handler slog.Handler
+    
+    // Base handler
+    opts := &slog.HandlerOptions{
+        Level:     config.Level,
+        AddSource: true,
+    }
+    
+    switch config.Format {
+    case "json":
+        handler = slog.NewJSONHandler(os.Stdout, opts)
+    default:
+        handler = slog.NewTextHandler(os.Stdout, opts)
+    }
+    
+    // New Relic integration
+    if config.NewRelic != nil {
+        handler = nrslog.WrapHandler(config.NewRelic, handler)
+        handler = &NewRelicLogForwarder{
+            handler: handler,
+            app:     config.NewRelic,
+        }
+    }
+    
+    return slog.New(handler)
 }
 ```
 
-## Zap Logging Framework
+### New Relic Log Forwarding
 
-### Architecture and Features
-
-#### High-Performance Structured Logging
-- **JSON Format**: Machine-readable log format
-- **Zero Allocation**: Optimized for production performance
-- **Multiple Outputs**: Console, file, and New Relic forwarding
-- **Log Rotation**: Automatic file rotation with configurable size/retention
-
-#### Logger Configuration
-**File**: [`internal/pkg/logger/zap.go`](../internal/pkg/logger/zap.go)
-
+**Automatic Error Log Forwarding**:
 ```go
-type LoggerConfig struct {
-    Level      string `json:"level"`       // debug, info, warn, error
-    FilePath   string `json:"file_path"`   // Log file path
-    MaxSize    int64  `json:"max_size"`    // Max size in MB
-    MaxAge     int    `json:"max_age"`     // Max age in days
-    MaxBackups int    `json:"max_backups"` // Max backup files
-    Compress   bool   `json:"compress"`    // Compress rotated files
-    Type       string `json:"type"`        // file, console, hybrid, newrelic
+type NewRelicLogForwarder struct {
+    handler slog.Handler
+    app     *newrelic.Application
+}
+
+func (h *NewRelicLogForwarder) Handle(ctx context.Context, record slog.Record) error {
+    // Forward ERROR level and above to New Relic
+    if record.Level >= slog.LevelError && h.app != nil {
+        logData := map[string]interface{}{
+            "message":   record.Message,
+            "level":     record.Level.String(),
+            "timestamp": record.Time.UnixMilli(),
+        }
+        
+        // Add all log attributes
+        record.Attrs(func(attr slog.Attr) bool {
+            logData[attr.Key] = attr.Value.Any()
+            return true
+        })
+        
+        // Send to New Relic Application Logs
+        h.app.RecordLog(newrelic.LogData{
+            Message:    record.Message,
+            Severity:   record.Level.String(),
+            Timestamp:  record.Time.UnixMilli(),
+            Attributes: logData,
+        })
+    }
+    
+    return h.handler.Handle(ctx, record)
 }
 ```
 
-#### Environment Variables
-```bash
-# Zap Logger Configuration
-LOG_LEVEL=info
-LOG_FILE_PATH=./logs/app.log
-LOG_MAX_SIZE=100
-LOG_MAX_AGE=30
-LOG_MAX_BACKUPS=10
-LOG_COMPRESS=true
-LOG_TYPE=hybrid
+### Context-Aware Logging
+
+**ContextLogger Implementation**:
+```go
+type ContextLogger struct {
+    logger *slog.Logger
+}
+
+func (cl *ContextLogger) WithContext(ctx context.Context) *slog.Logger {
+    attrs := []slog.Attr{}
+    
+    // Extract context values
+    if requestID := ctx.Value("request_id"); requestID != nil {
+        attrs = append(attrs, slog.String("request_id", requestID.(string)))
+    }
+    
+    if userID := ctx.Value("user_id"); userID != nil {
+        attrs = append(attrs, slog.String("user_id", userID.(string)))
+    }
+    
+    if serviceName := ctx.Value("service_name"); serviceName != nil {
+        attrs = append(attrs, slog.String("service_name", serviceName.(string)))
+    }
+    
+    if len(attrs) > 0 {
+        args := make([]any, len(attrs))
+        for i, attr := range attrs {
+            args[i] = attr
+        }
+        return cl.logger.With(args...)
+    }
+    
+    return cl.logger
+}
 ```
 
-### Logging Implementation
+### Structured Logging Examples
 
-#### Structured Logging with Context
+**Business Operation Logging**:
 ```go
-// Initialize logger with New Relic integration
-zapLogger, err := logger.InitZapLoggerFromConfig(configs, nrApp)
-if err != nil {
-    log.Fatalf("Failed to create Zap logger: %v", err)
-}
-defer zapLogger.Close()
-
-// Structured logging with context
-zapLogger.Info("User authentication successful",
-    zap.String("user_id", userID),
-    zap.String("method", "OTP"),
-    zap.Duration("response_time", time.Since(start)),
+// User authentication
+logger.InfoContext(ctx, "User authentication successful",
+    slog.String("user_id", userID),
+    slog.String("method", "JWT"),
+    slog.Duration("auth_time", authDuration),
+    slog.Bool("first_login", isFirstLogin),
 )
 
-// Error logging with stack trace
-zapLogger.Error("Database connection failed",
-    zap.Error(err),
-    zap.String("database", "postgresql"),
-    zap.String("operation", "user_lookup"),
+// Database operation error
+logger.ErrorContext(ctx, "Database operation failed",
+    slog.String("operation", "user_create"),
+    slog.String("table", "users"),
+    slog.Any("error", err),
+    slog.String("query_id", queryID),
+)
+
+// API request performance
+logger.InfoContext(ctx, "API request completed",
+    slog.String("endpoint", "/api/v1/users"),
+    slog.String("method", "POST"),
+    slog.Int("status_code", 201),
+    slog.Duration("response_time", duration),
+    slog.Int64("response_size", responseSize),
 )
 ```
 
-#### Echo Middleware Integration
-**File**: [`internal/pkg/middleware/logger.go`](../internal/pkg/middleware/logger.go)
+## HTTP Client Monitoring
+
+### Unified HTTP Client Integration
+
+**Location**: [`internal/pkg/http/client.go`](../internal/pkg/http/client.go)
+
+The unified HTTP client provides:
+- Request ID propagation
+- Retry logic monitoring
+- Error classification
+- Performance tracking
 
 ```go
-func ZapEchoMiddleware(logger *ZapLogger) echo.MiddlewareFunc {
-    return func(next echo.HandlerFunc) echo.HandlerFunc {
-        return func(c echo.Context) error {
-            start := time.Now()
-            
-            err := next(c)
-            
-            // Log HTTP request with comprehensive context
-            logger.Info("HTTP Request",
-                zap.String("method", c.Request().Method),
-                zap.String("path", c.Request().URL.Path),
-                zap.Int("status", c.Response().Status),
-                zap.Duration("latency", time.Since(start)),
-                zap.String("client_ip", c.RealIP()),
-                zap.String("user_id", getUserID(c)),
-                zap.String("request_id", getRequestID(c)),
+func (c *Client) Do(ctx context.Context, method, endpoint string, body interface{}) (*http.Response, error) {
+    // Request ID propagation
+    if requestID := ctx.Value("request_id"); requestID != nil {
+        req.Header.Set("X-Request-ID", fmt.Sprintf("%v", requestID))
+    }
+    
+    // Retry logic with monitoring
+    for attempt := 0; attempt < 3; attempt++ {
+        resp, err = c.httpClient.Do(req)
+        if err == nil && resp.StatusCode < 500 {
+            return resp, nil
+        }
+        
+        // Log retry attempts
+        if attempt < 2 {
+            logger.WarnContext(ctx, "HTTP request retry",
+                slog.String("url", url),
+                slog.Int("attempt", attempt+1),
+                slog.Int("status", resp.StatusCode),
             )
-            
-            return err
         }
     }
+    
+    return resp, err
 }
 ```
 
-#### Log Output Format
-```json
-{
-  "timestamp": "2024-01-15T10:30:45.123Z",
-  "level": "info",
-  "message": "HTTP Request",
-  "method": "POST",
-  "path": "/api/v1/auth/login",
-  "status": 200,
-  "latency_ms": 45,
-  "client_ip": "192.168.1.100",
-  "user_id": "550e8400-e29b-41d4-a716-446655440000",
-  "request_id": "req_123456789",
-  "service": "nebengjek-users-app",
-  "caller": "handler/http/auth.go:45"
-}
-```
+## WebSocket Monitoring
 
-### Log Correlation and Tracing
+### Echo WebSocket Integration
 
-#### Request ID Middleware
+**Location**: [`services/users/handler/websocket/echo_handler.go`](../services/users/handler/websocket/echo_handler.go)
+
+WebSocket monitoring includes:
+- Connection lifecycle tracking
+- Message processing metrics
+- Error classification and logging
+- Business event monitoring
+
 ```go
-func RequestIDMiddleware() echo.MiddlewareFunc {
-    return func(next echo.HandlerFunc) echo.HandlerFunc {
-        return func(c echo.Context) error {
-            requestID := c.Request().Header.Get("X-Request-ID")
-            if requestID == "" {
-                requestID = generateRequestID()
-            }
-            
-            c.Set("request_id", requestID)
-            c.Response().Header().Set("X-Request-ID", requestID)
-            
-            return next(c)
-        }
-    }
-}
-```
+// Connection logging
+logger.Info("WebSocket client connected",
+    slog.String("user_id", userID),
+    slog.String("role", role),
+    slog.String("connection_id", connectionID),
+)
 
-#### Context Propagation
-```go
-func LogWithContext(ctx context.Context, level string, message string, fields ...zap.Field) {
-    // Extract correlation IDs from context
-    if requestID := getRequestIDFromContext(ctx); requestID != "" {
-        fields = append(fields, zap.String("request_id", requestID))
-    }
-    
-    if userID := getUserIDFromContext(ctx); userID != "" {
-        fields = append(fields, zap.String("user_id", userID))
-    }
-    
-    // Add New Relic trace context
-    if txn := newrelic.FromContext(ctx); txn != nil {
-        fields = append(fields, zap.String("trace_id", txn.GetTraceMetadata().TraceID))
-    }
-    
-    logger.Log(level, message, fields...)
-}
+// Message processing
+logger.InfoContext(ctx, "WebSocket message processed",
+    slog.String("user_id", userID),
+    slog.String("event", msg.Event),
+    slog.Duration("processing_time", processingTime),
+)
+
+// Error logging with severity
+logger.Error("WebSocket operation failed",
+    slog.String("user_id", userID),
+    slog.String("event", eventType),
+    slog.String("error_code", errorCode),
+    slog.String("severity", severity),
+    slog.Any("error", err),
+)
 ```
 
 ## Performance Monitoring
 
-### Key Metrics to Monitor
+### Key Metrics
 
 #### Application Performance
 - **Transaction Throughput**: Requests per minute by service
@@ -386,56 +353,19 @@ func LogWithContext(ctx context.Context, level string, message string, fields ..
 - **Query Response Times**: Database operation latency
 - **Connection Pool Usage**: Active/idle connection ratios
 - **Slow Query Identification**: Queries exceeding thresholds
-- **Database Throughput**: Operations per second
-
-#### External Service Dependencies
-- **Service-to-Service Latency**: Inter-service call performance
-- **External Service Error Rates**: Dependency failure rates
-- **Dependency Failure Impact**: Cascade failure detection
 
 #### Business Metrics
 - **User Registration Success Rates**: Authentication performance
 - **Driver Matching Performance**: Match success rates and timing
-- **Location Update Frequency**: Real-time data freshness
+- **WebSocket Connection Health**: Real-time communication metrics
 - **Ride Completion Rates**: End-to-end transaction success
-
-### Alerting and Notifications
-
-#### Recommended Alerts
-```yaml
-# High Error Rate Alert
-- name: "High Error Rate"
-  condition: "error_rate > 5% for 5 minutes"
-  severity: "critical"
-  
-# Slow Response Time Alert  
-- name: "Slow Response Time"
-  condition: "average_response_time > 2 seconds for 5 minutes"
-  severity: "warning"
-  
-# Database Slow Queries
-- name: "Database Slow Queries"
-  condition: "query_time > 1 second"
-  severity: "warning"
-  
-# External Service Failures
-- name: "External Service Failures"
-  condition: "external_error_rate > 10% for 3 minutes"
-  severity: "critical"
-```
-
-#### Alert Channels
-- **Slack Integration**: Real-time team notifications
-- **Email Alerts**: Critical issue notifications
-- **PagerDuty**: On-call escalation for critical alerts
-- **Webhook Integration**: Custom alert handling
 
 ### Custom Dashboards
 
 #### Service Health Overview
 ```json
 {
-  "dashboard": "Service Health Overview",
+  "dashboard": "NebengJek Service Health",
   "widgets": [
     {
       "title": "Response Times by Service",
@@ -450,165 +380,173 @@ func LogWithContext(ctx context.Context, level string, message string, fields ..
       "facet": "appName"
     },
     {
-      "title": "Throughput by Service",
-      "type": "line_chart", 
-      "metrics": ["throughput"],
-      "facet": "appName"
-    }
-  ]
-}
-```
-
-#### Business Operations Dashboard
-```json
-{
-  "dashboard": "Business Operations",
-  "widgets": [
-    {
-      "title": "User Registrations per Hour",
-      "type": "line_chart",
-      "nrql": "SELECT count(*) FROM Transaction WHERE name = 'POST /auth/register' TIMESERIES 1 hour"
-    },
-    {
-      "title": "Driver Availability Metrics",
+      "title": "WebSocket Connections",
       "type": "billboard",
-      "nrql": "SELECT average(drivers.found_count) FROM Transaction WHERE operation = 'find_nearby_drivers'"
-    },
-    {
-      "title": "Ride Matching Success Rates",
-      "type": "pie_chart", 
-      "nrql": "SELECT count(*) FROM Transaction WHERE operation = 'match_request' FACET success"
+      "nrql": "SELECT count(*) FROM Log WHERE message = 'WebSocket client connected' SINCE 1 hour ago"
     }
   ]
 }
 ```
 
-## Health Checks and Monitoring
+## Health Checks
 
-### Enhanced Health Service
-**File**: [`internal/pkg/health/health.go`](../internal/pkg/health/health.go)
+### Enhanced Health Monitoring
+
+**Location**: [`internal/pkg/health/enhanced.go`](../internal/pkg/health/enhanced.go)
+
+Comprehensive health checking:
+- PostgreSQL connection health
+- Redis connection health
+- NATS JetStream health
+- Service dependency health
 
 ```go
-type HealthService struct {
-    checkers map[string]HealthChecker
-    logger   *logger.ZapLogger
+// PostgreSQL health checker
+type PostgresHealthChecker struct {
+    client *database.PostgresClient
 }
 
-func (hs *HealthService) AddChecker(name string, checker HealthChecker) {
-    hs.checkers[name] = checker
+func (p *PostgresHealthChecker) CheckHealth(ctx context.Context) error {
+    if p.client == nil {
+        return nil // Skip if no PostgreSQL client
+    }
+    return p.client.GetDB().PingContext(ctx)
 }
 
-func (hs *HealthService) CheckHealth() map[string]HealthStatus {
-    results := make(map[string]HealthStatus)
-    
-    for name, checker := range hs.checkers {
-        start := time.Now()
-        err := checker.Check()
-        duration := time.Since(start)
-        
-        status := HealthStatus{
-            Status:   "healthy",
-            Duration: duration,
-        }
-        
-        if err != nil {
-            status.Status = "unhealthy"
-            status.Error = err.Error()
-        }
-        
-        results[name] = status
-        
-        // Log health check results
-        hs.logger.Info("Health check completed",
-            zap.String("component", name),
-            zap.String("status", status.Status),
-            zap.Duration("duration", duration),
-        )
+// Redis health checker
+type RedisHealthChecker struct {
+    client *database.RedisClient
+}
+
+func (r *RedisHealthChecker) CheckHealth(ctx context.Context) error {
+    if r.client == nil {
+        return nil // Skip if no Redis client
+    }
+    return r.client.Client.Ping(ctx).Err()
+}
+
+// NATS health checker
+type NATSHealthChecker struct {
+    client *nats.Client
+}
+
+func (n *NATSHealthChecker) CheckHealth(ctx context.Context) error {
+    if n.client == nil {
+        return nil // Skip if no NATS client
     }
     
-    return results
-}
-```
-
-### Component Health Checkers
-
-#### PostgreSQL Health Checker
-```go
-func NewPostgresHealthChecker(client *database.PostgresClient) HealthChecker {
-    return &PostgresHealthChecker{client: client}
-}
-
-func (c *PostgresHealthChecker) Check() error {
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-    defer cancel()
-    
-    return c.client.GetDB().PingContext(ctx)
-}
-```
-
-#### Redis Health Checker
-```go
-func NewRedisHealthChecker(client *database.RedisClient) HealthChecker {
-    return &RedisHealthChecker{client: client}
-}
-
-func (c *RedisHealthChecker) Check() error {
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-    defer cancel()
-    
-    return c.client.GetClient().Ping(ctx).Err()
-}
-```
-
-#### NATS Health Checker
-```go
-func NewNATSHealthChecker(client *nats.Client) HealthChecker {
-    return &NATSHealthChecker{client: client}
-}
-
-func (c *NATSHealthChecker) Check() error {
-    if !c.client.IsConnected() {
+    // Check basic NATS connection
+    conn := n.client.GetConn()
+    if conn == nil || !conn.IsConnected() {
         return errors.New("NATS client not connected")
     }
     
     // Check JetStream availability
-    js, err := c.client.JetStream()
-    if err != nil {
-        return fmt.Errorf("JetStream not available: %w", err)
+    js := n.client.GetJetStream()
+    if js == nil {
+        return errors.New("JetStream not available")
     }
     
-    // Verify stream health
-    _, err = js.StreamInfo("LOCATION")
+    // Verify we can list streams
+    _, err := n.client.ListStreams()
     return err
 }
 ```
 
-## Troubleshooting and Debugging
+## Configuration
 
-### Common Monitoring Issues
+### Environment Variables
+
+```bash
+# New Relic Configuration
+NEW_RELIC_ENABLED=true
+NEW_RELIC_LICENSE_KEY=your_license_key_here
+NEW_RELIC_APP_NAME=nebengjek-users-service
+
+# Logging Configuration
+LOG_LEVEL=info
+LOG_FORMAT=json
+SERVICE_NAME=nebengjek-users
+
+# Health Check Configuration
+HEALTH_CHECK_INTERVAL=30s
+HEALTH_CHECK_TIMEOUT=5s
+```
+
+### Service-Specific Configuration
+
+```go
+// Service configuration
+type ObservabilityConfig struct {
+    NewRelic struct {
+        LicenseKey string
+        AppName    string
+        Enabled    bool
+    }
+    Logging struct {
+        Level  string
+        Format string
+    }
+    Health struct {
+        CheckInterval time.Duration
+        Timeout       time.Duration
+    }
+}
+```
+
+## Alerting
+
+### Recommended Alerts
+
+```yaml
+# High Error Rate Alert
+- name: "High Error Rate"
+  condition: "error_rate > 5% for 5 minutes"
+  severity: "critical"
+  
+# Slow Response Time Alert  
+- name: "Slow Response Time"
+  condition: "average_response_time > 2 seconds for 5 minutes"
+  severity: "warning"
+  
+# WebSocket Connection Issues
+- name: "WebSocket Connection Failures"
+  condition: "websocket_error_rate > 10% for 3 minutes"
+  severity: "warning"
+  
+# Database Health Issues
+- name: "Database Connection Issues"
+  condition: "database_error_rate > 5% for 2 minutes"
+  severity: "critical"
+```
+
+## Troubleshooting
+
+### Common Issues
 
 #### Missing Transactions
 **Symptoms**: No data in New Relic APM
 **Solutions**:
-- Verify middleware registration order
+- Verify unified middleware registration
 - Check New Relic license key configuration
 - Ensure `NEW_RELIC_ENABLED=true`
-
-#### Missing Custom Attributes
-**Symptoms**: Attributes not appearing in transaction traces
-**Solutions**:
-- Verify transaction context propagation
-- Check attribute naming conventions
-- Ensure attributes added before transaction ends
 
 #### Log Correlation Issues
 **Symptoms**: Logs not correlated with traces
 **Solutions**:
-- Verify request ID middleware
-- Check context propagation
-- Ensure trace ID extraction
+- Verify request ID middleware in unified middleware
+- Check context propagation in handlers
+- Ensure slog context logger usage
+
+#### WebSocket Monitoring Gaps
+**Symptoms**: Missing WebSocket metrics
+**Solutions**:
+- Verify WebSocket handler logging
+- Check connection lifecycle tracking
+- Ensure error severity classification
 
 ### Debug Configuration
+
 ```bash
 # Enable debug logging
 NEW_RELIC_DEBUG=true
@@ -618,14 +556,17 @@ LOG_LEVEL=debug
 NEW_RELIC_LOG_LEVEL=debug
 ```
 
-### Performance Impact
+## Performance Impact
+
 - **New Relic Overhead**: < 1ms per transaction
-- **Zap Logging Overhead**: Minimal memory footprint
-- **Asynchronous Transmission**: Non-blocking data collection
-- **Configurable Sampling**: Adjustable data collection rates
+- **slog Logging Overhead**: Minimal memory footprint with native Go implementation
+- **Unified Middleware**: Single-pass processing reduces overhead
+- **Asynchronous Log Forwarding**: Non-blocking New Relic integration
 
 ## See Also
+
+- [Tech Stack Rationale](tech-stack-rationale.md)
+- [Unified Middleware Guide](unified-middleware-guide.md)
+- [Structured Logging Guide](structured-logging-guide.md)
 - [Database Architecture](database-architecture.md)
-- [NATS Messaging System](nats-messaging.md)
-- [Security Implementation](security-implementation.md)
-- [Testing Strategies](testing-strategies.md)
+- [WebSocket Implementation Guide](websocket-echo-migration-plan.md)

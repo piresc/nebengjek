@@ -43,9 +43,9 @@ func (r *RideRepo) CreateRide(ride *models.Ride) (*models.Ride, error) {
 	// Insert the ride into the database
 	query := `
 		INSERT INTO rides (
-			ride_id, driver_id, passenger_id, status, total_cost, created_at, updated_at
+			ride_id, match_id, driver_id, passenger_id, status, total_cost, created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7
+			$1, $2, $3, $4, $5, $6, $7, $8
 		) RETURNING ride_id
 	`
 
@@ -53,6 +53,7 @@ func (r *RideRepo) CreateRide(ride *models.Ride) (*models.Ride, error) {
 		ctx,
 		query,
 		ride.RideID,
+		ride.MatchID,
 		ride.DriverID,
 		ride.PassengerID,
 		ride.Status,
@@ -142,7 +143,7 @@ func (r *RideRepo) GetRide(ctx context.Context, rideID string) (*models.Ride, er
 	}
 
 	query := `
-		SELECT ride_id, driver_id, passenger_id, status, total_cost, created_at, updated_at
+		SELECT ride_id, match_id, driver_id, passenger_id, status, total_cost, created_at, updated_at
 		FROM rides
 		WHERE ride_id = $1
 	`

@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS matches (
 ```sql
 CREATE TABLE IF NOT EXISTS rides (
     ride_id uuid NOT NULL DEFAULT gen_random_uuid(),
+    match_id uuid NOT NULL,
     driver_id uuid NOT NULL,
     passenger_id uuid NOT NULL,
     status ride_status NOT NULL DEFAULT 'PENDING'::ride_status,
@@ -65,8 +66,10 @@ CREATE TABLE IF NOT EXISTS rides (
     created_at timestamp with time zone NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT rides_pkey PRIMARY KEY (ride_id),
+    CONSTRAINT rides_match_id_fkey FOREIGN KEY (match_id) REFERENCES matches(id),
     CONSTRAINT rides_driver_id_fkey FOREIGN KEY (driver_id) REFERENCES users(id),
-    CONSTRAINT rides_passenger_id_fkey FOREIGN KEY (passenger_id) REFERENCES users(id)
+    CONSTRAINT rides_passenger_id_fkey FOREIGN KEY (passenger_id) REFERENCES users(id),
+    CONSTRAINT rides_match_id_unique UNIQUE (match_id)
 );
 ```
 
@@ -148,6 +151,7 @@ erDiagram
     
     rides {
         uuid ride_id PK
+        uuid match_id FK,UK
         uuid driver_id FK
         uuid passenger_id FK
         ride_status status

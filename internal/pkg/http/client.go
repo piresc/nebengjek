@@ -130,7 +130,7 @@ func (c *Client) GetJSON(ctx context.Context, endpoint string, result interface{
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
+		return fmt.Errorf("HTTP error %d: %s", resp.StatusCode, resp.Status)
 	}
 
 	if result != nil {
@@ -156,13 +156,19 @@ func (c *Client) GetJSON(ctx context.Context, endpoint string, result interface{
 
 			// Unmarshal the data field into the result
 			if structuredResp.Data != nil {
-				return json.Unmarshal(structuredResp.Data, result)
+				if err := json.Unmarshal(structuredResp.Data, result); err != nil {
+					return fmt.Errorf("failed to decode JSON response: %w", err)
+				}
+				return nil
 			}
 			return nil
 		}
 
 		// If not structured response, try direct unmarshaling
-		return json.Unmarshal(body, result)
+		if err := json.Unmarshal(body, result); err != nil {
+			return fmt.Errorf("failed to decode JSON response: %w", err)
+		}
+		return nil
 	}
 
 	return nil
@@ -177,7 +183,7 @@ func (c *Client) PostJSON(ctx context.Context, endpoint string, body, result int
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
+		return fmt.Errorf("HTTP error %d: %s", resp.StatusCode, resp.Status)
 	}
 
 	if result != nil {
@@ -203,13 +209,19 @@ func (c *Client) PostJSON(ctx context.Context, endpoint string, body, result int
 
 			// Unmarshal the data field into the result
 			if structuredResp.Data != nil {
-				return json.Unmarshal(structuredResp.Data, result)
+				if err := json.Unmarshal(structuredResp.Data, result); err != nil {
+					return fmt.Errorf("failed to decode JSON response: %w", err)
+				}
+				return nil
 			}
 			return nil
 		}
 
 		// If not structured response, try direct unmarshaling
-		return json.Unmarshal(respBody, result)
+		if err := json.Unmarshal(respBody, result); err != nil {
+			return fmt.Errorf("failed to decode JSON response: %w", err)
+		}
+		return nil
 	}
 
 	return nil
@@ -224,7 +236,7 @@ func (c *Client) PutJSON(ctx context.Context, endpoint string, body, result inte
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
+		return fmt.Errorf("HTTP error %d: %s", resp.StatusCode, resp.Status)
 	}
 
 	if result != nil {
@@ -250,13 +262,19 @@ func (c *Client) PutJSON(ctx context.Context, endpoint string, body, result inte
 
 			// Unmarshal the data field into the result
 			if structuredResp.Data != nil {
-				return json.Unmarshal(structuredResp.Data, result)
+				if err := json.Unmarshal(structuredResp.Data, result); err != nil {
+					return fmt.Errorf("failed to decode JSON response: %w", err)
+				}
+				return nil
 			}
 			return nil
 		}
 
 		// If not structured response, try direct unmarshaling
-		return json.Unmarshal(respBody, result)
+		if err := json.Unmarshal(respBody, result); err != nil {
+			return fmt.Errorf("failed to decode JSON response: %w", err)
+		}
+		return nil
 	}
 
 	return nil

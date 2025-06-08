@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -39,15 +40,33 @@ func (uc *rideUC) CreateRide(ctx context.Context, mp models.MatchProposal) error
 		logger.String("driver_id", mp.DriverID),
 		logger.String("passenger_id", mp.PassengerID))
 
+	// Parse UUIDs safely
+	matchID, err := uuid.Parse(mp.ID)
+	if err != nil {
+		return fmt.Errorf("invalid match ID format: %w", err)
+	}
+
+	driverID, err := uuid.Parse(mp.DriverID)
+	if err != nil {
+		return fmt.Errorf("invalid driver ID format: %w", err)
+	}
+
+	passengerID, err := uuid.Parse(mp.PassengerID)
+	if err != nil {
+		return fmt.Errorf("invalid passenger ID format: %w", err)
+	}
+
 	// Create a new ride from the match proposal
 	ride := &models.Ride{
-		DriverID:    uuid.MustParse(mp.DriverID),
-		PassengerID: uuid.MustParse(mp.PassengerID),
+		MatchID:     matchID,
+		DriverID:    driverID,
+		PassengerID: passengerID,
 		Status:      models.RideStatusDriverPickup, // Set initial status to driver pickup
 		TotalCost:   0,                             // This will be calculated later
 	}
 
 	logger.Info("Creating ride in database",
+		logger.String("match_id", ride.MatchID.String()),
 		logger.String("driver_id", ride.DriverID.String()),
 		logger.String("passenger_id", ride.PassengerID.String()),
 		logger.String("status", string(ride.Status)))
@@ -55,7 +74,19 @@ func (uc *rideUC) CreateRide(ctx context.Context, mp models.MatchProposal) error
 	// Delegate to repository
 	createdRide, err := uc.ridesRepo.CreateRide(ride)
 	if err != nil {
+		// Check if this is a duplicate match_id constraint violation
+		if strings.Contains(err.Error(), "rides_match_id_unique") ||
+			strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+			logger.Warn("Ride already exists for this match - ignoring duplicate creation attempt",
+				logger.String("match_id", mp.ID),
+				logger.String("driver_id", mp.DriverID),
+				logger.String("passenger_id", mp.PassengerID))
+			// Return success since the ride already exists for this match
+			return nil
+		}
+
 		logger.Error("Failed to create ride in database",
+			logger.String("match_id", mp.ID),
 			logger.String("driver_id", mp.DriverID),
 			logger.String("passenger_id", mp.PassengerID),
 			logger.ErrorField(err))

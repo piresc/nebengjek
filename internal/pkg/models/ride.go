@@ -19,6 +19,7 @@ const (
 // Ride represents a ride record
 type Ride struct {
 	RideID      uuid.UUID  `json:"ride_id" db:"ride_id"`
+	MatchID     uuid.UUID  `json:"match_id" db:"match_id"`
 	DriverID    uuid.UUID  `json:"driver_id" db:"driver_id"`
 	PassengerID uuid.UUID  `json:"passenger_id" db:"passenger_id"`
 	Status      RideStatus `json:"status" db:"status"`
@@ -29,6 +30,7 @@ type Ride struct {
 
 type RideResp struct {
 	RideID      string    `json:"ride_id"`
+	MatchID     string    `json:"match_id"`
 	DriverID    string    `json:"driver_id"`
 	PassengerID string    `json:"passenger_id"`
 	Status      string    `json:"status"`

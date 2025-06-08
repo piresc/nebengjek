@@ -11,13 +11,17 @@ A lightweight, real-time trip-hailing and social matching platform integrated wi
 - **[Database Architecture](docs/database-architecture.md)** - PostgreSQL schema design, Redis implementation, data models, and performance optimization
 - **[NATS Messaging System](docs/nats-messaging.md)** - JetStream architecture, event-driven communication, and asynchronous processing
 - **[Business Logic Workflows](docs/business-logic-workflows.md)** - Domain-driven design, service responsibilities, and business rule implementation
+- **[Tech Stack Rationale](docs/tech-stack-rationale.md)** - Technology choices, architecture decisions, and future roadmap
 
-### Technical Implementation  
-- **[WebSocket Implementation](docs/websocket-implementation.md)** - Real-time communication, JWT authentication, and architectural rationale
+### Technical Implementation
+- **[Unified Middleware Guide](docs/unified-middleware-guide.md)** - Request lifecycle management, WebSocket support, and observability integration
+- **[WebSocket Implementation Guide](docs/websocket-echo-migration-plan.md)** - Echo native WebSocket, real-time events, and business logic integration
+- **[Structured Logging Guide](docs/structured-logging-guide.md)** - Go slog implementation, New Relic integration, and context-aware logging
+- **[HTTP Client Guide](docs/http-client-guide.md)** - Inter-service communication, retry logic, and error handling
 - **[Security Implementation](docs/security-implementation.md)** - API key authentication, panic recovery, graceful shutdown, and security scanning
-- **[Monitoring & Observability](docs/monitoring-observability.md)** - New Relic APM integration, Zap logging framework, and performance monitoring
 
 ### Development & Operations
+- **[Monitoring & Observability](docs/monitoring-observability.md)** - New Relic APM, slog integration, and performance monitoring
 - **[Testing Strategies](docs/testing-strategies.md)** - Unit testing with mocks, Redis integration testing, and coverage analysis
 - **[CI/CD & Deployment](docs/cicd-deployment.md)** - GitHub Actions pipelines, Docker deployment, and graceful shutdown procedures
 
@@ -75,14 +79,16 @@ graph TB
 | **Category** | **Technology** | **Purpose** | **Documentation** |
 |--------------|----------------|-------------|-------------------|
 | **Language** | Go 1.23 | Primary development language | - |
-| **Web Framework** | Echo v4 | HTTP server and routing | - |
+| **Web Framework** | Echo v4 | HTTP server and routing | [Unified Middleware Guide](docs/unified-middleware-guide.md) |
 | **Database** | PostgreSQL with pgx | Primary data storage | [Database Architecture](docs/database-architecture.md) |
 | **Cache/Session** | Redis | Caching, geospatial indexing | [Database Architecture](docs/database-architecture.md) |
 | **Message Broker** | NATS JetStream | Event-driven communication | [NATS Messaging](docs/nats-messaging.md) |
-| **WebSocket** | Gorilla WebSocket | Real-time communication | [WebSocket Implementation](docs/websocket-implementation.md) |
+| **WebSocket** | Echo Native + golang.org/x/net/websocket | Real-time communication | [WebSocket Implementation Guide](docs/websocket-echo-migration-plan.md) |
 | **Authentication** | JWT + API Keys | Stateless authentication | [Security Implementation](docs/security-implementation.md) |
-| **Monitoring** | New Relic APM | Performance monitoring | [Monitoring & Observability](docs/monitoring-observability.md) |
-| **Logging** | Zap Logger | Structured JSON logging | [Monitoring & Observability](docs/monitoring-observability.md) |
+| **Monitoring** | New Relic APM | Performance monitoring | [Tech Stack Rationale](docs/tech-stack-rationale.md) |
+| **Logging** | Go slog + New Relic | Structured logging with APM integration | [Structured Logging Guide](docs/structured-logging-guide.md) |
+| **HTTP Client** | Unified HTTP Client | Inter-service communication | [HTTP Client Guide](docs/http-client-guide.md) |
+| **Middleware** | Unified Middleware | Request lifecycle management | [Unified Middleware Guide](docs/unified-middleware-guide.md) |
 | **Testing** | Testify, GoMock | Unit and integration testing | [Testing Strategies](docs/testing-strategies.md) |
 | **Containerization** | Docker & Docker Compose | Service orchestration | [CI/CD & Deployment](docs/cicd-deployment.md) |
 
@@ -199,13 +205,15 @@ graph TB
 - **Distributed Tracing**: End-to-end request tracking across services
 - **Custom Attributes**: Business context for transactions
 - **Database Instrumentation**: PostgreSQL and Redis operation monitoring
+- **Log Forwarding**: Automatic ERROR level log forwarding to New Relic
 
-### Zap Logging Framework
-- **Structured JSON Logging**: Machine-readable log format
-- **Log Correlation**: Request ID and trace ID correlation
-- **Multiple Outputs**: Console, file, and New Relic forwarding
+### Go slog Structured Logging
+- **Native Go Implementation**: Built on Go 1.21+ log/slog package
+- **Context-Aware Logging**: Automatic request ID, user ID, and trace correlation
+- **APM Integration**: Seamless New Relic log forwarding
+- **High Performance**: Minimal allocation overhead with structured attributes
 
-**Monitoring Setup**: [Monitoring & Observability](docs/monitoring-observability.md)
+**Monitoring Setup**: [Structured Logging Guide](docs/structured-logging-guide.md) | [Tech Stack Rationale](docs/tech-stack-rationale.md)
 
 ---
 
@@ -317,11 +325,15 @@ LOG_LEVEL=info
 
 | **Topic** | **File** | **Description** |
 |-----------|----------|-----------------|
+| **Tech Stack Overview** | [`docs/tech-stack-rationale.md`](docs/tech-stack-rationale.md) | Technology choices, architecture decisions, future roadmap |
 | **Database Design** | [`docs/database-architecture.md`](docs/database-architecture.md) | PostgreSQL schema, Redis patterns, data models |
 | **Messaging System** | [`docs/nats-messaging.md`](docs/nats-messaging.md) | NATS JetStream, event flows, async communication |
-| **Real-time Communication** | [`docs/websocket-implementation.md`](docs/websocket-implementation.md) | WebSocket architecture, JWT auth, message handling |
+| **Unified Middleware** | [`docs/unified-middleware-guide.md`](docs/unified-middleware-guide.md) | Request lifecycle, WebSocket support, observability |
+| **WebSocket Implementation** | [`docs/websocket-echo-migration-plan.md`](docs/websocket-echo-migration-plan.md) | Echo native WebSocket, real-time events, business logic |
+| **Structured Logging** | [`docs/structured-logging-guide.md`](docs/structured-logging-guide.md) | Go slog, New Relic integration, context-aware logging |
+| **HTTP Client** | [`docs/http-client-guide.md`](docs/http-client-guide.md) | Inter-service communication, retry logic, error handling |
 | **Security & Auth** | [`docs/security-implementation.md`](docs/security-implementation.md) | API keys, panic recovery, security scanning |
-| **Monitoring & Logs** | [`docs/monitoring-observability.md`](docs/monitoring-observability.md) | New Relic APM, Zap logging, performance metrics |
+| **Monitoring & Observability** | [`docs/monitoring-observability.md`](docs/monitoring-observability.md) | New Relic APM, slog integration, performance monitoring |
 | **Business Logic** | [`docs/business-logic-workflows.md`](docs/business-logic-workflows.md) | Domain models, workflows, business rules |
 | **Testing & Quality** | [`docs/testing-strategies.md`](docs/testing-strategies.md) | Unit tests, mocks, coverage analysis |
 | **Deployment & CI/CD** | [`docs/cicd-deployment.md`](docs/cicd-deployment.md) | GitHub Actions, Docker, graceful shutdown |

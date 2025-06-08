@@ -27,9 +27,10 @@ func TestCreateRide_Success(t *testing.T) {
 
 	driverID := uuid.New().String()
 	passengerID := uuid.New().String()
+	matchID := uuid.New().String()
 
 	matchProposal := models.MatchProposal{
-		ID:          "match-123",
+		ID:          matchID,
 		DriverID:    driverID,
 		PassengerID: passengerID,
 		UserLocation: models.Location{
@@ -47,6 +48,7 @@ func TestCreateRide_Success(t *testing.T) {
 	mockRepo.EXPECT().
 		CreateRide(gomock.Any()).
 		DoAndReturn(func(ride *models.Ride) (*models.Ride, error) {
+			assert.Equal(t, uuid.MustParse(matchID), ride.MatchID)
 			assert.Equal(t, uuid.MustParse(driverID), ride.DriverID)
 			assert.Equal(t, uuid.MustParse(passengerID), ride.PassengerID)
 
@@ -80,9 +82,10 @@ func TestCreateRide_RepositoryError(t *testing.T) {
 
 	driverID := uuid.New().String()
 	passengerID := uuid.New().String()
+	matchID := uuid.New().String()
 
 	matchProposal := models.MatchProposal{
-		ID:          "match-123",
+		ID:          matchID,
 		DriverID:    driverID,
 		PassengerID: passengerID,
 		MatchStatus: models.MatchStatusAccepted,
@@ -117,9 +120,10 @@ func TestCreateRide_PublishError(t *testing.T) {
 
 	driverID := uuid.New().String()
 	passengerID := uuid.New().String()
+	matchID := uuid.New().String()
 
 	matchProposal := models.MatchProposal{
-		ID:          "match-123",
+		ID:          matchID,
 		DriverID:    driverID,
 		PassengerID: passengerID,
 		MatchStatus: models.MatchStatusAccepted,
