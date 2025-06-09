@@ -13,7 +13,7 @@ import (
 // HTTPHandler combines all handlers for the location service
 type HTTPHandler struct {
 	locationHTTP *httpHandler.LocationHandler
-	locationNATS *LocationHandler // This is the existing NATS handler in the same package
+	locationNATS *LocationHandler
 	cfg          *models.Config
 }
 
@@ -26,7 +26,7 @@ func NewHTTPHandler(
 ) *HTTPHandler {
 	return &HTTPHandler{
 		locationHTTP: httpHandler.NewLocationHandler(locationUC),
-		locationNATS: NewLocationHandler(locationUC, natsClient, nrApp), // Use existing NATS handler
+		locationNATS: NewLocationHandler(locationUC, natsClient, nrApp),
 		cfg:          cfg,
 	}
 }

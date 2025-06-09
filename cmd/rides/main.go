@@ -111,7 +111,13 @@ func main() {
 	// Initialize Echo server
 	e := echo.New()
 
-	// Use  middleware
+	// Initialize enhanced health service
+	healthService := health.NewHealthService(slogLogger)
+	healthService.AddChecker("postgres", health.NewPostgresHealthChecker(postgresClient))
+	healthService.AddChecker("redis", health.NewRedisHealthChecker(redisClient))
+	healthService.AddChecker("nats", health.NewNATSHealthChecker(natsClient))
+
+	// Initialize middleware
 	MW := middleware.NewMiddleware(middleware.Config{
 		Logger: slogLogger,
 		Tracer: tracer,
@@ -124,19 +130,16 @@ func main() {
 		ServiceName: appName,
 	})
 
-	e.Use(MW.Handler())
-
-	// Initialize enhanced health service
-	healthService := health.NewHealthService(nil) // Pass nil for old logger since we're using slog
-	healthService.AddChecker("postgres", health.NewPostgresHealthChecker(postgresClient))
-	healthService.AddChecker("redis", health.NewRedisHealthChecker(redisClient))
-	healthService.AddChecker("nats", health.NewNATSHealthChecker(natsClient))
-
-	// Register enhanced health endpoints
+	// Register enhanced health endpoints BEFORE applying middleware
 	health.RegisterEnhancedHealthEndpoints(e, appName, configs.App.Version, healthService)
 
-	// Create the old API key middleware for compatibility
-	// Use  middleware instead of separate API key middleware
+	// Register additional health endpoint for /health/rides
+	healthGroup := e.Group("/health")
+	healthGroup.GET("/rides", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, map[string]interface{}{"status": "ok"})
+	})
+
+	e.Use(MW.Handler())
 
 	// Register service routes
 	rideHandler.RegisterRoutes(e, MW)

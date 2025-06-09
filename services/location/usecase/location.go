@@ -42,11 +42,6 @@ func (uc *locationUC) StoreLocation(ctx context.Context, update models.LocationU
 		return nil
 	}
 
-	// logger.Info("Found previous location for ride",
-	//	logger.String("ride_id", update.RideID),
-	//	logger.Float64("prev_latitude", lastLocation.Latitude),
-	//	logger.Float64("prev_longitude", lastLocation.Longitude))
-
 	// Calculate distance using Haversine formula
 	lastPoint := utils.GeoPoint{
 		Latitude:  lastLocation.Latitude,
@@ -58,20 +53,12 @@ func (uc *locationUC) StoreLocation(ctx context.Context, update models.LocationU
 	}
 	distance := utils.CalculateDistance(lastPoint, currentPoint)
 
-	// logger.Info("Calculated distance for ride",
-	//	logger.String("ride_id", update.RideID),
-	//	logger.Float64("distance_km", distance))
-
 	// Store new location
 	err = uc.locationRepo.StoreLocation(ctx, update.RideID, update.Location)
 	if err != nil {
 		return fmt.Errorf("failed to store location: %w", err)
 	}
 
-	// Publish location aggregate
-	// logger.Info("Publishing location aggregate",
-	//	logger.String("ride_id", update.RideID),
-	//	logger.Float64("distance_km", distance))
 	aggregate := models.LocationAggregate{
 		RideID:    update.RideID,
 		Distance:  distance,

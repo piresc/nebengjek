@@ -25,7 +25,6 @@ type Config struct {
 }
 
 // Middleware combines multiple middleware into a single, efficient handler
-// This replaces: PanicRecovery, RequestID, RequestContext, Logger, and APM middleware
 type Middleware struct {
 	config Config
 }
@@ -33,6 +32,79 @@ type Middleware struct {
 // NewMiddleware creates a new middleware instance
 func NewMiddleware(config Config) *Middleware {
 	return &Middleware{config: config}
+}
+
+// RegisterHealthEndpoints is a helper method to register health endpoints before applying middleware
+func (m *Middleware) RegisterHealthEndpoints(e *echo.Echo, serviceName, version string, healthChecker func(ctx context.Context) (map[string]interface{}, error)) {
+	healthGroup := e.Group("/health")
+
+	// Basic health check (for load balancers)
+	healthGroup.GET("", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"status":    "ok",
+			"service":   serviceName,
+			"timestamp": time.Now(),
+		})
+	})
+
+	// Detailed health check with dependencies
+	healthGroup.GET("/detailed", func(c echo.Context) error {
+		ctx, cancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
+		defer cancel()
+
+		response, err := healthChecker(ctx)
+		if err != nil {
+			return c.JSON(http.StatusServiceUnavailable, map[string]interface{}{
+				"status":    "unhealthy",
+				"service":   serviceName,
+				"version":   version,
+				"timestamp": time.Now(),
+				"error":     err.Error(),
+			})
+		}
+
+		response["service"] = serviceName
+		response["version"] = version
+
+		statusCode := http.StatusOK
+		if status, ok := response["status"].(string); ok && status == "unhealthy" {
+			statusCode = http.StatusServiceUnavailable
+		}
+
+		return c.JSON(statusCode, response)
+	})
+
+	// Readiness probe (for Kubernetes)
+	healthGroup.GET("/ready", func(c echo.Context) error {
+		ctx, cancel := context.WithTimeout(c.Request().Context(), 3*time.Second)
+		defer cancel()
+
+		response, err := healthChecker(ctx)
+		if err != nil {
+			return c.JSON(http.StatusServiceUnavailable, map[string]interface{}{
+				"status":  "not ready",
+				"service": serviceName,
+				"error":   err.Error(),
+			})
+		}
+
+		if status, ok := response["status"].(string); ok && status == "unhealthy" {
+			return c.JSON(http.StatusServiceUnavailable, response)
+		}
+
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"status":  "ready",
+			"service": serviceName,
+		})
+	})
+
+	// Liveness probe (for Kubernetes)
+	healthGroup.GET("/live", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"status":  "alive",
+			"service": serviceName,
+		})
+	})
 }
 
 // Handler returns the main middleware handler that combines all functionality

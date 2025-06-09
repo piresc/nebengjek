@@ -15,7 +15,7 @@ type HTTPGateway struct {
 	locationClient *LocationClient
 }
 
-// LocationClient is a simplified HTTP client for communicating with the location service
+// LocationClient is a HTTP client for communicating with the location service
 type LocationClient struct {
 	client  *httpclient.Client
 	tracer  observability.Tracer

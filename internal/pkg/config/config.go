@@ -76,12 +76,9 @@ func loadConfigFromEnv() *models.Config {
 	configs.Match.SearchRadiusKm = GetEnvAsFloat("MATCH_SEARCH_RADIUS_KM", 1.0)
 
 	// Pricing config
-	configs.Pricing.RatePerKm = GetEnvAsFloat("PRICING_RATE_PER_KM", 1000.0)
-	configs.Pricing.Currency = GetEnv("PRICING_CURRENCY", "IDR")
-	configs.Pricing.BaseFare = GetEnvAsFloat("PRICING_BASE_FARE", 5000.0)
-	configs.Pricing.PerKmRate = GetEnvAsFloat("PRICING_PER_KM_RATE", 2000.0)
-	configs.Pricing.PerMinuteRate = GetEnvAsFloat("PRICING_PER_MINUTE_RATE", 200.0)
-	configs.Pricing.SurgeFactor = GetEnvAsFloat("PRICING_SURGE_FACTOR", 1.0)
+	configs.Pricing.RatePerKm = GetEnvAsFloat("PRICING_RATE_PER_KM", 3000.0)
+
+	configs.Pricing.AdminFeePercent = GetEnvAsFloat("BILLING_ADMIN_FEE_PERCENT", 5.0)
 
 	// Rides config
 	configs.Rides.MinDistanceKm = GetEnvAsFloat("RIDES_MIN_DISTANCE_KM", 1.0)

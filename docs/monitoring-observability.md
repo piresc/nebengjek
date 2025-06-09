@@ -569,4 +569,4 @@ NEW_RELIC_LOG_LEVEL=debug
 - [Unified Middleware Guide](unified-middleware-guide.md)
 - [Structured Logging Guide](structured-logging-guide.md)
 - [Database Architecture](database-architecture.md)
-- [WebSocket Implementation Guide](websocket-echo-migration-plan.md)
+- [WebSocket Events Specification](websocket-events-specification.md)

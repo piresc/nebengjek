@@ -2,35 +2,39 @@
 
 ## Overview
 
-NebengJek implements comprehensive testing strategies including unit testing with mocks, integration testing with Redis, test coverage analysis, and automated testing in CI/CD pipelines. The testing approach ensures code quality, reliability, and maintainability across all services.
+NebengJek implements unit testing strategies with GoMock for core business logic components. The testing approach focuses on isolated unit tests for services, use cases, and repository layers to ensure code quality and reliability.
+
+## Testing Implementation
+
+### Unit Testing
+- **Core Business Logic**: Testing with GoMock for dependency injection
+  - User service: authentication, user management, match confirmation
+  - Match service: beacon handling, match processing, status confirmation
+  - Location service: location updates and tracking
+  - Repository layer: database operations with SQL mocks
+- **Mock Generation**: GoMock-based mocks for interfaces
+- **Test Organization**: Structured test files following Go conventions
 
 ## Testing Architecture
 
-### Testing Pyramid
+### Current Testing Focus
 
 ```mermaid
 graph TD
-    A[Unit Tests] --> B[Integration Tests]
-    B --> C[End-to-End Tests]
+    A[Unit Tests] --> B[Mock-based Testing]
+    B --> C[Repository Testing]
     
-    subgraph "Unit Tests (70%)"
+    subgraph "Unit Tests"
         D[Business Logic]
-        E[Repository Layer]
-        F[Use Case Layer]
+        E[Use Case Layer]
+        F[Repository Layer]
         G[Handler Layer]
     end
     
-    subgraph "Integration Tests (20%)"
-        H[Database Integration]
-        I[Redis Integration]
-        J[NATS Integration]
-        K[HTTP API Tests]
-    end
-    
-    subgraph "End-to-End Tests (10%)"
-        L[Full Workflow Tests]
-        M[Service Communication]
-        N[WebSocket Integration]
+    subgraph "Mock Framework"
+        H[GoMock Interfaces]
+        I[SQL Mock Testing]
+        J[Dependency Injection]
     end
 ```
 

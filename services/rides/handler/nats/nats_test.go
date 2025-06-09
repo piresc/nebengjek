@@ -150,6 +150,9 @@ func TestRidesHandler_handleLocationAggregate_Success(t *testing.T) {
 		Rides: models.RidesConfig{
 			MinDistanceKm: 1.0,
 		},
+		Pricing: models.PricingConfig{
+			RatePerKm: 3000.0, // Configure the same rate as was hardcoded
+		},
 	}
 
 	mockNRApp := &newrelic.Application{}
@@ -161,7 +164,7 @@ func TestRidesHandler_handleLocationAggregate_Success(t *testing.T) {
 		Distance: 2.5, // Above minimum distance
 	}
 
-	expectedCost := int(2.5 * 3000) // 7500
+	expectedCost := int(2.5 * cfg.Pricing.RatePerKm) // Use configured rate instead of hardcoded
 	expectedEntry := &models.BillingLedger{
 		RideID:   rideID,
 		Distance: 2.5,
@@ -282,6 +285,9 @@ func TestRidesHandler_handleLocationAggregate_ProcessBillingError(t *testing.T) 
 		Rides: models.RidesConfig{
 			MinDistanceKm: 1.0,
 		},
+		Pricing: models.PricingConfig{
+			RatePerKm: 3000.0, // Configure the same rate as was hardcoded
+		},
 	}
 
 	mockNRApp := &newrelic.Application{}
@@ -293,7 +299,7 @@ func TestRidesHandler_handleLocationAggregate_ProcessBillingError(t *testing.T) 
 		Distance: 2.5,
 	}
 
-	expectedCost := int(2.5 * 3000)
+	expectedCost := int(2.5 * cfg.Pricing.RatePerKm) // Use configured rate instead of hardcoded
 	expectedEntry := &models.BillingLedger{
 		RideID:   rideID,
 		Distance: 2.5,

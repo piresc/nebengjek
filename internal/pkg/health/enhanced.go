@@ -8,7 +8,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/database"
-	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/nats"
 )
 
@@ -134,9 +133,11 @@ func (h *HealthService) CheckAllHealth(ctx context.Context) HealthResponse {
 
 	for name, checker := range h.checkers {
 		if err := checker.CheckHealth(ctx); err != nil {
-			h.logger.Error("Health check failed",
-				logger.String("dependency", name),
-				logger.Err(err))
+			if h.logger != nil {
+				h.logger.Error("Health check failed",
+					slog.String("dependency", name),
+					slog.Any("error", err))
+			}
 
 			response.Dependencies[name] = DependencyInfo{
 				Status: "unhealthy",
@@ -154,7 +155,9 @@ func (h *HealthService) CheckAllHealth(ctx context.Context) HealthResponse {
 }
 
 // RegisterEnhancedHealthEndpoints registers comprehensive health check endpoints
+// These endpoints are registered WITHOUT middleware to ensure they don't require authentication
 func RegisterEnhancedHealthEndpoints(e *echo.Echo, serviceName, version string, healthService *HealthService) {
+	// Create a separate group for health endpoints without any middleware
 	healthGroup := e.Group("/health")
 
 	// Basic health check (for load balancers)

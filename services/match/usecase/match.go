@@ -277,7 +277,6 @@ func (uc *MatchUC) startAsyncAutoRejection(match *models.Match) {
 			logger.Error("Critical: Failed to handle auto-rejection for match",
 				logger.String("match_id", match.ID.String()),
 				logger.ErrorField(err))
-			// TODO: Add alerting/retry mechanism for critical failures
 		}
 	}()
 }

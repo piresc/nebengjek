@@ -219,8 +219,7 @@ func (h *RidesHandler) handleLocationAggregate(ctx context.Context, msg []byte) 
 			return fmt.Errorf("invalid ride ID: %w", err)
 		}
 
-		// Calculate cost at 3000 IDR per km
-		cost := int(math.Round(update.Distance * 3000))
+		cost := int(math.Round(update.Distance * h.cfg.Pricing.RatePerKm))
 
 		// Add billing attributes to transaction
 		if txn := nrpkg.FromContext(ctx); txn != nil {

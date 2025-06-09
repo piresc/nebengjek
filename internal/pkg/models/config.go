@@ -87,12 +87,8 @@ type APIKeyConfig struct {
 }
 
 type PricingConfig struct {
-	RatePerKm     float64 `json:"rate_per_km"`
-	Currency      string  `json:"currency"`
-	BaseFare      float64 `json:"base_fare"`
-	PerKmRate     float64 `json:"per_km_rate"`
-	PerMinuteRate float64 `json:"per_minute_rate"`
-	SurgeFactor   float64 `json:"surge_factor"`
+	RatePerKm       float64 `json:"rate_per_km"`
+	AdminFeePercent float64 `json:"admin_fee_percent"`
 }
 
 // PaymentConfig contains payment service configuration

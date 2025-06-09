@@ -424,7 +424,11 @@ func TestRideArrived_Success(t *testing.T) {
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
 
-	cfg := &models.Config{}
+	cfg := &models.Config{
+		Pricing: models.PricingConfig{
+			AdminFeePercent: 5.0, // 5% admin fee
+		},
+	}
 	uc, err := NewRideUC(cfg, mockRepo, mockGW)
 	require.NoError(t, err)
 
@@ -447,7 +451,8 @@ func TestRideArrived_Success(t *testing.T) {
 
 	// Expected values
 	adjustedCost := int(float64(totalCost) * adjustmentFactor)
-	adminFee := int(float64(adjustedCost) * 0.05)
+	adminFeePercent := 5.0 / 100.0 // Use same default as config
+	adminFee := int(float64(adjustedCost) * adminFeePercent)
 	driverPayout := adjustedCost - adminFee
 
 	// Set up expectations
@@ -648,7 +653,11 @@ func TestRideArrived_InvalidAdjustmentFactor(t *testing.T) {
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
 
-	cfg := &models.Config{}
+	cfg := &models.Config{
+		Pricing: models.PricingConfig{
+			AdminFeePercent: 5.0, // 5% admin fee
+		},
+	}
 	uc, err := NewRideUC(cfg, mockRepo, mockGW)
 	require.NoError(t, err)
 
@@ -670,7 +679,8 @@ func TestRideArrived_InvalidAdjustmentFactor(t *testing.T) {
 
 	// Expected values with adjustment factor reset to 1.0
 	adjustedCost := totalCost
-	adminFee := int(float64(adjustedCost) * 0.05)
+	adminFeePercent := 5.0 / 100.0 // Use same default as config
+	adminFee := int(float64(adjustedCost) * adminFeePercent)
 	driverPayout := adjustedCost - adminFee
 
 	// Set up expectations

@@ -1,3 +1,7 @@
+-- Create enum types
+CREATE TYPE match_status AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED', 'DRIVER_CONFIRMED', 'PASSENGER_CONFIRMED');
+CREATE TYPE ride_status AS ENUM ('PENDING', 'PICKUP', 'ONGOING', 'COMPLETED');
+
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
     id uuid NOT NULL DEFAULT gen_random_uuid(),

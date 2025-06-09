@@ -255,7 +255,9 @@ func (uc *rideUC) RideArrived(ctx context.Context, req models.RideArrivalReq) (*
 
 	// Calculate adjusted cost
 	adjustedCost := int(float64(totalCost) * req.AdjustmentFactor)
-	adminFee := int(float64(adjustedCost) * 0.05)
+
+	adminFeePercent := uc.cfg.Pricing.AdminFeePercent / 100.0 // Convert percentage to decimal
+	adminFee := int(float64(adjustedCost) * adminFeePercent)
 	driverPayout := adjustedCost - adminFee
 
 	// Create payment record

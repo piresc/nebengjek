@@ -1,8 +1,3 @@
--- Create enum types
-CREATE TYPE match_status AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED', 'DRIVER_CONFIRMED', 'PASSENGER_CONFIRMED');
-CREATE TYPE ride_status AS ENUM ('PENDING', 'PICKUP', 'ONGOING', 'COMPLETED');
-
-
 -- Matches table indexes
 CREATE INDEX idx_matches_driver_id ON matches(driver_id);
 CREATE INDEX idx_matches_passenger_id ON matches(passenger_id);

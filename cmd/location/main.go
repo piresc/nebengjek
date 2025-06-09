@@ -99,7 +99,12 @@ func main() {
 	// Initialize Echo server
 	e := echo.New()
 
-	// Use  middleware
+	// Initialize enhanced health service
+	healthService := health.NewHealthService(slogLogger)
+	healthService.AddChecker("redis", health.NewRedisHealthChecker(redisClient))
+	healthService.AddChecker("nats", health.NewNATSHealthChecker(natsClient))
+
+	// Initialize middleware
 	MW := middleware.NewMiddleware(middleware.Config{
 		Logger: slogLogger,
 		Tracer: tracer,
@@ -114,16 +119,8 @@ func main() {
 
 	e.Use(MW.Handler())
 
-	// Initialize enhanced health service
-	healthService := health.NewHealthService(nil) // Pass nil for old logger since we're using slog
-	healthService.AddChecker("redis", health.NewRedisHealthChecker(redisClient))
-	healthService.AddChecker("nats", health.NewNATSHealthChecker(natsClient))
-
-	// Register enhanced health endpoints
+	// Register enhanced health endpoints BEFORE applying middleware
 	health.RegisterEnhancedHealthEndpoints(e, appName, configs.App.Version, healthService)
-
-	// Create the old API key middleware for compatibility
-	// Use  middleware instead of separate API key middleware
 
 	// Register service routes
 	locationHandler.RegisterRoutes(e, MW)

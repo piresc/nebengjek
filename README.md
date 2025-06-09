@@ -8,19 +8,27 @@ A lightweight, real-time trip-hailing and social matching platform integrated wi
 ## 📚 Quick Reference Glossary
 
 ### Core Architecture
+- **[System Architecture](docs/system-architecture.md)** - Enhanced microservices architecture with internal packages and observability
 - **[Database Architecture](docs/database-architecture.md)** - PostgreSQL schema design, Redis implementation, data models, and performance optimization
 - **[NATS Messaging System](docs/nats-messaging.md)** - JetStream architecture, event-driven communication, and asynchronous processing
 - **[Business Logic Workflows](docs/business-logic-workflows.md)** - Domain-driven design, service responsibilities, and business rule implementation
 - **[Tech Stack Rationale](docs/tech-stack-rationale.md)** - Technology choices, architecture decisions, and future roadmap
 
-### Technical Implementation
+### Infrastructure & Operations
+- **[Enhanced Health Checks](docs/enhanced-health-checks.md)** - Comprehensive dependency health monitoring with Kubernetes integration
+- **[Observability & Tracing](docs/observability-tracing.md)** - APM abstraction layer with New Relic integration and NoOp testing support
+- **[Graceful Server Management](docs/graceful-server-management.md)** - Signal handling, component cleanup, and container orchestration
 - **[Unified Middleware Guide](docs/unified-middleware-guide.md)** - Request lifecycle management, WebSocket support, and observability integration
-- **[WebSocket Implementation Guide](docs/websocket-echo-migration-plan.md)** - Echo native WebSocket, real-time events, and business logic integration
-- **[Structured Logging Guide](docs/structured-logging-guide.md)** - Go slog implementation, New Relic integration, and context-aware logging
-- **[HTTP Client Guide](docs/http-client-guide.md)** - Inter-service communication, retry logic, and error handling
 - **[Security Implementation](docs/security-implementation.md)** - API key authentication, panic recovery, graceful shutdown, and security scanning
 
-### Development & Operations
+### API & Communication
+- **[API Reference](docs/api-reference.md)** - Complete REST API documentation for all services with request/response schemas
+- **[WebSocket Events Specification](docs/websocket-events-specification.md)** - Real-time event documentation with payload schemas and flow patterns
+- **[NATS Event Schemas](docs/nats-event-schemas.md)** - Asynchronous event documentation with JetStream configuration and patterns
+- **[HTTP Client Guide](docs/http-client-guide.md)** - Inter-service communication, retry logic, and error handling
+
+### Development & Quality
+- **[Structured Logging Guide](docs/structured-logging-guide.md)** - Go slog implementation, New Relic integration, and context-aware logging
 - **[Monitoring & Observability](docs/monitoring-observability.md)** - New Relic APM, slog integration, and performance monitoring
 - **[Testing Strategies](docs/testing-strategies.md)** - Unit testing with mocks, Redis integration testing, and coverage analysis
 - **[CI/CD & Deployment](docs/cicd-deployment.md)** - GitHub Actions pipelines, Docker deployment, and graceful shutdown procedures
@@ -83,7 +91,7 @@ graph TB
 | **Database** | PostgreSQL with pgx | Primary data storage | [Database Architecture](docs/database-architecture.md) |
 | **Cache/Session** | Redis | Caching, geospatial indexing | [Database Architecture](docs/database-architecture.md) |
 | **Message Broker** | NATS JetStream | Event-driven communication | [NATS Messaging](docs/nats-messaging.md) |
-| **WebSocket** | Echo Native + golang.org/x/net/websocket | Real-time communication | [WebSocket Implementation Guide](docs/websocket-echo-migration-plan.md) |
+| **WebSocket** | Echo Native + golang.org/x/net/websocket | Real-time communication | [WebSocket Events Specification](docs/websocket-events-specification.md) |
 | **Authentication** | JWT + API Keys | Stateless authentication | [Security Implementation](docs/security-implementation.md) |
 | **Monitoring** | New Relic APM | Performance monitoring | [Tech Stack Rationale](docs/tech-stack-rationale.md) |
 | **Logging** | Go slog + New Relic | Structured logging with APM integration | [Structured Logging Guide](docs/structured-logging-guide.md) |
@@ -325,11 +333,18 @@ LOG_LEVEL=info
 
 | **Topic** | **File** | **Description** |
 |-----------|----------|-----------------|
+| **System Architecture** | [`docs/system-architecture.md`](docs/system-architecture.md) | Enhanced microservices architecture with internal packages and observability |
+| **Enhanced Health Checks** | [`docs/enhanced-health-checks.md`](docs/enhanced-health-checks.md) | Comprehensive dependency health monitoring with Kubernetes integration |
+| **Observability & Tracing** | [`docs/observability-tracing.md`](docs/observability-tracing.md) | APM abstraction layer with New Relic integration and NoOp testing support |
+| **Graceful Server Management** | [`docs/graceful-server-management.md`](docs/graceful-server-management.md) | Signal handling, component cleanup, and container orchestration |
+| **API Reference** | [`docs/api-reference.md`](docs/api-reference.md) | Complete REST API documentation for all services with request/response schemas |
+| **WebSocket Events** | [`docs/websocket-events-specification.md`](docs/websocket-events-specification.md) | Real-time event documentation with payload schemas and flow patterns |
+| **NATS Event Schemas** | [`docs/nats-event-schemas.md`](docs/nats-event-schemas.md) | Asynchronous event documentation with JetStream configuration and patterns |
 | **Tech Stack Overview** | [`docs/tech-stack-rationale.md`](docs/tech-stack-rationale.md) | Technology choices, architecture decisions, future roadmap |
 | **Database Design** | [`docs/database-architecture.md`](docs/database-architecture.md) | PostgreSQL schema, Redis patterns, data models |
 | **Messaging System** | [`docs/nats-messaging.md`](docs/nats-messaging.md) | NATS JetStream, event flows, async communication |
 | **Unified Middleware** | [`docs/unified-middleware-guide.md`](docs/unified-middleware-guide.md) | Request lifecycle, WebSocket support, observability |
-| **WebSocket Implementation** | [`docs/websocket-echo-migration-plan.md`](docs/websocket-echo-migration-plan.md) | Echo native WebSocket, real-time events, business logic |
+| **WebSocket Implementation** | [`docs/websocket-implementation.md`](docs/websocket-implementation.md) | Echo native WebSocket, real-time events, business logic |
 | **Structured Logging** | [`docs/structured-logging-guide.md`](docs/structured-logging-guide.md) | Go slog, New Relic integration, context-aware logging |
 | **HTTP Client** | [`docs/http-client-guide.md`](docs/http-client-guide.md) | Inter-service communication, retry logic, error handling |
 | **Security & Auth** | [`docs/security-implementation.md`](docs/security-implementation.md) | API keys, panic recovery, security scanning |
