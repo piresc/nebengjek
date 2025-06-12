@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -75,8 +76,9 @@ func (s *GracefulServer) Shutdown() error {
 	return nil
 }
 
-// ShutdownComponents provides a way to register cleanup functions
+// ShutdownManager manages graceful shutdown of multiple components
 type ShutdownManager struct {
+	mu        sync.RWMutex
 	logger    *slog.Logger
 	functions []func(context.Context) error
 }
@@ -91,19 +93,30 @@ func NewShutdownManager(slogLogger *slog.Logger) *ShutdownManager {
 
 // Register adds a cleanup function to be called during shutdown
 func (sm *ShutdownManager) Register(fn func(context.Context) error) {
-	sm.functions = append(sm.functions, fn)
+	if fn != nil {
+		sm.mu.Lock()
+		sm.functions = append(sm.functions, fn)
+		sm.mu.Unlock()
+	}
 }
 
 // Shutdown executes all registered cleanup functions
 func (sm *ShutdownManager) Shutdown(ctx context.Context) error {
-	sm.logger.Info("Starting graceful shutdown of components", logger.Int("components", len(sm.functions)))
+	sm.mu.RLock()
+	functionsCopy := make([]func(context.Context) error, len(sm.functions))
+	copy(functionsCopy, sm.functions)
+	sm.mu.RUnlock()
 
-	for i, fn := range sm.functions {
-		if err := fn(ctx); err != nil {
-			sm.logger.Error("Error during component shutdown",
-				logger.Int("component", i),
-				logger.Err(err))
-			// Continue with other components even if one fails
+	sm.logger.Info("Starting graceful shutdown of components", logger.Int("components", len(functionsCopy)))
+
+	for i, fn := range functionsCopy {
+		if fn != nil {
+			if err := fn(ctx); err != nil {
+				sm.logger.Error("Error during component shutdown",
+					logger.Int("component", i),
+					logger.Err(err))
+				// Continue with other components even if one fails
+			}
 		}
 	}
 

@@ -35,6 +35,7 @@ func (g *RideGW) PublishRidePickup(ctx context.Context, ride *models.Ride) error
 
 	rideResponse := models.RideResp{
 		RideID:      ride.RideID.String(),
+		MatchID:     ride.MatchID.String(),
 		DriverID:    ride.DriverID.String(),
 		PassengerID: ride.PassengerID.String(),
 		Status:      string(ride.Status),

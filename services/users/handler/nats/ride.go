@@ -176,7 +176,6 @@ func (h *NatsHandler) handleRidePickupEvent(msg []byte) error {
 		logger.String("passenger_id", ridePickup.PassengerID),
 		logger.String("status", ridePickup.Status))
 
-	// CRITICAL FIX: Use EventRidePickup instead of SubjectRidePickup for WebSocket notifications
 	logger.InfoCtx(context.Background(), "Sending WebSocket notifications for ride pickup",
 		logger.String("driver_id", ridePickup.DriverID),
 		logger.String("passenger_id", ridePickup.PassengerID),
