@@ -889,26 +889,6 @@ version_migration:
 
 ## Monitoring and Observability
 
-### Event Metrics
-```yaml
-metrics:
-  - name: "nats_events_published_total"
-    type: "counter"
-    labels: ["service", "event_type", "status"]
-    
-  - name: "nats_events_consumed_total"
-    type: "counter"
-    labels: ["service", "event_type", "consumer"]
-    
-  - name: "nats_event_processing_duration"
-    type: "histogram"
-    labels: ["service", "event_type"]
-    
-  - name: "nats_dlq_events_total"
-    type: "counter"
-    labels: ["service", "event_type", "error_type"]
-```
-
 ### Event Tracing
 All events include tracing information for distributed tracing:
 

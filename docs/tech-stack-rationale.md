@@ -28,7 +28,6 @@ Our unified middleware provides comprehensive request handling in a single, effi
 **Future Enhancements:**
 - Rate limiting integration for API protection
 - Circuit breaker patterns for external service calls
-- Distributed tracing with OpenTelemetry support
 - Custom metrics collection for business KPIs
 
 ### 2. Real-Time WebSocket Architecture

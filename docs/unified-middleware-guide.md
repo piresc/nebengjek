@@ -305,7 +305,6 @@ func (r *responseBodyCapture) Write(b []byte) (int, error) {
 - **Request Validation**: Input sanitization and validation
 
 ### Advanced Features
-- **Distributed Tracing**: OpenTelemetry integration
 - **Security Headers**: Automatic security header injection
 - **Content Compression**: Response compression support
 - **Request Caching**: Intelligent response caching

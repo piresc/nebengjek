@@ -362,31 +362,13 @@ logger.Error("WebSocket operation failed",
 
 ### Custom Dashboards
 
-#### Service Health Overview
-```json
-{
-  "dashboard": "NebengJek Service Health",
-  "widgets": [
-    {
-      "title": "Response Times by Service",
-      "type": "line_chart",
-      "metrics": ["average_response_time"],
-      "facet": "appName"
-    },
-    {
-      "title": "Error Rates by Service", 
-      "type": "line_chart",
-      "metrics": ["error_rate"],
-      "facet": "appName"
-    },
-    {
-      "title": "WebSocket Connections",
-      "type": "billboard",
-      "nrql": "SELECT count(*) FROM Log WHERE message = 'WebSocket client connected' SINCE 1 hour ago"
-    }
-  ]
-}
-```
+New Relic provides built-in dashboards for:
+- Service performance metrics
+- Error rate tracking
+- Database operation monitoring 
+- WebSocket connection metrics
+
+Custom queries can be created through the New Relic UI for specific business metrics and KPIs.
 
 ## Health Checks
 
@@ -497,6 +479,8 @@ type ObservabilityConfig struct {
 ## Alerting
 
 ### Recommended Alerts
+
+New Relic alert policies can be configured for:
 
 ```yaml
 # High Error Rate Alert

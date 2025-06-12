@@ -567,69 +567,50 @@ func (h *HealthHandler) ReadinessCheck(c echo.Context) error {
 
 ### Shutdown Metrics
 
-Track shutdown performance and reliability:
+Track shutdown performance and reliability through structured logging:
 
 ```go
-var (
-    shutdownDuration = prometheus.NewHistogram(
-        prometheus.HistogramOpts{
-            Name: "graceful_shutdown_duration_seconds",
-            Help: "Duration of graceful shutdown",
-        },
-    )
-    
-    shutdownErrors = prometheus.NewCounterVec(
-        prometheus.CounterOpts{
-            Name: "graceful_shutdown_errors_total",
-            Help: "Number of graceful shutdown errors",
-        },
-        []string{"component"},
-    )
-)
-
 func (sm *ShutdownManager) Shutdown(ctx context.Context) error {
     start := time.Now()
-    defer func() {
-        shutdownDuration.Observe(time.Since(start).Seconds())
-    }()
-    
+    sm.logger.Info("Starting graceful shutdown of components", 
+        logger.Int("components", len(sm.functions)))
+
     for i, fn := range sm.functions {
         if err := fn(ctx); err != nil {
-            shutdownErrors.WithLabelValues(fmt.Sprintf("component_%d", i)).Inc()
-            // ... error handling ...
+            sm.logger.Error("Error during component shutdown",
+                logger.Int("component", i),
+                logger.Err(err))
+            // Continue with other components even if one fails
         }
     }
-    
+
+    duration := time.Since(start)
+    sm.logger.Info("All components shutdown completed",
+        logger.Duration("shutdown_duration", duration))
     return nil
 }
 ```
 
 ### Alerting
 
-Set up alerts for shutdown issues:
+Set up alerts through New Relic for shutdown issues:
 
 ```yaml
-# Prometheus alerting rule
-groups:
-- name: graceful_shutdown
-  rules:
-  - alert: GracefulShutdownTooSlow
-    expr: graceful_shutdown_duration_seconds > 25
-    for: 0m
-    labels:
-      severity: warning
-    annotations:
-      summary: "Graceful shutdown taking too long"
-      description: "Service {{ $labels.instance }} shutdown took {{ $value }}s"
-  
-  - alert: GracefulShutdownErrors
-    expr: increase(graceful_shutdown_errors_total[5m]) > 0
-    for: 0m
-    labels:
-      severity: critical
-    annotations:
-      summary: "Graceful shutdown errors detected"
-      description: "Service {{ $labels.instance }} had shutdown errors"
+# New Relic alert policies
+policies:
+  - name: "Graceful Shutdown Monitoring"
+    conditions:
+      - name: "Slow Shutdown Detection"
+        type: "NRQL"
+        query: "SELECT average(duration) FROM Log WHERE message = 'All components shutdown completed' SINCE 5 minutes ago"
+        threshold: 25000  # 25 seconds in milliseconds
+        severity: "warning"
+      
+      - name: "Shutdown Error Detection"
+        type: "NRQL"  
+        query: "SELECT count(*) FROM Log WHERE message = 'Error during component shutdown' SINCE 5 minutes ago"
+        threshold: 1
+        severity: "critical"
 ```
 
 ## Troubleshooting

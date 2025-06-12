@@ -409,9 +409,6 @@ logger.InfoContext(ctx, "User login attempt",
 - **Compression**: Log compression for storage efficiency
 
 ### Advanced Features
-- **Distributed Tracing**: OpenTelemetry integration
-- **Log Analytics**: Real-time log analysis and insights
-- **Anomaly Detection**: ML-based log pattern analysis
 - **Compliance Logging**: Audit trail and regulatory compliance
 
 ## Conclusion

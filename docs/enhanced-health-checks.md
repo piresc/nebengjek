@@ -232,37 +232,41 @@ import (
     "github.com/piresc/nebengjek/internal/pkg/database"
 )
 
-func setupHealthChecks(e *echo.Echo, logger *slog.Logger, pgClient *database.PostgresClient, redisClient *database.RedisClient, natsClient *nats.Client) {
-    // Create health service
-    healthService := health.NewHealthService(logger)
+func main() {
+    // ... service initialization ...
     
-    // Register health checkers
-    healthService.AddChecker("postgres", health.NewPostgresHealthChecker(pgClient))
+    // Initialize enhanced health service
+    healthService := health.NewHealthService(slogLogger)
+    healthService.AddChecker("postgres", health.NewPostgresHealthChecker(postgresClient))
     healthService.AddChecker("redis", health.NewRedisHealthChecker(redisClient))
     healthService.AddChecker("nats", health.NewNATSHealthChecker(natsClient))
     
-    // Register health endpoints
-    health.RegisterEnhancedHealthEndpoints(e, "users-service", "1.0.0", healthService)
+    // Register enhanced health endpoints BEFORE applying middleware
+    health.RegisterEnhancedHealthEndpoints(e, appName, configs.App.Version, healthService)
+    
+    // ... rest of service setup ...
 }
 ```
 
 ### Service Integration
 
-Each service should integrate health checks in their main function:
+Each service integrates health checks directly in their main function:
 
 ```go
-// cmd/users/main.go
+// Example from cmd/users/main.go
 func main() {
     // ... service initialization ...
     
-    // Setup health checks
-    setupHealthChecks(e, logger, pgClient, redisClient, natsClient)
+    // Initialize enhanced health service
+    healthService := health.NewHealthService(slogLogger)
+    healthService.AddChecker("postgres", health.NewPostgresHealthChecker(postgresClient))
+    healthService.AddChecker("redis", health.NewRedisHealthChecker(redisClient))
+    healthService.AddChecker("nats", health.NewNATSHealthChecker(natsClient))
+
+    // Register enhanced health endpoints BEFORE applying middleware
+    health.RegisterEnhancedHealthEndpoints(e, appName, configs.App.Version, healthService)
     
-    // Start server
-    server := server.NewGracefulServer(e, logger, cfg.Server.Port)
-    if err := server.Start(); err != nil {
-        logger.Error("Server failed", logger.Err(err))
-    }
+    // ... middleware and route setup ...
 }
 ```
 
@@ -343,39 +347,18 @@ services:
 
 ## Monitoring Integration
 
-### Prometheus Metrics
+### New Relic Integration
 
-Health check results can be exposed as Prometheus metrics:
+Health check results are automatically logged using structured logging and can be monitored in New Relic via the APM integration:
 
 ```go
-// Example metric collection
-var (
-    healthCheckDuration = prometheus.NewHistogramVec(
-        prometheus.HistogramOpts{
-            Name: "health_check_duration_seconds",
-            Help: "Duration of health checks",
-        },
-        []string{"service", "dependency", "status"},
-    )
-)
+// Health checks are performed with automatic New Relic instrumentation
+// when the service is wrapped with New Relic middleware
+response := healthService.CheckAllHealth(ctx)
 
-func (h *HealthService) CheckAllHealthWithMetrics(ctx context.Context) HealthResponse {
-    start := time.Now()
-    response := h.CheckAllHealth(ctx)
-    
-    for name, dep := range response.Dependencies {
-        healthCheckDuration.WithLabelValues(
-            response.Service,
-            name,
-            dep.Status,
-        ).Observe(time.Since(start).Seconds())
-    }
-    
-    return response
-}
+// All health check operations and their durations are automatically
+// tracked in New Relic APM under the service's transaction traces
 ```
-
-### New Relic Integration
 
 Health check failures are automatically logged and can be monitored in New Relic:
 
@@ -387,8 +370,8 @@ func (h *HealthService) CheckAllHealth(ctx context.Context) HealthResponse {
         if err := checker.CheckHealth(ctx); err != nil {
             if h.logger != nil {
                 h.logger.Error("Health check failed",
-                    logger.String("dependency", name),
-                    logger.Err(err))
+                    slog.String("dependency", name),
+                    slog.Any("error", err))
             }
             // Error is automatically forwarded to New Relic via slog integration
         }

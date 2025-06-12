@@ -13,10 +13,9 @@ graph TD
     A[Code Push/PR] --> B[Secret Scanning]
     B --> C[Unit Tests]
     C --> D[SonarCloud Analysis]
-    D --> E[Coverage Analysis]
-    E --> F{PR or Release?}
+    D --> F{PR or Release?}
     
-    F -->|PR| G[Coverage Comparison]
+    F -->|PR| G[Test Results Comment]
     F -->|Release| H[Build Services]
     
     G --> I[PR Comment]
@@ -29,7 +28,6 @@ graph TD
     subgraph "Quality Gates"
         N[Secret Scan Pass]
         O[Tests Pass]
-        P[Coverage Maintained]
         Q[SonarCloud Pass]
     end
 ```
