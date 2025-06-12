@@ -54,11 +54,11 @@ func GenerateDummyOTP(msisdn string) string {
 	stripped = strings.ReplaceAll(stripped, " ", "")
 	stripped = strings.ReplaceAll(stripped, "+", "")
 
-	// Get last 4 digits
+	// Get last 4 digits, or return the entire string if shorter
 	if len(stripped) >= 4 {
 		return stripped[len(stripped)-4:]
 	}
 
-	// Fallback if MSISDN is too short (shouldn't happen with validation)
-	return "1234"
+	// Return the entire string if shorter than 4 digits
+	return stripped
 }

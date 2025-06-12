@@ -63,6 +63,6 @@ func (p *PostgresClient) GetDB() *sqlx.DB {
 }
 
 // Close closes the database connection
-func (p *PostgresClient) Close() {
-	p.db.Close()
+func (p *PostgresClient) Close() error {
+	return p.db.Close()
 }

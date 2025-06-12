@@ -117,10 +117,16 @@ func main() {
 		ServiceName: appName,
 	})
 
-	e.Use(MW.Handler())
-
 	// Register enhanced health endpoints BEFORE applying middleware
 	health.RegisterEnhancedHealthEndpoints(e, appName, configs.App.Version, healthService)
+
+	// Register additional health endpoint for /health/location
+	healthGroup := e.Group("/health")
+	healthGroup.GET("/location", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, map[string]interface{}{"status": "ok"})
+	})
+
+	e.Use(MW.Handler())
 
 	// Register service routes
 	locationHandler.RegisterRoutes(e, MW)
