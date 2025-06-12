@@ -451,8 +451,8 @@ func TestRideArrived_Success(t *testing.T) {
 
 	// Expected values
 	adjustedCost := int(float64(totalCost) * adjustmentFactor)
-	adminFeePercent := 5.0 / 100.0 // Use same default as config
-	adminFee := int(float64(adjustedCost) * adminFeePercent)
+	adminFeePercent := 5.0 / 100.0                           // Use same default as config
+	adminFee := int(float64(adjustedCost) * adminFeePercent) // Admin fee on adjusted cost
 	driverPayout := adjustedCost - adminFee
 
 	// Set up expectations

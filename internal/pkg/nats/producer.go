@@ -15,6 +15,11 @@ type Producer struct {
 
 // NewProducer creates a new NATS producer
 func NewProducer(address string) (*Producer, error) {
+	// Validate address
+	if address == "" {
+		return nil, fmt.Errorf("NATS server address cannot be empty")
+	}
+
 	// Connect to NATS server
 	conn, err := nats.Connect(address)
 	if err != nil {

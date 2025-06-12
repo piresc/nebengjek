@@ -430,7 +430,15 @@ func (uc *MatchUC) handleMatchRejection(ctx context.Context, match *models.Match
 		updatedMatch = match
 	}
 
-	return uc.buildMatchProposal(updatedMatch), nil
+	// Publish match rejection event
+	matchProposal := uc.buildMatchProposal(updatedMatch)
+	if err := uc.matchGW.PublishMatchRejected(ctx, matchProposal); err != nil {
+		logger.Error("Failed to publish match rejection event",
+			logger.String("match_id", matchID),
+			logger.ErrorField(err))
+	}
+
+	return matchProposal, nil
 }
 
 // ConfirmMatchStatus handles match confirmation from either driver or passenger

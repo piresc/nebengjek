@@ -31,7 +31,10 @@ func GenerateRandomHex(length int) (string, error) {
 
 // IsValidEmail checks if a string is a valid email address
 func IsValidEmail(email string) bool {
-	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+	// Updated regex to ensure:
+	// - Local part doesn't start or end with dots
+	// - Domain parts don't start or end with dashes
+	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9_%+\-]([a-zA-Z0-9._%+\-]*[a-zA-Z0-9_%+\-])?@[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$`)
 	return emailRegex.MatchString(email)
 }
 
@@ -45,16 +48,31 @@ func IsValidPhoneNumber(phone string) bool {
 
 // Truncate truncates a string to the specified length and adds ellipsis if needed
 func Truncate(s string, maxLength int) string {
-	if len(s) <= maxLength {
+	// Convert string to runes to handle Unicode characters properly
+	runes := []rune(s)
+	
+	// If the string is already shorter than or equal to maxLength, return it as is
+	if len(runes) <= maxLength {
 		return s
 	}
-	return s[:maxLength-3] + "..."
+	
+	// Handle edge cases where maxLength is too small to fit the ellipsis
+	if maxLength <= 3 {
+		return "..."
+	}
+	
+	// Truncate the string and add ellipsis
+	return string(runes[:maxLength-3]) + "..."
 }
 
 // SanitizeString removes unwanted characters from a string
 func SanitizeString(s string) string {
-	// Remove control characters and trim spaces
-	return strings.TrimSpace(regexp.MustCompile(`[\p{Cc}\p{Cf}\p{Co}\p{Cs}]`).ReplaceAllString(s, ""))
+	// Replace control characters with spaces, then normalize multiple spaces to single space
+	result := regexp.MustCompile(`[\p{Cc}\p{Cf}\p{Co}\p{Cs}]`).ReplaceAllString(s, " ")
+	// Replace multiple consecutive spaces with single space
+	result = regexp.MustCompile(`\s+`).ReplaceAllString(result, " ")
+	// Trim leading and trailing spaces
+	return strings.TrimSpace(result)
 }
 
 // MaskString masks a portion of a string (useful for PII)

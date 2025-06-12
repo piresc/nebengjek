@@ -21,6 +21,8 @@ type Transaction interface {
 	NoticeError(error)
 	AddAttribute(key string, value interface{})
 	GetContext() context.Context
+	SetTag(key string, value interface{})
+	SetError(error)
 }
 
 // NoOpTracer provides a no-operation implementation for testing
@@ -53,6 +55,8 @@ func (t *NoOpTransaction) SetWebResponse(http.ResponseWriter)         {}
 func (t *NoOpTransaction) NoticeError(error)                          {}
 func (t *NoOpTransaction) AddAttribute(key string, value interface{}) {}
 func (t *NoOpTransaction) GetContext() context.Context                { return t.ctx }
+func (t *NoOpTransaction) SetError(error)                             {}
+func (t *NoOpTransaction) SetTag(key string, value interface{})       {}
 
 // NewRelicTracer implements Tracer interface using New Relic
 type NewRelicTracer struct {
@@ -128,6 +132,20 @@ func (t *NewRelicTransaction) GetContext() context.Context {
 		return newrelic.NewContext(context.Background(), t.txn)
 	}
 	return context.Background()
+}
+
+// SetTag adds a custom tag to the transaction (alias for AddAttribute)
+func (t *NewRelicTransaction) SetTag(key string, value interface{}) {
+	if t.txn != nil {
+		t.txn.AddAttribute(key, value)
+	}
+}
+
+// SetError reports an error to the transaction (alias for NoticeError)
+func (t *NewRelicTransaction) SetError(err error) {
+	if t.txn != nil && err != nil {
+		t.txn.NoticeError(err)
+	}
 }
 
 // TracerFactory creates tracers based on configuration

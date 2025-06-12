@@ -29,6 +29,9 @@ func NewRequestContext(serviceName string) *RequestContext {
 
 // WithRequestContext adds request context to the given context
 func WithRequestContext(ctx context.Context, reqCtx *RequestContext) context.Context {
+	if reqCtx == nil {
+		return ctx
+	}
 	ctx = context.WithValue(ctx, RequestIDKey, reqCtx.RequestID)
 	ctx = context.WithValue(ctx, UserIDKey, reqCtx.UserID)
 	ctx = context.WithValue(ctx, TraceIDKey, reqCtx.TraceID)
