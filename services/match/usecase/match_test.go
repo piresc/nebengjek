@@ -514,6 +514,11 @@ func TestConfirmMatchStatus_RejectSuccess(t *testing.T) {
 			Status:      models.MatchStatusRejected,
 		}, nil)
 
+	// Expect PublishMatchRejected to be called
+	mockGW.EXPECT().
+		PublishMatchRejected(gomock.Any(), gomock.Any()).
+		Return(nil)
+
 	// Act
 	req := &models.MatchConfirmRequest{
 		ID:     matchID,
