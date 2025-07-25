@@ -21,9 +21,11 @@ type Config struct {
 
 // ServicesConfig contains URLs for other microservices
 type ServicesConfig struct {
-	MatchServiceURL    string
-	RidesServiceURL    string
-	LocationServiceURL string
+	MatchServiceURL       string
+	RidesServiceURL       string
+	LocationServiceURL    string
+	GatewayServiceURL     string
+	NotificationServiceURL string
 }
 
 // AppConfig contains application-specific configuration
@@ -80,10 +82,12 @@ type JWTConfig struct {
 
 // APIKeyConfig contains API key authentication configuration
 type APIKeyConfig struct {
-	UserService     string
-	MatchService    string
-	RidesService    string
-	LocationService string
+	UserService         string
+	MatchService        string
+	RidesService        string
+	LocationService     string
+	GatewayService      string
+	NotificationService string
 }
 
 type PricingConfig struct {

@@ -21,7 +21,6 @@ CREATE TABLE IF NOT EXISTS drivers (
     vehicle_type character varying(50) NOT NULL,
     vehicle_plate character varying(20) NOT NULL,
     CONSTRAINT drivers_pkey PRIMARY KEY (user_id),
-    CONSTRAINT drivers_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Matches table
@@ -38,8 +37,6 @@ CREATE TABLE IF NOT EXISTS matches (
     passenger_confirmed boolean NOT NULL DEFAULT false,
     target_location point NULL,
     CONSTRAINT matches_pkey PRIMARY KEY (id),
-    CONSTRAINT matches_driver_id_fkey FOREIGN KEY (driver_id) REFERENCES users(id),
-    CONSTRAINT matches_passenger_id_fkey FOREIGN KEY (passenger_id) REFERENCES users(id)
 );
 
 -- Rides table
@@ -53,9 +50,6 @@ CREATE TABLE IF NOT EXISTS rides (
     created_at timestamp with time zone NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT rides_pkey PRIMARY KEY (ride_id),
-    CONSTRAINT rides_match_id_fkey FOREIGN KEY (match_id) REFERENCES matches(id),
-    CONSTRAINT rides_driver_id_fkey FOREIGN KEY (driver_id) REFERENCES users(id),
-    CONSTRAINT rides_passenger_id_fkey FOREIGN KEY (passenger_id) REFERENCES users(id),
     CONSTRAINT rides_match_id_unique UNIQUE (match_id)
 );
 
@@ -67,7 +61,6 @@ CREATE TABLE IF NOT EXISTS billing_ledger (
     cost integer NOT NULL,
     created_at timestamp with time zone NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT billing_ledger_pkey PRIMARY KEY (entry_id),
-    CONSTRAINT billing_ledger_ride_id_fkey FOREIGN KEY (ride_id) REFERENCES rides(ride_id),
     CONSTRAINT positive_distance CHECK (distance > 0),
     CONSTRAINT positive_cost CHECK (cost > 0)
 );
@@ -82,7 +75,6 @@ CREATE TABLE IF NOT EXISTS payments (
     created_at timestamp with time zone NULL DEFAULT CURRENT_TIMESTAMP,
     status character varying(20) NOT NULL DEFAULT 'PENDING'::character varying,
     CONSTRAINT payments_pkey PRIMARY KEY (payment_id),
-    CONSTRAINT payments_ride_id_fkey FOREIGN KEY (ride_id) REFERENCES rides(ride_id),
     CONSTRAINT payments_ride_id_key UNIQUE (ride_id),
     CONSTRAINT positive_adjusted_cost CHECK (adjusted_cost > 0),
     CONSTRAINT positive_admin_fee CHECK (admin_fee > 0),

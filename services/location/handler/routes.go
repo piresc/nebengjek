@@ -34,7 +34,7 @@ func NewHTTPHandler(
 // RegisterRoutes registers all HTTP routes
 func (h *HTTPHandler) RegisterRoutes(e *echo.Echo, Middleware *middleware.Middleware) {
 	// Internal routes for service-to-service communication (API key required)
-	internal := e.Group("/internal", Middleware.APIKeyHandler("match-service"))
+	internal := e.Group("/internal", Middleware.APIKeyHandler(h.cfg.APIKey.MatchService))
 
 	// Driver routes
 	internal.POST("/drivers/:id/available", h.locationHTTP.AddAvailableDriver)
@@ -46,6 +46,8 @@ func (h *HTTPHandler) RegisterRoutes(e *echo.Echo, Middleware *middleware.Middle
 	internal.POST("/passengers/:id/available", h.locationHTTP.AddAvailablePassenger)
 	internal.DELETE("/passengers/:id/available", h.locationHTTP.RemoveAvailablePassenger)
 	internal.GET("/passengers/:id/location", h.locationHTTP.GetPassengerLocation)
+
+	internal.POST("/locations/update", h.locationHTTP.UpdateLocation)
 }
 
 // InitNATSConsumers initializes all NATS consumers

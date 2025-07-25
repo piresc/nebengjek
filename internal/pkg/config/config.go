@@ -102,6 +102,8 @@ func loadConfigFromEnv() *models.Config {
 	configs.APIKey.MatchService = GetEnv("API_KEY_MATCH_SERVICE", "")
 	configs.APIKey.RidesService = GetEnv("API_KEY_RIDES_SERVICE", "")
 	configs.APIKey.LocationService = GetEnv("API_KEY_LOCATION_SERVICE", "")
+	configs.APIKey.GatewayService = GetEnv("API_KEY_GATEWAY_SERVICE", "")
+	configs.APIKey.NotificationService = GetEnv("API_KEY_NOTIFICATION_SERVICE", "")
 
 	// Logger config
 	configs.Logger.Level = GetEnv("LOG_LEVEL", "info")

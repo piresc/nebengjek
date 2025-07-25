@@ -16,19 +16,25 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/health"
 	slogpkg "github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/middleware"
-	"github.com/piresc/nebengjek/internal/pkg/nats"
 	nrpkg "github.com/piresc/nebengjek/internal/pkg/newrelic"
 	"github.com/piresc/nebengjek/internal/pkg/observability"
-	"github.com/piresc/nebengjek/services/users/gateway"
-	"github.com/piresc/nebengjek/services/users/handler"
-	httpHandler "github.com/piresc/nebengjek/services/users/handler/http"
-	"github.com/piresc/nebengjek/services/users/repository"
-	"github.com/piresc/nebengjek/services/users/usecase"
+	gatewaygateway "github.com/piresc/nebengjek/services/gateway/gateway"
+	"github.com/piresc/nebengjek/services/gateway/handler"
+	gatewaywebsocket "github.com/piresc/nebengjek/services/gateway/handler/websocket"
+	gatewayusecase "github.com/piresc/nebengjek/services/gateway/usecase"
+	userrepo "github.com/piresc/nebengjek/services/users/repository"
+	useruc "github.com/piresc/nebengjek/services/users/usecase"
+)
+
+var (
+	Version   = "development"
+	GitCommit = "unknown"
+	BuildTime = "unknown"
 )
 
 func main() {
-	appName := "users-service"
-	configPath := "/Users/pirescerullo/GitHub/assessment/nebengjek/config/users.env"
+	appName := "gateway-service"
+	configPath := "/Users/pirescerullo/GitHub/assessment/nebengjek/config/gateway.env"
 	configs := config.InitConfig(configPath)
 
 	// Initialize New Relic
@@ -49,17 +55,9 @@ func main() {
 	// Log startup
 	slogLogger.Info("Starting application",
 		slog.String("app", appName),
-		slog.String("version", configs.App.Version),
+		slog.String("version", Version),
 		slog.String("environment", configs.App.Environment),
 	)
-
-	// Initialize PostgreSQL database connection
-	postgresClient, err := database.NewPostgresClient(configs.Database)
-	if err != nil {
-		slogLogger.Error("Failed to connect to PostgreSQL", slog.Any("error", err))
-		os.Exit(1)
-	}
-	defer postgresClient.Close()
 
 	// Initialize Redis client
 	redisClient, err := database.NewRedisClient(configs.Redis)
@@ -69,65 +67,49 @@ func main() {
 	}
 	defer redisClient.Close()
 
-	// Initialize JetStream-enabled NATS client
-	natsClient, err := nats.NewClient(configs.NATS.URL)
-	if err != nil {
-		slogLogger.Error("Failed to connect to NATS with JetStream", slog.Any("error", err))
-		os.Exit(1)
-	}
-	defer natsClient.Close()
+	// Initialize repositories
+	userRepo := userrepo.NewUserRepo(configs, nil, redisClient)
 
-	// Verify JetStream is available
-	if !natsClient.IsConnected() {
-		slogLogger.Error("NATS JetStream client not connected")
-		os.Exit(1)
-	}
+	// Initialize gateways
+	gatewayGW := gatewaygateway.NewHTTPGateway(configs)
 
-	slogLogger.Info("JetStream client initialized successfully",
-		slog.String("url", configs.NATS.URL),
-		slog.Bool("connected", natsClient.IsConnected()))
-
-	// Initialize repository
-	userRepo := repository.NewUserRepo(configs, postgresClient.GetDB(), redisClient)
-
-	// Initialize gateway with
-	userGW := gateway.NewUserGW(natsClient, configs.Services.MatchServiceURL, configs.Services.RidesServiceURL, &configs.APIKey, tracer)
-
-	// Initialize usecase
-	userUC := usecase.NewUserUC(userRepo, userGW, configs)
+	// Initialize usecases
+	userUC := useruc.NewUserUC(userRepo, nil, configs)
+	gatewayUC := gatewayusecase.NewGatewayUC(userUC, gatewayGW)
 
 	// Initialize handlers
-	userHandler := httpHandler.NewUserHandler(userUC)
-	authHandler := httpHandler.NewAuthHandler(userUC)
+	wsHandler := gatewaywebsocket.NewEchoWebSocketHandler(gatewayUC, userUC)
+	gatewayHandler := handler.NewHandler(gatewayUC, configs, nrApp, wsHandler)
 
-	// Initialize handlers
-	Handler := handler.NewHandler(userHandler, authHandler, configs)
+	// Initialize NATS consumers
+	if err := gatewayHandler.InitNATSConsumers(); err != nil {
+		slogLogger.Error("Failed to initialize NATS consumers", slog.Any("error", err))
+		os.Exit(1)
+	}
 
 	// Initialize Echo server
 	e := echo.New()
 
 	// Initialize enhanced health service
 	healthService := health.NewHealthService(slogLogger)
-	healthService.AddChecker("postgres", health.NewPostgresHealthChecker(postgresClient))
 	healthService.AddChecker("redis", health.NewRedisHealthChecker(redisClient))
-	healthService.AddChecker("nats", health.NewNATSHealthChecker(natsClient))
 
 	// Initialize middleware
 	MW := middleware.NewMiddleware(configs, slogLogger, tracer)
 
 	// Register enhanced health endpoints BEFORE applying middleware
-	health.RegisterEnhancedHealthEndpoints(e, appName, configs.App.Version, healthService)
+	health.RegisterEnhancedHealthEndpoints(e, appName, Version, healthService)
 
-	// Register additional health endpoint for /health/users
+	// Register additional health endpoint for /health/gateway
 	healthGroup := e.Group("/health")
-	healthGroup.GET("/users", func(c echo.Context) error {
+	healthGroup.GET("/gateway", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]interface{}{"status": "ok"})
 	})
 
 	e.Use(MW.Handler())
 
 	// Register service routes
-	Handler.RegisterRoutes(e, MW)
+	gatewayHandler.RegisterRoutes(e, MW)
 
 	// Start server in goroutine
 	go func() {
@@ -160,19 +142,11 @@ func main() {
 		slogLogger.Error("Server forced to shutdown", slog.Any("error", err))
 	}
 
-	// Close PostgreSQL connection
-	slogLogger.Info("Closing PostgreSQL connection...")
-	postgresClient.Close()
-
 	// Close Redis connection
 	slogLogger.Info("Closing Redis connection...")
 	if err := redisClient.Close(); err != nil {
 		slogLogger.Error("Error closing Redis connection", slog.Any("error", err))
 	}
-
-	// Close NATS connection
-	slogLogger.Info("Closing NATS connection...")
-	natsClient.Close()
 
 	// Shutdown New Relic
 	if nrApp != nil {

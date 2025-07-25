@@ -1,4 +1,4 @@
-package websocket
+package gatewaywebsocket
 
 import (
 	"context"
@@ -7,27 +7,33 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/services/gateway"
 	"github.com/piresc/nebengjek/services/users"
 	"golang.org/x/net/websocket"
 )
 
 // EchoWebSocketHandler handles websocket connections using Echo's native support
 type EchoWebSocketHandler struct {
-	userUC  users.UserUC
-	clients map[string]*websocket.Conn
-	mu      sync.RWMutex
+	gatewayUC    gateway.GatewayUC
+	userUC       users.UserUC
+	clients      map[string]*websocket.Conn
+	lastActivity map[string]time.Time
+	mu           sync.RWMutex
 }
 
 // NewEchoWebSocketHandler creates a new Echo-based websocket handler
-func NewEchoWebSocketHandler(userUC users.UserUC) *EchoWebSocketHandler {
+func NewEchoWebSocketHandler(gatewayUC gateway.GatewayUC, userUC users.UserUC) *EchoWebSocketHandler {
 	return &EchoWebSocketHandler{
-		userUC:  userUC,
-		clients: make(map[string]*websocket.Conn),
+		gatewayUC:    gatewayUC,
+		userUC:       userUC,
+		clients:      make(map[string]*websocket.Conn),
+		lastActivity: make(map[string]time.Time),
 	}
 }
 
@@ -105,6 +111,7 @@ func (h *EchoWebSocketHandler) addClient(userID string, ws *websocket.Conn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.clients[userID] = ws
+	h.lastActivity[userID] = time.Now()
 }
 
 // removeClient safely removes a client from the manager
@@ -112,6 +119,32 @@ func (h *EchoWebSocketHandler) removeClient(userID string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	delete(h.clients, userID)
+	delete(h.lastActivity, userID)
+}
+
+// IsUserConnected checks if a user is currently connected
+func (h *EchoWebSocketHandler) IsUserConnected(userID string) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	_, exists := h.clients[userID]
+	return exists
+}
+
+// GetConnectedUsersCount returns the number of connected users
+func (h *EchoWebSocketHandler) GetConnectedUsersCount() int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return len(h.clients)
+}
+
+// GetUserLastActivity returns the last activity time for a user
+func (h *EchoWebSocketHandler) GetUserLastActivity(userID string) time.Time {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if lastActivity, exists := h.lastActivity[userID]; exists {
+		return lastActivity
+	}
+	return time.Time{}
 }
 
 // NotifyClient sends a notification to a specific client
@@ -232,7 +265,7 @@ func (h *EchoWebSocketHandler) handleBeaconUpdate(userID string, ws *websocket.C
 		return nil
 	}
 
-	if err := h.userUC.UpdateBeaconStatus(context.Background(), &req); err != nil {
+	if err := h.gatewayUC.UpdateBeaconStatus(context.Background(), &req); err != nil {
 		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 		return nil
 	}
@@ -254,7 +287,7 @@ func (h *EchoWebSocketHandler) handleFinderUpdate(userID string, ws *websocket.C
 		return nil
 	}
 
-	if err := h.userUC.UpdateFinderStatus(context.Background(), &req); err != nil {
+	if err := h.gatewayUC.UpdateFinderStatus(context.Background(), &req); err != nil {
 		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 		return nil
 	}
@@ -279,7 +312,7 @@ func (h *EchoWebSocketHandler) handleMatchConfirmation(userID string, ws *websoc
 	// Critical: Set UserID from client context
 	req.UserID = userID
 
-	result, err := h.userUC.ConfirmMatch(context.Background(), &req)
+	result, err := h.gatewayUC.ConfirmMatch(context.Background(), &req)
 	if err != nil {
 		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 		return nil
@@ -304,7 +337,7 @@ func (h *EchoWebSocketHandler) handleLocationUpdate(userID string, ws *websocket
 	// Critical: Add timestamp to location data (preserved business logic)
 	// This logic is handled inside the use case, but we ensure the call is made
 
-	if err := h.userUC.UpdateUserLocation(context.Background(), &req); err != nil {
+	if err := h.gatewayUC.UpdateUserLocation(context.Background(), &req); err != nil {
 		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 		return nil
 	}
@@ -321,7 +354,7 @@ func (h *EchoWebSocketHandler) handleRideStart(userID string, ws *websocket.Conn
 		return nil
 	}
 
-	resp, err := h.userUC.RideStart(context.Background(), &req)
+	resp, err := h.gatewayUC.RideStart(context.Background(), &req)
 	if err != nil {
 		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 		return nil
@@ -342,7 +375,7 @@ func (h *EchoWebSocketHandler) handleRideArrived(userID string, ws *websocket.Co
 		return nil
 	}
 
-	paymentReq, err := h.userUC.RideArrived(context.Background(), &req)
+	paymentReq, err := h.gatewayUC.RideArrived(context.Background(), &req)
 	if err != nil {
 		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 		return nil
@@ -369,7 +402,7 @@ func (h *EchoWebSocketHandler) handleProcessPayment(userID string, ws *websocket
 		return nil
 	}
 
-	payment, err := h.userUC.ProcessPayment(context.Background(), &req)
+	payment, err := h.gatewayUC.ProcessPayment(context.Background(), &req)
 	if err != nil {
 		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 		return nil

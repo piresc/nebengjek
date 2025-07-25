@@ -118,18 +118,7 @@ func main() {
 	healthService.AddChecker("nats", health.NewNATSHealthChecker(natsClient))
 
 	// Initialize middleware
-	MW := middleware.NewMiddleware(middleware.Config{
-		Logger: slogLogger,
-		Tracer: tracer,
-		APIKeys: map[string]string{
-			"user-service":     configs.APIKey.UserService,
-			"match-service":    configs.APIKey.MatchService,
-			"rides-service":    configs.APIKey.RidesService,
-			"location-service": configs.APIKey.LocationService,
-		},
-		ServiceName: appName,
-	})
-
+	MW := middleware.NewMiddleware(configs, slogLogger, tracer)
 	// Register enhanced health endpoints BEFORE applying middleware
 	health.RegisterEnhancedHealthEndpoints(e, appName, configs.App.Version, healthService)
 
