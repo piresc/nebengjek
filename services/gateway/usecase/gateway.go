@@ -24,13 +24,13 @@ func NewGatewayUC(userUC users.UserUC, gatewayGW gateway.GatewayGW) gateway.Gate
 	}
 }
 
-// UpdateBeaconStatus updates beacon status through match service
+// UpdateBeaconStatus updates beacon status through users service
 func (uc *GatewayUseCase) UpdateBeaconStatus(ctx context.Context, req *models.BeaconRequest) error {
-	// Call Match Service as beacon updates are match events
-	resp, err := uc.gatewayGW.CallMatchService(
+	// Call Users Service which will handle business logic and publish to NATS
+	resp, err := uc.gatewayGW.CallUsersService(
 		ctx,
 		"POST",
-		"/internal/matches/beacon",
+		"/beacon/update",
 		req,
 		nil,
 		nil,
@@ -41,19 +41,19 @@ func (uc *GatewayUseCase) UpdateBeaconStatus(ctx context.Context, req *models.Be
 	}
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("match service returned error: %s", string(resp.Body))
+		return fmt.Errorf("users service returned error: %s", string(resp.Body))
 	}
 
 	return nil
 }
 
-// UpdateFinderStatus updates finder status through match service
+// UpdateFinderStatus updates finder status through users service
 func (uc *GatewayUseCase) UpdateFinderStatus(ctx context.Context, req *models.FinderRequest) error {
-	// Call Match Service as finder updates are match events
-	resp, err := uc.gatewayGW.CallMatchService(
+	// Call Users Service which will handle business logic and publish to NATS
+	resp, err := uc.gatewayGW.CallUsersService(
 		ctx,
 		"POST",
-		"/internal/matches/finder",
+		"/finder/update",
 		req,
 		nil,
 		nil,
@@ -64,7 +64,7 @@ func (uc *GatewayUseCase) UpdateFinderStatus(ctx context.Context, req *models.Fi
 	}
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("match service returned error: %s", string(resp.Body))
+		return fmt.Errorf("users service returned error: %s", string(resp.Body))
 	}
 
 	return nil
@@ -76,7 +76,7 @@ func (uc *GatewayUseCase) ConfirmMatch(ctx context.Context, req *models.MatchCon
 	resp, err := uc.gatewayGW.CallMatchService(
 		ctx,
 		"POST",
-		"/internal/matches/confirm",
+		"/matches/confirm",
 		req,
 		map[string]string{"X-User-ID": req.UserID},
 		nil,
@@ -105,7 +105,7 @@ func (uc *GatewayUseCase) UpdateUserLocation(ctx context.Context, req *models.Lo
 	resp, err := uc.gatewayGW.CallLocationService(
 		ctx,
 		"POST",
-		"/internal/locations/update",
+		"/locations/update",
 		req,
 		nil,
 		nil,
@@ -128,7 +128,7 @@ func (uc *GatewayUseCase) RideStart(ctx context.Context, req *models.RideStartRe
 	resp, err := uc.gatewayGW.CallRidesService(
 		ctx,
 		"POST",
-		"/internal/rides/start",
+		"/rides/start",
 		req,
 		nil,
 		nil,
@@ -157,7 +157,7 @@ func (uc *GatewayUseCase) RideArrived(ctx context.Context, req *models.RideArriv
 	resp, err := uc.gatewayGW.CallRidesService(
 		ctx,
 		"POST",
-		"/internal/rides/arrived",
+		"/rides/arrived",
 		req,
 		nil,
 		nil,
@@ -186,7 +186,7 @@ func (uc *GatewayUseCase) ProcessPayment(ctx context.Context, req *models.Paymen
 	resp, err := uc.gatewayGW.CallRidesService(
 		ctx,
 		"POST",
-		"/internal/rides/payment",
+		"/rides/payment",
 		req,
 		nil,
 		nil,

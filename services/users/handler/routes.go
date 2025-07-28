@@ -46,4 +46,12 @@ func (h *Handler) RegisterRoutes(e *echo.Echo, mw *middleware.Middleware) {
 	driverGroup := internal.Group("/drivers")
 	driverGroup.POST("/register", h.userHandler.RegisterDriver)
 
+	// Finder routes (called by Gateway)
+	finderGroup := internal.Group("/finder")
+	finderGroup.POST("/update", h.userHandler.UpdateFinderStatus)
+
+	// Beacon routes (called by Gateway)
+	beaconGroup := internal.Group("/beacon")
+	beaconGroup.POST("/update", h.userHandler.UpdateBeaconStatus)
+
 }

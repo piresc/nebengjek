@@ -1,25 +1,22 @@
 package gateway
 
 import (
-	"log/slog"
-
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/database"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
-	"github.com/piresc/nebengjek/internal/pkg/observability"
 	"github.com/piresc/nebengjek/services/match"
 	gateway_nats "github.com/piresc/nebengjek/services/match/gateway/nats"
 )
 
 // MatchGW handles match gateway operations
 type MatchGW struct {
-	natsGateway *gateway_nats.NATSGateway
-	httpGateway *HTTPGateway
+	natsGateway  *gateway_nats.NATSGateway
+	redisGateway *RedisGateway
 }
 
-// NewMatchGW creates a new  gateway instance with NATS and HTTP clients with API key authentication
-func NewMatchGW(natsClient *natspkg.Client, locationServiceURL string, config *models.APIKeyConfig, tracer observability.Tracer, logger *slog.Logger) match.MatchGW {
+// NewMatchGW creates a new gateway instance with NATS and Redis clients
+func NewMatchGW(natsClient *natspkg.Client, redisClient *database.RedisClient) match.MatchGW {
 	return &MatchGW{
-		natsGateway: gateway_nats.NewNATSGateway(natsClient),
-		httpGateway: NewHTTPGateway(locationServiceURL, config, tracer, logger),
+		natsGateway:  gateway_nats.NewNATSGateway(natsClient),
+		redisGateway: NewRedisGateway(redisClient),
 	}
 }

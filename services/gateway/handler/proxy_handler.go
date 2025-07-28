@@ -49,7 +49,7 @@ func (h *ProxyHandler) proxyRequest(c echo.Context, targetService string) error 
 	// Get request details
 	method := c.Request().Method
 	path := c.Request().URL.Path
-	
+
 	// Clean path for internal routing
 	path = h.cleanPath(path, targetService)
 
@@ -110,13 +110,13 @@ func (h *ProxyHandler) proxyRequest(c echo.Context, targetService string) error 
 	}
 
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadGateway, "Failed to communicate with microservice")
+		return echo.NewHTTPError(http.StatusBadGateway,
+			fmt.Sprintf("Failed to communicate with %s: %v", targetService, err))
 	}
 
-	// Set response headers
 	for key, values := range resp.Headers {
-		if len(values) > 0 {
-			c.Response().Header().Set(key, values[0])
+		for _, value := range values {
+			c.Response().Header().Add(key, value)
 		}
 	}
 
@@ -124,18 +124,22 @@ func (h *ProxyHandler) proxyRequest(c echo.Context, targetService string) error 
 	return c.Blob(resp.StatusCode, "application/json", resp.Body)
 }
 
-// cleanPath removes service prefixes from the path and prepares for internal routing
+// at file scope, add:
+var servicePrefixes = map[string][]string{
+	"users-service":    {"/api/v1/users", "/users"},
+	"match-service":    {"/api/v1/match", "/match"},
+	"rides-service":    {"/api/v1/rides", "/rides"},
+	"location-service": {"/api/v1/location", "/location"},
+}
+
 func (h *ProxyHandler) cleanPath(path, service string) string {
-	// Remove common prefixes that might be added by routing
-	prefixes := []string{
-		"/api/v1/users",
-		"/api/v1/match",
-		"/api/v1/rides",
-		"/api/v1/location",
-		"/users",
-		"/match",
-		"/rides",
-		"/location",
+	// Get prefixes for the specific service
+	prefixes, ok := servicePrefixes[service]
+	if !ok {
+		// If service not found, try all prefixes
+		for _, servicePrefixes := range servicePrefixes {
+			prefixes = append(prefixes, servicePrefixes...)
+		}
 	}
 
 	for _, prefix := range prefixes {

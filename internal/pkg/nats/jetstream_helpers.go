@@ -208,7 +208,7 @@ func DefaultConsumerConfigs() map[string]ConsumerConfig {
 
 		"user_beacon_match": NewConsumerConfigBuilder("USER_STREAM", "user_beacon_match").
 			WithSubject("user.beacon").
-			WithDeliverPolicy(jetstream.DeliverAllPolicy).
+			WithDeliverPolicy(jetstream.DeliverNewPolicy).
 			WithAckPolicy(jetstream.AckExplicitPolicy).
 			WithMaxDeliver(3).
 			Build(),
@@ -223,7 +223,7 @@ func DefaultConsumerConfigs() map[string]ConsumerConfig {
 
 		"user_finder_match": NewConsumerConfigBuilder("USER_STREAM", "user_finder_match").
 			WithSubject("user.finder").
-			WithDeliverPolicy(jetstream.DeliverAllPolicy).
+			WithDeliverPolicy(jetstream.DeliverNewPolicy).
 			WithAckPolicy(jetstream.AckExplicitPolicy).
 			WithMaxDeliver(3).
 			Build(),

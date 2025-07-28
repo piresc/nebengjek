@@ -89,14 +89,14 @@ func main() {
 	// Initialize repositories
 	matchRepo := repository.NewMatchRepository(configs, postgresClient.GetDB(), redisClient)
 
-	// Initialize  gateway with tracer and logger
-	matchGW := gateway.NewMatchGW(natsClient, configs.Services.LocationServiceURL, &configs.APIKey, tracer, slogLogger)
+	// Initialize gateway with NATS and Redis clients
+	matchGW := gateway.NewMatchGW(natsClient, redisClient)
 
 	// Initialize usecase
 	matchUC := usecase.NewMatchUC(configs, matchRepo, matchGW)
 
 	// Initialize handlers
-	handler := handler.NewHandler(matchUC, natsClient, configs, nrApp)
+	handler := handler.NewHandler(matchUC, natsClient, configs)
 
 	// Initialize NATS consumers
 	if err := handler.InitNATSConsumers(); err != nil {
