@@ -192,6 +192,15 @@ func DefaultStreamConfigs() []StreamConfig {
 			WithMaxBytes(100 * 1024 * 1024).
 			WithMaxMsgs(1000000).
 			Build(),
+
+		NewStreamConfigBuilder("NOTIFICATION_STREAM").
+			WithSubjects("NOTIFICATION.deliver").
+			WithRetention(jetstream.LimitsPolicy).
+			WithStorage(jetstream.FileStorage).
+			WithMaxAge(24 * time.Hour).
+			WithMaxBytes(50 * 1024 * 1024).
+			WithMaxMsgs(500000).
+			Build(),
 	}
 }
 
@@ -223,7 +232,7 @@ func DefaultConsumerConfigs() map[string]ConsumerConfig {
 
 		"user_finder_match": NewConsumerConfigBuilder("USER_STREAM", "user_finder_match").
 			WithSubject("user.finder").
-			WithDeliverPolicy(jetstream.DeliverNewPolicy).
+			WithDeliverPolicy(jetstream.DeliverAllPolicy).
 			WithAckPolicy(jetstream.AckExplicitPolicy).
 			WithMaxDeliver(3).
 			Build(),
@@ -326,6 +335,8 @@ func GetStreamForSubject(subject string) string {
 		return "RIDE_STREAM"
 	case subject == "location.update" || subject == "location.aggregate":
 		return "LOCATION_STREAM"
+	case subject == "NOTIFICATION.deliver":
+		return "NOTIFICATION_STREAM"
 	default:
 		return ""
 	}

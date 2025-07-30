@@ -46,6 +46,8 @@ func (r *MatchRepo) checkExistingPendingMatch(ctx context.Context, driverID, pas
 			(driver_location[1])::float8 as driver_latitude,
 			(passenger_location[0])::float8 as passenger_longitude,
 			(passenger_location[1])::float8 as passenger_latitude,
+			(target_location[0])::float8 as target_longitude,
+			(target_location[1])::float8 as target_latitude,
 			status, driver_confirmed, passenger_confirmed,
 			created_at, updated_at
 		FROM matches
@@ -57,6 +59,7 @@ func (r *MatchRepo) checkExistingPendingMatch(ctx context.Context, driverID, pas
 		&dto.ID, &dto.DriverID, &dto.PassengerID,
 		&dto.DriverLongitude, &dto.DriverLatitude,
 		&dto.PassengerLongitude, &dto.PassengerLatitude,
+		&dto.TargetLongitude, &dto.TargetLatitude,
 		&dto.Status, &dto.DriverConfirmed, &dto.PassengerConfirmed,
 		&dto.CreatedAt, &dto.UpdatedAt,
 	)

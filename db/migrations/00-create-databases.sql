@@ -81,3 +81,17 @@ CREATE TABLE IF NOT EXISTS payments (
     CONSTRAINT positive_driver_payout CHECK (driver_payout > 0),
     CONSTRAINT check_payment_status CHECK (status IN ('PENDING', 'ACCEPTED', 'REJECTED', 'PROCESSED'))
 );
+
+-- Notification service table for notification history
+CREATE TABLE IF NOT EXISTS notification_history (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL,
+    type character varying(100) NOT NULL,
+    data jsonb NOT NULL,
+    timestamp timestamp with time zone NOT NULL,
+    delivered boolean NOT NULL DEFAULT false,
+    created_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT notification_history_pkey PRIMARY KEY (id),
+    CONSTRAINT notification_history_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);

@@ -16,3 +16,9 @@ CREATE INDEX idx_billing_ledger_ride_id ON billing_ledger(ride_id);
 
 -- Payments table indexes
 CREATE INDEX idx_payments_ride_id ON payments(ride_id);
+
+-- Notification history indexes for efficient querying
+CREATE INDEX idx_notification_history_user_id ON notification_history(user_id);
+CREATE INDEX idx_notification_history_type ON notification_history(type);
+CREATE INDEX idx_notification_history_timestamp ON notification_history(timestamp);
+CREATE INDEX idx_notification_history_delivered ON notification_history(delivered);

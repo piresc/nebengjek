@@ -19,24 +19,16 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/nats"
 	nrpkg "github.com/piresc/nebengjek/internal/pkg/newrelic"
 	"github.com/piresc/nebengjek/internal/pkg/observability"
-	gatewaygateway "github.com/piresc/nebengjek/services/gateway/gateway"
-	"github.com/piresc/nebengjek/services/gateway/handler"
-	gatewaynats "github.com/piresc/nebengjek/services/gateway/handler/nats"
-	gatewaywebsocket "github.com/piresc/nebengjek/services/gateway/handler/websocket"
-	gatewayusecase "github.com/piresc/nebengjek/services/gateway/usecase"
-	userrepo "github.com/piresc/nebengjek/services/users/repository"
-	useruc "github.com/piresc/nebengjek/services/users/usecase"
-)
-
-var (
-	Version   = "development"
-	GitCommit = "unknown"
-	BuildTime = "unknown"
+	"github.com/piresc/nebengjek/services/notification/handler"
+	httpHandler "github.com/piresc/nebengjek/services/notification/handler/http"
+	natsHandler "github.com/piresc/nebengjek/services/notification/handler/nats"
+	"github.com/piresc/nebengjek/services/notification/repository"
+	"github.com/piresc/nebengjek/services/notification/usecase"
 )
 
 func main() {
-	appName := "gateway-service"
-	configPath := "/Users/pirescerullo/GitHub/assessment/nebengjek/config/gateway.env"
+	appName := "notification-service"
+	configPath := "/Users/pirescerullo/GitHub/assessment/nebengjek/config/notification.env"
 	configs := config.InitConfig(configPath)
 
 	// Initialize New Relic
@@ -57,19 +49,19 @@ func main() {
 	// Log startup
 	slogLogger.Info("Starting application",
 		slog.String("app", appName),
-		slog.String("version", Version),
+		slog.String("version", configs.App.Version),
 		slog.String("environment", configs.App.Environment),
 	)
 
-	// Initialize Redis client
-	redisClient, err := database.NewRedisClient(configs.Redis)
+	// Initialize PostgreSQL database connection
+	postgresClient, err := database.NewPostgresClient(configs.Database)
 	if err != nil {
-		slogLogger.Error("Failed to connect to Redis", slog.Any("error", err))
+		slogLogger.Error("Failed to connect to PostgreSQL", slog.Any("error", err))
 		os.Exit(1)
 	}
-	defer redisClient.Close()
+	defer postgresClient.Close()
 
-	// Initialize JetStream-enabled NATS client for notification consumption
+	// Initialize JetStream-enabled NATS client
 	natsClient, err := nats.NewClient(configs.NATS.URL)
 	if err != nil {
 		slogLogger.Error("Failed to connect to NATS with JetStream", slog.Any("error", err))
@@ -87,61 +79,50 @@ func main() {
 		slog.String("url", configs.NATS.URL),
 		slog.Bool("connected", natsClient.IsConnected()))
 
-	// Initialize repositories
-	userRepo := userrepo.NewUserRepo(configs, nil, redisClient)
+	// Initialize repository
+	notificationRepo := repository.NewNotificationRepo(postgresClient.GetDB())
 
-	// Initialize gateways
-	gatewayGW := gatewaygateway.NewHTTPGateway(configs)
+	// Initialize usecase
+	notificationUC := usecase.NewNotificationUC(notificationRepo, natsClient, slogLogger)
 
-	// Initialize usecases
-	userUC := useruc.NewUserUC(userRepo, nil, configs)
-	gatewayUC := gatewayusecase.NewGatewayUC(userUC, gatewayGW)
+	// Initialize HTTP handler
+	notificationHTTPHandler := httpHandler.NewNotificationHandler(notificationUC)
 
-	// Initialize handlers
-	wsHandler := gatewaywebsocket.NewEchoWebSocketHandler(gatewayUC, userUC)
-	gatewayHandler := handler.NewHandler(gatewayUC, configs, nrApp, wsHandler)
+	// Initialize NATS handler for consuming events
+	notificationNATSHandler := natsHandler.NewNotificationHandler(notificationUC, natsClient, slogLogger)
 
-	// Initialize notification handler for consuming notification delivery events
-	notificationHandler := gatewaynats.NewGatewayNotificationHandler(natsClient, wsHandler, slogLogger)
-
-	// Initialize NATS consumers for notifications
-	slogLogger.Info("Initializing NATS consumers for gateway...")
-	if err := notificationHandler.InitNotificationConsumer(); err != nil {
-		slogLogger.Error("Failed to initialize notification NATS consumer", slog.Any("error", err))
-		os.Exit(1)
-	}
-	slogLogger.Info("NATS notification consumer initialized successfully")
-
-	// Initialize other NATS consumers
-	if err := gatewayHandler.InitNATSConsumers(); err != nil {
+	// Start NATS consumers
+	slogLogger.Info("Initializing NATS consumers for notification service...")
+	if err := notificationNATSHandler.InitNATSConsumers(); err != nil {
 		slogLogger.Error("Failed to initialize NATS consumers", slog.Any("error", err))
 		os.Exit(1)
 	}
+	slogLogger.Info("NATS consumers initialized successfully")
 
 	// Initialize Echo server
 	e := echo.New()
 
 	// Initialize enhanced health service
 	healthService := health.NewHealthService(slogLogger)
-	healthService.AddChecker("redis", health.NewRedisHealthChecker(redisClient))
+	healthService.AddChecker("postgres", health.NewPostgresHealthChecker(postgresClient))
 	healthService.AddChecker("nats", health.NewNATSHealthChecker(natsClient))
 
 	// Initialize middleware
 	MW := middleware.NewMiddleware(configs, slogLogger, tracer)
 
 	// Register enhanced health endpoints BEFORE applying middleware
-	health.RegisterEnhancedHealthEndpoints(e, appName, Version, healthService)
+	health.RegisterEnhancedHealthEndpoints(e, appName, configs.App.Version, healthService)
 
-	// Register additional health endpoint for /health/gateway
+	// Register additional health endpoint for /health/notification
 	healthGroup := e.Group("/health")
-	healthGroup.GET("/gateway", func(c echo.Context) error {
+	healthGroup.GET("/notification", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]interface{}{"status": "ok"})
 	})
 
 	e.Use(MW.Handler())
 
 	// Register service routes
-	gatewayHandler.RegisterRoutes(e, MW)
+	handler.RegisterRoutes(e, notificationHTTPHandler)
 
 	// Start server in goroutine
 	go func() {
@@ -174,11 +155,9 @@ func main() {
 		slogLogger.Error("Server forced to shutdown", slog.Any("error", err))
 	}
 
-	// Close Redis connection
-	slogLogger.Info("Closing Redis connection...")
-	if err := redisClient.Close(); err != nil {
-		slogLogger.Error("Error closing Redis connection", slog.Any("error", err))
-	}
+	// Close PostgreSQL connection
+	slogLogger.Info("Closing PostgreSQL connection...")
+	postgresClient.Close()
 
 	// Close NATS connection
 	slogLogger.Info("Closing NATS connection...")

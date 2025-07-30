@@ -28,6 +28,14 @@ func (uc *UserUC) UpdateFinderStatus(ctx context.Context, finderReq *models.Find
 		return nil // Skip duplicate event
 	}
 
+	// Debug logging to check target location data
+	logger.InfoCtx(ctx, "Processing finder update with target location",
+		logger.String("user_id", user.ID.String()),
+		logger.Bool("is_active", finderReq.IsActive),
+		logger.Float64("target_lat", finderReq.TargetLocation.Latitude),
+		logger.Float64("target_lon", finderReq.TargetLocation.Longitude),
+		logger.String("target_timestamp", finderReq.TargetLocation.Timestamp.String()))
+
 	// Create and publish finder event
 	finderEvent := &models.FinderEvent{
 		UserID:         user.ID.String(),

@@ -52,6 +52,22 @@ func (uc *MatchUC) createMatchesWithNearbyDrivers(ctx context.Context, passenger
 
 // buildMatch constructs a match object with the provided data
 func (uc *MatchUC) buildMatch(driverID, passengerID string, driverLocation, passengerLocation, targetLocation *models.Location) *models.Match {
+	logger.Info("Building match with locations",
+		logger.String("driver_id", driverID),
+		logger.String("passenger_id", passengerID),
+		logger.Float64("driver_lat", driverLocation.Latitude),
+		logger.Float64("driver_lon", driverLocation.Longitude),
+		logger.Float64("passenger_lat", passengerLocation.Latitude),
+		logger.Float64("passenger_lon", passengerLocation.Longitude))
+
+	if targetLocation != nil {
+		logger.Info("Target location provided",
+			logger.Float64("target_lat", targetLocation.Latitude),
+			logger.Float64("target_lon", targetLocation.Longitude))
+	} else {
+		logger.Warn("Target location is nil")
+	}
+
 	match := &models.Match{
 		DriverID:          converter.StrToUUID(driverID),
 		PassengerID:       converter.StrToUUID(passengerID),
@@ -64,6 +80,9 @@ func (uc *MatchUC) buildMatch(driverID, passengerID string, driverLocation, pass
 
 	if targetLocation != nil {
 		match.TargetLocation = *targetLocation
+		logger.Info("Match created with target location",
+			logger.Float64("match_target_lat", match.TargetLocation.Latitude),
+			logger.Float64("match_target_lon", match.TargetLocation.Longitude))
 	}
 
 	return match
@@ -140,6 +159,14 @@ func (uc *MatchUC) HandleFinderEvent(ctx context.Context, event models.FinderEve
 		Longitude: event.TargetLocation.Longitude,
 	}
 
+	logger.InfoCtx(ctx, "Processing finder event with target location",
+		logger.String("user_id", event.UserID),
+		logger.Bool("is_active", event.IsActive),
+		logger.Float64("event_target_lat", event.TargetLocation.Latitude),
+		logger.Float64("event_target_lon", event.TargetLocation.Longitude),
+		logger.Float64("processed_target_lat", targetLocation.Latitude),
+		logger.Float64("processed_target_lon", targetLocation.Longitude))
+
 	if event.IsActive {
 		// Check if passenger has an active ride before adding to pool
 		hasActiveRide, err := uc.HasActiveRide(ctx, event.UserID, false) // false = isPassenger
@@ -181,7 +208,13 @@ func (uc *MatchUC) CreateMatch(ctx context.Context, match *models.Match) error {
 
 // buildMatchProposal creates a match proposal from a match object
 func (uc *MatchUC) buildMatchProposal(match *models.Match) models.MatchProposal {
-	return models.MatchProposal{
+	logger.Info("Building match proposal",
+		logger.String("match_id", match.ID.String()),
+		logger.Float64("match_target_lat", match.TargetLocation.Latitude),
+		logger.Float64("match_target_lon", match.TargetLocation.Longitude),
+		logger.String("match_target_timestamp", match.TargetLocation.Timestamp.String()))
+
+	proposal := models.MatchProposal{
 		ID:             match.ID.String(),
 		PassengerID:    converter.UUIDToStr(match.PassengerID),
 		DriverID:       converter.UUIDToStr(match.DriverID),
@@ -190,6 +223,13 @@ func (uc *MatchUC) buildMatchProposal(match *models.Match) models.MatchProposal 
 		TargetLocation: match.TargetLocation,
 		MatchStatus:    match.Status,
 	}
+
+	logger.Info("Match proposal created",
+		logger.Float64("proposal_target_lat", proposal.TargetLocation.Latitude),
+		logger.Float64("proposal_target_lon", proposal.TargetLocation.Longitude),
+		logger.String("proposal_target_timestamp", proposal.TargetLocation.Timestamp.String()))
+
+	return proposal
 }
 
 // updateMatchConfirmation updates match confirmation status based on user type

@@ -154,6 +154,35 @@ services:
       retries: 3
       start_period: 30s
 
+  # Notification Service
+  notification-service:
+    image: ${DOCKER_USERNAME:-piresc16}/nebengjek-notification:latest
+    container_name: nebengjek-notification-service
+    ports:
+      - "9991:9991"
+    environment:
+      - VERSION=${VERSION:-latest}
+      - GIT_COMMIT=${GIT_COMMIT:-unknown}
+      - BUILD_TIME=${BUILD_TIME:-unknown}
+    env_file:
+      - ./config/notification.env
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    networks:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9991/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
   # PostgreSQL - Main Database
   postgres:
     image: postgres:14-alpine

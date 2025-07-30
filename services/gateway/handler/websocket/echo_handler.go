@@ -154,6 +154,9 @@ func (h *EchoWebSocketHandler) NotifyClient(userID string, event string, data in
 	h.mu.RUnlock()
 
 	if !exists {
+		logger.Warn("Client not connected for notification delivery",
+			logger.String("user_id", userID),
+			logger.String("event", event))
 		return
 	}
 
@@ -176,6 +179,10 @@ func (h *EchoWebSocketHandler) NotifyClient(userID string, event string, data in
 			logger.String("user_id", userID),
 			logger.String("event", event),
 			logger.ErrorField(err))
+	} else {
+		logger.Info("WebSocket message sent successfully",
+			logger.String("user_id", userID),
+			logger.String("event", event))
 	}
 }
 

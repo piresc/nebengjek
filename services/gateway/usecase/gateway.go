@@ -76,7 +76,7 @@ func (uc *GatewayUseCase) ConfirmMatch(ctx context.Context, req *models.MatchCon
 	resp, err := uc.gatewayGW.CallMatchService(
 		ctx,
 		"POST",
-		"/matches/confirm",
+		fmt.Sprintf("/matches/%s/confirm", req.ID),
 		req,
 		map[string]string{"X-User-ID": req.UserID},
 		nil,
