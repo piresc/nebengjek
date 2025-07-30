@@ -127,6 +127,46 @@ func (uc *NotificationUC) ProcessMatchRejected(ctx context.Context, eventData []
 	return uc.processAndStoreNotification(ctx, passengerNotification)
 }
 
+// ProcessRidePickup processes ride pickup events (ride.pickup subject)
+func (uc *NotificationUC) ProcessRidePickup(ctx context.Context, eventData []byte) error {
+	var rideResp models.RideResp
+	if err := json.Unmarshal(eventData, &rideResp); err != nil {
+		return fmt.Errorf("failed to unmarshal ride pickup data: %w", err)
+	}
+
+	// Convert string IDs to UUIDs for notification processing
+	driverID, err := uuid.Parse(rideResp.DriverID)
+	if err != nil {
+		return fmt.Errorf("failed to parse driver ID: %w", err)
+	}
+	
+	passengerID, err := uuid.Parse(rideResp.PassengerID)
+	if err != nil {
+		return fmt.Errorf("failed to parse passenger ID: %w", err)
+	}
+
+	// Create notifications for both driver and passenger with ride_started type
+	driverNotification := &models.UserNotification{
+		UserID:    driverID,
+		Type:      models.NotificationTypeRideStarted,
+		Data:      rideResp,
+		Timestamp: time.Now(),
+	}
+
+	passengerNotification := &models.UserNotification{
+		UserID:    passengerID,
+		Type:      models.NotificationTypeRideStarted,
+		Data:      rideResp,
+		Timestamp: time.Now(),
+	}
+
+	if err := uc.processAndStoreNotification(ctx, driverNotification); err != nil {
+		return err
+	}
+
+	return uc.processAndStoreNotification(ctx, passengerNotification)
+}
+
 // ProcessRideStarted processes ride started events
 func (uc *NotificationUC) ProcessRideStarted(ctx context.Context, eventData []byte) error {
 	var rideData models.Ride
@@ -174,25 +214,25 @@ func (uc *NotificationUC) ProcessRidePickupArrived(ctx context.Context, eventDat
 	return uc.processAndStoreNotification(ctx, notification)
 }
 
-// ProcessRideCompleted processes ride completed events
+// ProcessRideCompleted processes ride completed events (sends payment_processed notifications)
 func (uc *NotificationUC) ProcessRideCompleted(ctx context.Context, eventData []byte) error {
-	var rideData models.Ride
-	if err := json.Unmarshal(eventData, &rideData); err != nil {
+	var rideCompleteData models.RideComplete
+	if err := json.Unmarshal(eventData, &rideCompleteData); err != nil {
 		return fmt.Errorf("failed to unmarshal ride completed data: %w", err)
 	}
 
-	// Create notifications for both driver and passenger
+	// Create payment_processed notifications for both driver and passenger
 	driverNotification := &models.UserNotification{
-		UserID:    rideData.DriverID,
-		Type:      models.NotificationTypeRideCompleted,
-		Data:      rideData,
+		UserID:    rideCompleteData.Ride.DriverID,
+		Type:      models.NotificationTypePaymentProcessed,
+		Data:      rideCompleteData,
 		Timestamp: time.Now(),
 	}
 
 	passengerNotification := &models.UserNotification{
-		UserID:    rideData.PassengerID,
-		Type:      models.NotificationTypeRideCompleted,
-		Data:      rideData,
+		UserID:    rideCompleteData.Ride.PassengerID,
+		Type:      models.NotificationTypePaymentProcessed,
+		Data:      rideCompleteData,
 		Timestamp: time.Now(),
 	}
 

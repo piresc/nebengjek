@@ -14,6 +14,7 @@ type NotificationUC interface {
 	ProcessMatchProposal(ctx context.Context, eventData []byte) error
 	ProcessMatchAccepted(ctx context.Context, eventData []byte) error
 	ProcessMatchRejected(ctx context.Context, eventData []byte) error
+	ProcessRidePickup(ctx context.Context, eventData []byte) error
 	ProcessRideStarted(ctx context.Context, eventData []byte) error
 	ProcessRidePickupArrived(ctx context.Context, eventData []byte) error
 	ProcessRideCompleted(ctx context.Context, eventData []byte) error

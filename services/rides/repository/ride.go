@@ -195,7 +195,7 @@ func (r *RideRepo) CompleteRide(ctx context.Context, ride *models.Ride) error {
 // GetBillingLedgerSum gets the sum of all costs in the billing ledger for a ride
 func (r *RideRepo) GetBillingLedgerSum(ctx context.Context, rideID string) (int, error) {
 	query := `
-		SELECT SUM(cost) 
+		SELECT COALESCE(SUM(cost), 0)
 		FROM billing_ledger 
 		WHERE ride_id = $1
 	`

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -186,6 +187,47 @@ func (h *EchoWebSocketHandler) NotifyClient(userID string, event string, data in
 	}
 }
 
+// NotifyClientWithError sends a notification to a specific client and returns an error if delivery fails
+func (h *EchoWebSocketHandler) NotifyClientWithError(userID string, event string, data interface{}) error {
+	h.mu.RLock()
+	ws, exists := h.clients[userID]
+	h.mu.RUnlock()
+
+	if !exists {
+		logger.Warn("Client not connected for notification delivery",
+			logger.String("user_id", userID),
+			logger.String("event", event))
+		return fmt.Errorf("client %s not connected", userID)
+	}
+
+	rawData, err := json.Marshal(data)
+	if err != nil {
+		logger.Error("Error marshaling notification data",
+			logger.String("user_id", userID),
+			logger.String("event", event),
+			logger.ErrorField(err))
+		return fmt.Errorf("failed to marshal notification data: %w", err)
+	}
+
+	response := models.WSMessage{
+		Event: event,
+		Data:  rawData,
+	}
+
+	if err := websocket.JSON.Send(ws, response); err != nil {
+		logger.Warn("Error sending message to client",
+			logger.String("user_id", userID),
+			logger.String("event", event),
+			logger.ErrorField(err))
+		return fmt.Errorf("failed to send WebSocket message: %w", err)
+	}
+
+	logger.Info("WebSocket message sent successfully",
+		logger.String("user_id", userID),
+		logger.String("event", event))
+	return nil
+}
+
 // sendError sends an error message to the client
 func (h *EchoWebSocketHandler) sendError(ws *websocket.Conn, userID string, err error, code string, severity constants.ErrorSeverity) {
 	// Always log detailed error server-side
@@ -208,13 +250,21 @@ func (h *EchoWebSocketHandler) sendError(ws *websocket.Conn, userID string, err 
 			logger.Err(err))
 		message = "Access denied"
 	default: // ErrorSeverityServer
-		// Generic message for server errors
-		message = "Operation failed"
+		// Extract clean error message from service responses
+		message = h.extractCleanErrorMessage(err.Error())
 	}
 
+	// Create properly formatted error response
+	errorData := map[string]string{
+		"code":     code,
+		"message":  message,
+		"severity": h.getSeverityString(severity),
+	}
+
+	errorDataBytes, _ := json.Marshal(errorData)
 	errorResponse := models.WSMessage{
 		Event: constants.EventError,
-		Data:  json.RawMessage(fmt.Sprintf(`{"code":"%s","message":"%s"}`, code, message)),
+		Data:  json.RawMessage(errorDataBytes),
 	}
 
 	if err := websocket.JSON.Send(ws, errorResponse); err != nil {
@@ -236,6 +286,31 @@ func (h *EchoWebSocketHandler) getSeverityString(severity constants.ErrorSeverit
 	default:
 		return "unknown"
 	}
+}
+
+// extractCleanErrorMessage extracts clean error message from service responses
+func (h *EchoWebSocketHandler) extractCleanErrorMessage(errorStr string) string {
+	// Handle service error responses like: 'rides service returned error: {"success":false,"error":"actual message","code":500}'
+	if strings.Contains(errorStr, "service returned error:") {
+		// Try to extract JSON part
+		jsonStart := strings.Index(errorStr, "{")
+		if jsonStart > 0 {
+			jsonPart := errorStr[jsonStart:]
+			// Remove trailing newline
+			jsonPart = strings.TrimSpace(jsonPart)
+
+			// Try to parse JSON and extract error field
+			var errorResponse struct {
+				Error string `json:"error"`
+			}
+			if err := json.Unmarshal([]byte(jsonPart), &errorResponse); err == nil && errorResponse.Error != "" {
+				return errorResponse.Error
+			}
+		}
+	}
+
+	// Fallback to original error message
+	return errorStr
 }
 
 // handleMessage processes incoming WebSocket messages with preserved business logic
@@ -272,15 +347,36 @@ func (h *EchoWebSocketHandler) handleBeaconUpdate(userID string, ws *websocket.C
 		return nil
 	}
 
-	if err := h.gatewayUC.UpdateBeaconStatus(context.Background(), &req); err != nil {
+	// Use ProxyToUsersService directly to get the actual response from the microservice
+	resp, err := h.gatewayUC.ProxyToUsersService(
+		context.Background(),
+		"POST",
+		"/beacon/update",
+		req,
+		nil,
+		nil,
+	)
+	if err != nil {
 		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 		return nil
 	}
 
-	// Send success response with same event type
+	if resp.StatusCode >= 400 {
+		h.sendError(ws, userID, fmt.Errorf("users service returned error: %s", string(resp.Body)), constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+		return nil
+	}
+
+	// Send success response with proper API response format
+	successData := map[string]interface{}{
+		"success": true,
+		"message": "Beacon status updated successfully",
+		"status":  resp.StatusCode,
+	}
+	
+	successDataBytes, _ := json.Marshal(successData)
 	response := models.WSMessage{
 		Event: constants.EventBeaconUpdate,
-		Data:  data, // Echo back the same data
+		Data:  json.RawMessage(successDataBytes),
 	}
 
 	return websocket.JSON.Send(ws, response)
@@ -294,15 +390,36 @@ func (h *EchoWebSocketHandler) handleFinderUpdate(userID string, ws *websocket.C
 		return nil
 	}
 
-	if err := h.gatewayUC.UpdateFinderStatus(context.Background(), &req); err != nil {
+	// Use ProxyToUsersService directly to get the actual response from the microservice
+	resp, err := h.gatewayUC.ProxyToUsersService(
+		context.Background(),
+		"POST",
+		"/finder/update",
+		req,
+		nil,
+		nil,
+	)
+	if err != nil {
 		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 		return nil
 	}
 
-	// Send success response with same event type
+	if resp.StatusCode >= 400 {
+		h.sendError(ws, userID, fmt.Errorf("users service returned error: %s", string(resp.Body)), constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+		return nil
+	}
+
+	// Send success response with proper API response format
+	successData := map[string]interface{}{
+		"success": true,
+		"message": "Finder status updated successfully",
+		"status":  resp.StatusCode,
+	}
+	
+	successDataBytes, _ := json.Marshal(successData)
 	response := models.WSMessage{
 		Event: constants.EventFinderUpdate,
-		Data:  data, // Echo back the same data
+		Data:  json.RawMessage(successDataBytes),
 	}
 
 	return websocket.JSON.Send(ws, response)
@@ -329,7 +446,20 @@ func (h *EchoWebSocketHandler) handleMatchConfirmation(userID string, ws *websoc
 	h.NotifyClient(result.DriverID, constants.EventMatchConfirm, result)
 	h.NotifyClient(result.PassengerID, constants.EventMatchConfirm, result)
 
-	return nil
+	// Send success response to the requesting client
+	successData := map[string]interface{}{
+		"success": true,
+		"message": "Match confirmation processed successfully",
+		"match_id": result.ID,
+	}
+	
+	successDataBytes, _ := json.Marshal(successData)
+	response := models.WSMessage{
+		Event: constants.EventMatchConfirm,
+		Data:  json.RawMessage(successDataBytes),
+	}
+
+	return websocket.JSON.Send(ws, response)
 }
 
 // handleLocationUpdate processes location updates with timestamp addition
@@ -349,8 +479,20 @@ func (h *EchoWebSocketHandler) handleLocationUpdate(userID string, ws *websocket
 		return nil
 	}
 
-	// No response message sent back for location updates
-	return nil
+	// Send success response for location update
+	successData := map[string]interface{}{
+		"success": true,
+		"message": "Location updated successfully",
+		"created_at": req.CreatedAt,
+	}
+	
+	successDataBytes, _ := json.Marshal(successData)
+	response := models.WSMessage{
+		Event: constants.EventLocationUpdate,
+		Data:  json.RawMessage(successDataBytes),
+	}
+
+	return websocket.JSON.Send(ws, response)
 }
 
 // handleRideStart processes ride start with dual notification
@@ -371,7 +513,20 @@ func (h *EchoWebSocketHandler) handleRideStart(userID string, ws *websocket.Conn
 	h.NotifyClient(resp.DriverID.String(), constants.EventRideStarted, resp)
 	h.NotifyClient(resp.PassengerID.String(), constants.EventRideStarted, resp)
 
-	return nil
+	// Send success response to the requesting client
+	successData := map[string]interface{}{
+		"success": true,
+		"message": "Ride started successfully",
+		"ride_id": resp.RideID,
+	}
+	
+	successDataBytes, _ := json.Marshal(successData)
+	response := models.WSMessage{
+		Event: constants.EventRideStarted,
+		Data:  json.RawMessage(successDataBytes),
+	}
+
+	return websocket.JSON.Send(ws, response)
 }
 
 // handleRideArrived processes ride arrival with event type transformation
@@ -388,10 +543,31 @@ func (h *EchoWebSocketHandler) handleRideArrived(userID string, ws *websocket.Co
 		return nil
 	}
 
-	// Critical: Event type transformation (arrival → payment request)
+	// First: Send ride_arrived notification to BOTH driver and passenger
+	rideArrivedData := map[string]interface{}{
+		"ride_id":           req.RideID,
+		"adjustment_factor": req.AdjustmentFactor,
+	}
+	h.NotifyClient(paymentReq.PassengerID, constants.EventRideArrived, rideArrivedData)
+	h.NotifyClient(paymentReq.DriverID, constants.EventRideArrived, rideArrivedData)
+
+	// Then: Send payment request to passenger only (payment is passenger's responsibility)
 	h.NotifyClient(paymentReq.PassengerID, constants.EventPaymentRequest, paymentReq)
 
-	return nil
+	// Send success response to the requesting client
+	successData := map[string]interface{}{
+		"success": true,
+		"message": "Ride arrival processed successfully",
+		"ride_id": req.RideID,
+	}
+	
+	successDataBytes, _ := json.Marshal(successData)
+	response := models.WSMessage{
+		Event: constants.EventRideArrived,
+		Data:  json.RawMessage(successDataBytes),
+	}
+
+	return websocket.JSON.Send(ws, response)
 }
 
 // handleProcessPayment processes payment with status validation
@@ -409,18 +585,26 @@ func (h *EchoWebSocketHandler) handleProcessPayment(userID string, ws *websocket
 		return nil
 	}
 
-	payment, err := h.gatewayUC.ProcessPayment(context.Background(), &req)
+	_, err := h.gatewayUC.ProcessPayment(context.Background(), &req)
 	if err != nil {
 		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 		return nil
 	}
 
-	// Send response with EventPaymentProcessed
-	paymentData, _ := json.Marshal(payment)
+	// Send success response to the requesting client
+	successData := map[string]interface{}{
+		"success": true,
+		"message": "Payment processed successfully",
+		"status": req.Status,
+	}
+	
+	successDataBytes, _ := json.Marshal(successData)
 	response := models.WSMessage{
 		Event: constants.EventPaymentProcessed,
-		Data:  paymentData,
+		Data:  json.RawMessage(successDataBytes),
 	}
 
+	// Payment processing successful - NATS event will also handle separate notifications
+	// The notification service will send payment_processed events via NATS to both users
 	return websocket.JSON.Send(ws, response)
 }

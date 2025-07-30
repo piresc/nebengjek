@@ -284,6 +284,7 @@ func (uc *rideUC) RideArrived(ctx context.Context, req models.RideArrivalReq) (*
 	paymentRequest := &models.PaymentRequest{
 		RideID:      req.RideID,
 		PassengerID: ride.PassengerID.String(),
+		DriverID:    ride.DriverID.String(),
 		TotalCost:   adjustedCost,
 		QRCodeURL:   qrCodeURL,
 	}
@@ -332,6 +333,10 @@ func (uc *rideUC) ProcessPayment(ctx context.Context, req models.PaymentProccess
 	if err != nil {
 		return nil, fmt.Errorf("failed to update payment status: %w", err)
 	}
+
+	// Populate driver and passenger IDs for WebSocket notifications
+	payment.DriverID = ride.DriverID
+	payment.PassengerID = ride.PassengerID
 
 	// Payment status needs to be accepted for ride to be completed
 	if req.Status == models.PaymentStatusAccepted {

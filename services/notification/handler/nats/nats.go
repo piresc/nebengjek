@@ -30,15 +30,14 @@ func NewNotificationHandler(notificationUC notification.NotificationUC, client *
 func (h *NotificationHandler) InitNATSConsumers() error {
 	// Define notification-specific consumer configurations
 	notificationConsumers := map[string]string{
-		"match.found":    "match_proposal_notification",
-		"match.accepted": "match_accepted_notification",
-		"match.rejected": "match_rejected_notification",
-		"ride.pickup":            "ride_pickup_notification",
-		"RIDE.started":           "ride_started_notification",
-		"RIDE.pickup.arrived":    "ride_pickup_arrived_notification",
-		"RIDE.completed":         "ride_completed_notification",
-		"RIDE.cancelled":         "ride_cancelled_notification",
-		// "PAYMENT.processed": "payment_processed_notification", // TODO: Add when PAYMENT_STREAM is implemented
+		"match.found":         "match_proposal_notification",
+		"match.accepted":      "match_accepted_notification",
+		"match.rejected":      "match_rejected_notification",
+		"ride.pickup":         "ride_pickup_notification",
+		"RIDE.started":        "ride_started_notification",
+		"RIDE.pickup.arrived": "ride_pickup_arrived_notification",
+		"ride.completed":      "ride_completed_notification",
+		"RIDE.cancelled":      "ride_cancelled_notification",
 	}
 
 	// Create consumers for each selective notification event
@@ -48,10 +47,8 @@ func (h *NotificationHandler) InitNATSConsumers() error {
 		switch {
 		case subject == "match.found" || subject == "match.accepted" || subject == "match.rejected":
 			streamName = "MATCH_STREAM"
-		case subject == "ride.pickup" || subject == "RIDE.started" || subject == "RIDE.pickup.arrived" || subject == "RIDE.completed" || subject == "RIDE.cancelled":
+		case subject == "ride.pickup" || subject == "RIDE.started" || subject == "RIDE.pickup.arrived" || subject == "ride.completed" || subject == "RIDE.cancelled":
 			streamName = "RIDE_STREAM"
-		// case subject == "PAYMENT.processed": // TODO: Add when PAYMENT_STREAM is implemented
-		//	streamName = "PAYMENT_STREAM"
 		default:
 			streamName = "MATCH_STREAM" // fallback
 		}
@@ -62,12 +59,13 @@ func (h *NotificationHandler) InitNATSConsumers() error {
 			ConsumerName:  consumerName,
 			FilterSubject: subject,
 			AckPolicy:     jetstream.AckExplicitPolicy,
+			DeliverPolicy: jetstream.DeliverNewPolicy, // Only deliver new messages after consumer creation
 			MaxDeliver:    3,
 		}
 
 		// Recreate consumer
 		if err := h.natsClient.RecreateConsumer(config); err != nil {
-			h.logger.Error("Failed to create notification consumer", 
+			h.logger.Error("Failed to create notification consumer",
 				slog.String("consumer", consumerName),
 				slog.String("subject", subject),
 				slog.Any("error", err))
@@ -89,7 +87,7 @@ func (h *NotificationHandler) InitNATSConsumers() error {
 			handler = h.handleRideStartedJS
 		case "RIDE.pickup.arrived":
 			handler = h.handleRidePickupArrivedJS
-		case "RIDE.completed":
+		case "ride.completed":
 			handler = h.handleRideCompletedJS
 		case "RIDE.cancelled":
 			handler = h.handleRideCancelledJS
@@ -103,13 +101,13 @@ func (h *NotificationHandler) InitNATSConsumers() error {
 		if err := h.natsClient.ConsumeMessages(streamName, consumerName, func(msg jetstream.Msg) error {
 			return handler(msg)
 		}); err != nil {
-			h.logger.Error("Failed to start consuming messages", 
+			h.logger.Error("Failed to start consuming messages",
 				slog.String("consumer", consumerName),
 				slog.Any("error", err))
 			return fmt.Errorf("failed to start consuming for %s: %w", consumerName, err)
 		}
 
-		h.logger.Info("Started notification consumer", 
+		h.logger.Info("Started notification consumer",
 			slog.String("consumer", consumerName),
 			slog.String("subject", subject))
 	}
@@ -150,7 +148,7 @@ func (h *NotificationHandler) handleMatchRejectedJS(msg jetstream.Msg) error {
 
 func (h *NotificationHandler) handleRidePickupJS(msg jetstream.Msg) error {
 	ctx := context.Background()
-	err := h.notificationUC.ProcessRideStarted(ctx, msg.Data())
+	err := h.notificationUC.ProcessRidePickup(ctx, msg.Data())
 	if err != nil {
 		h.logger.Error("Failed to process ride pickup notification", slog.Any("error", err))
 		return err

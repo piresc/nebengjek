@@ -328,9 +328,37 @@ func (c *Client) ConsumeMessages(streamName, consumerName string, handler func(j
 		}
 
 		// Acknowledge successful processing
-		if ackErr := msg.Ack(); ackErr != nil {
-			logger.Error("Failed to ACK message", logger.Err(ackErr))
+		metadata, metaErr := msg.Metadata()
+		var sequenceStr string
+		if metaErr == nil {
+			sequenceStr = fmt.Sprintf("%d", metadata.Sequence.Stream)
+		} else {
+			sequenceStr = "unknown"
 		}
+		
+		logger.Info("Attempting to ACK message",
+			logger.String("consumer", consumerKey),
+			logger.String("subject", msg.Subject()),
+			logger.String("sequence", sequenceStr))
+		
+		if ackErr := msg.Ack(); ackErr != nil {
+			logger.Error("Failed to ACK message - will NAK for retry",
+				logger.String("consumer", consumerKey),
+				logger.String("subject", msg.Subject()),
+				logger.String("sequence", sequenceStr),
+				logger.Err(ackErr))
+			
+			// If ACK fails, NAK the message for retry
+			if nakErr := msg.Nak(); nakErr != nil {
+				logger.Error("Failed to NAK message after ACK failure", logger.Err(nakErr))
+			}
+			return
+		}
+
+		logger.Info("Message successfully ACK'd",
+			logger.String("consumer", consumerKey),
+			logger.String("subject", msg.Subject()),
+			logger.String("sequence", sequenceStr))
 	})
 
 	if err != nil {

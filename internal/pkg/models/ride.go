@@ -68,6 +68,8 @@ type Payment struct {
 	DriverPayout int           `json:"driver_payout" db:"driver_payout"`
 	Status       PaymentStatus `json:"status" db:"status"`
 	CreatedAt    time.Time     `json:"created_at" db:"created_at"`
+	DriverID     uuid.UUID     `json:"driver_id,omitempty" db:"-"`    // Not stored in DB, populated for WebSocket notifications
+	PassengerID  uuid.UUID     `json:"passenger_id,omitempty" db:"-"` // Not stored in DB, populated for WebSocket notifications
 }
 
 type RideComplete struct {

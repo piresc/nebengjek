@@ -128,7 +128,7 @@ func (uc *GatewayUseCase) RideStart(ctx context.Context, req *models.RideStartRe
 	resp, err := uc.gatewayGW.CallRidesService(
 		ctx,
 		"POST",
-		"/rides/start",
+		fmt.Sprintf("/rides/%s/start", req.RideID),
 		req,
 		nil,
 		nil,
@@ -142,13 +142,17 @@ func (uc *GatewayUseCase) RideStart(ctx context.Context, req *models.RideStartRe
 		return nil, fmt.Errorf("rides service returned error: %s", string(resp.Body))
 	}
 
-	// Parse response
-	var result models.Ride
-	if err := json.Unmarshal(resp.Body, &result); err != nil {
+	// Parse wrapped response
+	var wrappedResponse struct {
+		Success bool        `json:"success"`
+		Message string      `json:"message"`
+		Data    models.Ride `json:"data"`
+	}
+	if err := json.Unmarshal(resp.Body, &wrappedResponse); err != nil {
 		return nil, fmt.Errorf("failed to parse rides service response: %w", err)
 	}
 
-	return &result, nil
+	return &wrappedResponse.Data, nil
 }
 
 // RideArrived handles ride arrival through rides service
@@ -157,7 +161,7 @@ func (uc *GatewayUseCase) RideArrived(ctx context.Context, req *models.RideArriv
 	resp, err := uc.gatewayGW.CallRidesService(
 		ctx,
 		"POST",
-		"/rides/arrived",
+		fmt.Sprintf("/rides/%s/arrive", req.RideID),
 		req,
 		nil,
 		nil,
@@ -171,13 +175,17 @@ func (uc *GatewayUseCase) RideArrived(ctx context.Context, req *models.RideArriv
 		return nil, fmt.Errorf("rides service returned error: %s", string(resp.Body))
 	}
 
-	// Parse response
-	var result models.PaymentRequest
-	if err := json.Unmarshal(resp.Body, &result); err != nil {
+	// Parse wrapped response
+	var wrappedResponse struct {
+		Success bool                  `json:"success"`
+		Message string                `json:"message"`
+		Data    models.PaymentRequest `json:"data"`
+	}
+	if err := json.Unmarshal(resp.Body, &wrappedResponse); err != nil {
 		return nil, fmt.Errorf("failed to parse rides service response: %w", err)
 	}
 
-	return &result, nil
+	return &wrappedResponse.Data, nil
 }
 
 // ProcessPayment processes payment through rides service
@@ -186,7 +194,7 @@ func (uc *GatewayUseCase) ProcessPayment(ctx context.Context, req *models.Paymen
 	resp, err := uc.gatewayGW.CallRidesService(
 		ctx,
 		"POST",
-		"/rides/payment",
+		fmt.Sprintf("/rides/%s/payment", req.RideID),
 		req,
 		nil,
 		nil,
@@ -200,13 +208,17 @@ func (uc *GatewayUseCase) ProcessPayment(ctx context.Context, req *models.Paymen
 		return nil, fmt.Errorf("rides service returned error: %s", string(resp.Body))
 	}
 
-	// Parse response
-	var result models.Payment
-	if err := json.Unmarshal(resp.Body, &result); err != nil {
+	// Parse wrapped response
+	var wrappedResponse struct {
+		Success bool           `json:"success"`
+		Message string         `json:"message"`
+		Data    models.Payment `json:"data"`
+	}
+	if err := json.Unmarshal(resp.Body, &wrappedResponse); err != nil {
 		return nil, fmt.Errorf("failed to parse rides service response: %w", err)
 	}
 
-	return &result, nil
+	return &wrappedResponse.Data, nil
 }
 
 // Proxy operations using Gateway interface

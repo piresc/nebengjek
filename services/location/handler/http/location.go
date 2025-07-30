@@ -262,7 +262,7 @@ func (h *LocationHandler) UpdateLocation(c echo.Context) error {
 	nrpkg.AddTransactionAttribute(txn, "ride_id", req.RideID)
 	nrpkg.AddTransactionAttribute(txn, "driver_id", req.DriverID)
 
-	if err := h.locationUC.StoreLocation(c.Request().Context(), &req); err != nil {
+	if err := h.locationUC.StoreLocation(c.Request().Context(), req); err != nil {
 		nrpkg.NoticeTransactionError(txn, err)
 		logger.Error("Failed to update location",
 			logger.String("ride_id", req.RideID),
