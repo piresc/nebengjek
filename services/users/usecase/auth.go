@@ -10,6 +10,7 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/internal/utils"
+	usererrors "github.com/piresc/nebengjek/services/users/errors"
 )
 
 // GenerateOTP generates a new OTP for the given MSISDN
@@ -17,7 +18,7 @@ func (u *UserUC) GenerateOTP(ctx context.Context, msisdn string) error {
 	// Validate MSISDN format and check if it's a Telkomsel number
 	isValid, formattedMSISDN, err := utils.ValidateMSISDN(msisdn)
 	if err != nil || !isValid {
-		return fmt.Errorf("invalid MSISDN format or not a Telkomsel number")
+		return usererrors.ErrInvalidTelkomselNumber
 	}
 
 	// Generate dummy OTP using the last 4 digits of the MSISDN
@@ -49,7 +50,7 @@ func (u *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*models.Au
 	// Validate MSISDN format
 	isValid, formattedMSISDN, err := utils.ValidateMSISDN(msisdn)
 	if err != nil || !isValid {
-		return nil, fmt.Errorf("invalid MSISDN format or not a Telkomsel number")
+		return nil, usererrors.ErrInvalidTelkomselNumber
 	}
 
 	// Get OTP from database
@@ -58,10 +59,10 @@ func (u *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*models.Au
 		return nil, fmt.Errorf("invalid OTP: %w", err)
 	}
 	if otp == nil {
-		return nil, fmt.Errorf("OTP not found or expired")
+		return nil, usererrors.ErrOTPNotFoundOrExpired
 	}
 	if otp.Code != code {
-		return nil, fmt.Errorf("invalid OTP code")
+		return nil, usererrors.ErrInvalidOTP
 	}
 
 	// Get or create user

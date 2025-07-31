@@ -164,35 +164,3 @@ func (f *TracerFactory) CreateTracer(nrApp *newrelic.Application) Tracer {
 	return NewNoOpTracer()
 }
 
-// SegmentHelper provides utilities for creating segments
-type SegmentHelper struct {
-	tracer Tracer
-}
-
-// NewSegmentHelper creates a new segment helper
-func NewSegmentHelper(tracer Tracer) *SegmentHelper {
-	return &SegmentHelper{tracer: tracer}
-}
-
-// StartDatabaseSegment starts a database segment
-func (h *SegmentHelper) StartDatabaseSegment(ctx context.Context, operation, table string) (context.Context, func()) {
-	segmentName := "Database/" + operation
-	if table != "" {
-		segmentName += "/" + table
-	}
-	return h.tracer.StartSegment(ctx, segmentName)
-}
-
-// StartExternalSegment starts an external service segment
-func (h *SegmentHelper) StartExternalSegment(ctx context.Context, service, operation string) (context.Context, func()) {
-	segmentName := "External/" + service
-	if operation != "" {
-		segmentName += "/" + operation
-	}
-	return h.tracer.StartSegment(ctx, segmentName)
-}
-
-// StartCustomSegment starts a custom segment
-func (h *SegmentHelper) StartCustomSegment(ctx context.Context, name string) (context.Context, func()) {
-	return h.tracer.StartSegment(ctx, "Custom/"+name)
-}

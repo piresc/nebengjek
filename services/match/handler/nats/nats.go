@@ -3,7 +3,6 @@ package nats
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/piresc/nebengjek/internal/pkg/models"
@@ -95,9 +94,6 @@ func (h *MatchHandler) handleBeaconEvent(ctx context.Context, msg []byte) error 
 		return err
 	}
 	
-	// Add debug logging to see if messages are being received
-	fmt.Printf("INFO: Match service received beacon event - user_id=%s is_active=%v\n", event.UserID, event.IsActive)
-	
 	return h.matchUC.HandleBeaconEvent(ctx, event)
 }
 
@@ -107,9 +103,6 @@ func (h *MatchHandler) handleFinderEvent(ctx context.Context, msg []byte) error 
 	if err := json.Unmarshal(msg, &event); err != nil {
 		return err
 	}
-	
-	// Add debug logging to see if messages are being received
-	fmt.Printf("INFO: Match service received finder event - user_id=%s is_active=%v\n", event.UserID, event.IsActive)
 	
 	return h.matchUC.HandleFinderEvent(ctx, event)
 }

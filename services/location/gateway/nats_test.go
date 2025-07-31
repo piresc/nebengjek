@@ -135,13 +135,12 @@ func TestPublishLocationAggregate_Error(t *testing.T) {
 	assert.Contains(t, err.Error(), "publish failed")
 }
 
-// TestNewLocationGWWithClient tests the concrete client constructor
-func TestNewLocationGWWithClient(t *testing.T) {
+// TestNewLocationGW tests the location gateway constructor
+func TestNewLocationGW(t *testing.T) {
 	// Create a mock NATS client
 	mockClient := NewMockNATSClient()
 
-	// Create the location gateway using the concrete client constructor
-	// We can't directly test this with our mock, but we can test that it creates a gateway
+	// Create the location gateway
 	gw := NewLocationGW(mockClient)
 
 	// Verify that the gateway was created successfully

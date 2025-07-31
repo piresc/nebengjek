@@ -17,7 +17,8 @@ func (uc *UserUC) UpdateBeaconStatus(ctx context.Context, beaconReq *models.Beac
 	}
 
 	// Atomically check and set cache key - if SetNX returns false, key already exists
-	wasSet, err := uc.userRepo.SetEventCacheWithTTL(ctx, "beacon_update", user.ID.String(), beaconReq, 5*time.Minute)
+	cacheTTL := time.Duration(uc.cfg.Users.BeaconCacheTTLMinutes) * time.Minute
+	wasSet, err := uc.userRepo.SetEventCacheWithTTL(ctx, "beacon_update", user.ID.String(), beaconReq, cacheTTL)
 	if err != nil {
 		logger.WarnCtx(ctx, "Failed to check/set beacon cache, continuing with event publish",
 			logger.String("user_id", user.ID.String()),
@@ -25,7 +26,9 @@ func (uc *UserUC) UpdateBeaconStatus(ctx context.Context, beaconReq *models.Beac
 	} else if !wasSet {
 		logger.InfoCtx(ctx, "Beacon event already processed recently, skipping duplicate",
 			logger.String("user_id", user.ID.String()))
-		return nil // Skip duplicate event
+		// Duplicate event detected within TTL window; skipping processing
+		// This prevents duplicate beacon events from being processed and published to NATS
+		return nil
 	}
 
 	// Create and publish beacon event

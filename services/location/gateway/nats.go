@@ -34,12 +34,6 @@ func NewLocationGW(client NATSPublisher) location.LocationGW {
 	}
 }
 
-// NewLocationGWWithClient creates a new location gateway with a concrete NATS client
-func NewLocationGWWithClient(client *natspkg.Client) location.LocationGW {
-	return &locationGW{
-		natsClient: client,
-	}
-}
 
 // PublishLocationAggregate publishes a location aggregate event to JetStream with delivery guarantees
 func (g *locationGW) PublishLocationAggregate(ctx context.Context, aggregate models.LocationAggregate) error {

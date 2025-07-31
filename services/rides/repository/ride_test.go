@@ -86,9 +86,9 @@ func TestGetBillingLedgerSum_Sum(t *testing.T) {
 	db, mock := setupMockDB(t)
 	repo := repository.NewRideRepository(&models.Config{}, db)
 
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT SUM(cost)")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT COALESCE(SUM(cost), 0)")).
 		WithArgs("id").
-		WillReturnRows(sqlmock.NewRows([]string{"sum"}).AddRow(250))
+		WillReturnRows(sqlmock.NewRows([]string{"coalesce"}).AddRow(250))
 
 	sum, err := repo.GetBillingLedgerSum(context.Background(), "id")
 	assert.NoError(t, err)
@@ -308,9 +308,9 @@ func TestGetBillingLedgerSum_NoEntries(t *testing.T) {
 
 	rideID := "test-ride-id"
 
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT SUM(cost)")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT COALESCE(SUM(cost), 0)")).
 		WithArgs(rideID).
-		WillReturnRows(sqlmock.NewRows([]string{"sum"}).AddRow(0))
+		WillReturnRows(sqlmock.NewRows([]string{"coalesce"}).AddRow(0))
 
 	sum, err := repo.GetBillingLedgerSum(context.Background(), rideID)
 	assert.NoError(t, err)

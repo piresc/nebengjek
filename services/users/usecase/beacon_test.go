@@ -45,6 +45,7 @@ func TestUpdateBeaconStatus_Success(t *testing.T) {
 	}
 
 	mockRepo.EXPECT().GetUserByMSISDN(gomock.Any(), "+628123456789").Return(expectedUser, nil)
+	mockRepo.EXPECT().SetEventCacheWithTTL(gomock.Any(), "beacon_update", expectedUser.ID.String(), gomock.Any(), gomock.Any()).Return(true, nil)
 	mockGW.EXPECT().PublishBeaconEvent(gomock.Any(), gomock.Any()).Return(nil)
 
 	// Act
@@ -88,6 +89,7 @@ func TestUpdateBeaconStatus_GatewayError(t *testing.T) {
 
 	expectedError := errors.New("gateway error")
 	mockRepo.EXPECT().GetUserByMSISDN(gomock.Any(), "+628123456789").Return(expectedUser, nil)
+	mockRepo.EXPECT().SetEventCacheWithTTL(gomock.Any(), "beacon_update", expectedUser.ID.String(), gomock.Any(), gomock.Any()).Return(true, nil)
 	mockGW.EXPECT().PublishBeaconEvent(gomock.Any(), gomock.Any()).Return(expectedError)
 
 	// Act
@@ -168,6 +170,7 @@ func TestUpdateBeaconStatus_DeactivateBeacon(t *testing.T) {
 	}
 
 	mockRepo.EXPECT().GetUserByMSISDN(gomock.Any(), "+628123456789").Return(expectedUser, nil)
+	mockRepo.EXPECT().SetEventCacheWithTTL(gomock.Any(), "beacon_update", expectedUser.ID.String(), gomock.Any(), gomock.Any()).Return(true, nil)
 	mockGW.EXPECT().PublishBeaconEvent(gomock.Any(), gomock.Any()).Return(nil)
 
 	// Act

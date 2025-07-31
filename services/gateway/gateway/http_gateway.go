@@ -66,17 +66,6 @@ func (g *HTTPGateway) CallLocationService(ctx context.Context, method, path stri
 	return g.makeHTTPCall(ctx, g.endpoints.LocationService, method, path, body, headers, queryParams, g.config.APIKey.LocationService)
 }
 
-// PublishNotification publishes a notification via NATS (placeholder implementation)
-func (g *HTTPGateway) PublishNotification(ctx context.Context, notification *models.Notification) error {
-	// TODO: Implement NATS notification publishing
-	return nil
-}
-
-// PublishEvent publishes an event via NATS (placeholder implementation)
-func (g *HTTPGateway) PublishEvent(ctx context.Context, subject string, data interface{}) error {
-	// TODO: Implement NATS event publishing
-	return nil
-}
 
 // makeHTTPCall is a helper method to make HTTP calls to microservices
 func (g *HTTPGateway) makeHTTPCall(ctx context.Context, baseURL, method, path string, body interface{}, headers map[string]string, queryParams map[string]string, apiKey string) (*models.ProxyResponse, error) {

@@ -17,7 +17,8 @@ func (uc *UserUC) UpdateFinderStatus(ctx context.Context, finderReq *models.Find
 	}
 
 	// Atomically check and set cache key - if SetNX returns false, key already exists
-	wasSet, err := uc.userRepo.SetEventCacheWithTTL(ctx, "finder_update", user.ID.String(), finderReq, 5*time.Minute)
+	cacheTTL := time.Duration(uc.cfg.Users.FinderCacheTTLMinutes) * time.Minute
+	wasSet, err := uc.userRepo.SetEventCacheWithTTL(ctx, "finder_update", user.ID.String(), finderReq, cacheTTL)
 	if err != nil {
 		logger.WarnCtx(ctx, "Failed to check/set finder cache, continuing with event publish",
 			logger.String("user_id", user.ID.String()),
@@ -25,7 +26,9 @@ func (uc *UserUC) UpdateFinderStatus(ctx context.Context, finderReq *models.Find
 	} else if !wasSet {
 		logger.InfoCtx(ctx, "Finder event already processed recently, skipping duplicate",
 			logger.String("user_id", user.ID.String()))
-		return nil // Skip duplicate event
+		// Duplicate event detected within TTL window; skipping processing
+		// This prevents duplicate finder events from being processed and published to NATS
+		return nil
 	}
 
 	// Debug logging to check target location data

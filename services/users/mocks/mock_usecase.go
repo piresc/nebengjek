@@ -35,21 +35,6 @@ func (m *MockUserUC) EXPECT() *MockUserUCMockRecorder {
 	return m.recorder
 }
 
-// ConfirmMatch mocks base method.
-func (m *MockUserUC) ConfirmMatch(arg0 context.Context, arg1 *models.MatchConfirmRequest) (*models.MatchProposal, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ConfirmMatch", arg0, arg1)
-	ret0, _ := ret[0].(*models.MatchProposal)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ConfirmMatch indicates an expected call of ConfirmMatch.
-func (mr *MockUserUCMockRecorder) ConfirmMatch(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConfirmMatch", reflect.TypeOf((*MockUserUC)(nil).ConfirmMatch), arg0, arg1)
-}
-
 // GenerateOTP mocks base method.
 func (m *MockUserUC) GenerateOTP(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
@@ -77,21 +62,6 @@ func (m *MockUserUC) GetUserByID(arg0 context.Context, arg1 string) (*models.Use
 func (mr *MockUserUCMockRecorder) GetUserByID(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserByID", reflect.TypeOf((*MockUserUC)(nil).GetUserByID), arg0, arg1)
-}
-
-// ProcessPayment mocks base method.
-func (m *MockUserUC) ProcessPayment(arg0 context.Context, arg1 *models.PaymentProccessRequest) (*models.Payment, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProcessPayment", arg0, arg1)
-	ret0, _ := ret[0].(*models.Payment)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ProcessPayment indicates an expected call of ProcessPayment.
-func (mr *MockUserUCMockRecorder) ProcessPayment(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessPayment", reflect.TypeOf((*MockUserUC)(nil).ProcessPayment), arg0, arg1)
 }
 
 // RegisterDriver mocks base method.
@@ -122,36 +92,6 @@ func (mr *MockUserUCMockRecorder) RegisterUser(arg0, arg1 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterUser", reflect.TypeOf((*MockUserUC)(nil).RegisterUser), arg0, arg1)
 }
 
-// RideArrived mocks base method.
-func (m *MockUserUC) RideArrived(arg0 context.Context, arg1 *models.RideArrivalReq) (*models.PaymentRequest, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RideArrived", arg0, arg1)
-	ret0, _ := ret[0].(*models.PaymentRequest)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// RideArrived indicates an expected call of RideArrived.
-func (mr *MockUserUCMockRecorder) RideArrived(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RideArrived", reflect.TypeOf((*MockUserUC)(nil).RideArrived), arg0, arg1)
-}
-
-// RideStart mocks base method.
-func (m *MockUserUC) RideStart(arg0 context.Context, arg1 *models.RideStartRequest) (*models.Ride, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RideStart", arg0, arg1)
-	ret0, _ := ret[0].(*models.Ride)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// RideStart indicates an expected call of RideStart.
-func (mr *MockUserUCMockRecorder) RideStart(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RideStart", reflect.TypeOf((*MockUserUC)(nil).RideStart), arg0, arg1)
-}
-
 // UpdateBeaconStatus mocks base method.
 func (m *MockUserUC) UpdateBeaconStatus(arg0 context.Context, arg1 *models.BeaconRequest) error {
 	m.ctrl.T.Helper()
@@ -178,20 +118,6 @@ func (m *MockUserUC) UpdateFinderStatus(arg0 context.Context, arg1 *models.Finde
 func (mr *MockUserUCMockRecorder) UpdateFinderStatus(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateFinderStatus", reflect.TypeOf((*MockUserUC)(nil).UpdateFinderStatus), arg0, arg1)
-}
-
-// UpdateUserLocation mocks base method.
-func (m *MockUserUC) UpdateUserLocation(arg0 context.Context, arg1 *models.LocationUpdate) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateUserLocation", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UpdateUserLocation indicates an expected call of UpdateUserLocation.
-func (mr *MockUserUCMockRecorder) UpdateUserLocation(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateUserLocation", reflect.TypeOf((*MockUserUC)(nil).UpdateUserLocation), arg0, arg1)
 }
 
 // VerifyOTP mocks base method.

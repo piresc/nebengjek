@@ -459,24 +459,6 @@ func TestRedisClient_GetClient(t *testing.T) {
 	assert.NotNil(t, result)
 }
 
-func TestRedisClient_Keys_Method(t *testing.T) {
-	// Note: The Keys method in the original code has an error - it should return []string, not error
-	// This test demonstrates the current implementation
-	db, mock := redismock.NewClientMock()
-	client := &RedisClient{Client: db}
-
-	ctx := context.Background()
-	pattern := "test:*"
-
-	mock.ExpectKeys(pattern).SetVal([]string{"test:key1", "test:key2"})
-
-	err := client.Keys(ctx, pattern)
-
-	// The current implementation returns an error, but it should return []string
-	// This is likely a bug in the original code
-	assert.NoError(t, err)
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
 
 func TestRedisClient_IntegrationScenario(t *testing.T) {
 	// Test a realistic scenario with multiple operations

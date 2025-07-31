@@ -32,10 +32,6 @@ func NewHandler(gatewayUC gateway.GatewayUC, cfg *models.Config, nrApp *newrelic
 	}
 }
 
-// InitNATSConsumers initializes NATS consumers
-func (h *Handler) InitNATSConsumers() error {
-	return nil
-}
 
 // GetWebSocketJWTMiddleware returns a custom JWT middleware for WebSocket requests
 func (h *Handler) GetWebSocketJWTMiddleware() echo.MiddlewareFunc {

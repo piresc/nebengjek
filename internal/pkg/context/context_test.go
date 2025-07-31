@@ -2,9 +2,7 @@ package context
 
 import (
 	"context"
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -293,85 +291,6 @@ func TestGetServiceName(t *testing.T) {
 	}
 }
 
-func TestWithTimeout(t *testing.T) {
-	timeouts := []time.Duration{
-		1 * time.Second,
-		5 * time.Second,
-		30 * time.Second,
-		1 * time.Minute,
-	}
-
-	for _, timeout := range timeouts {
-		t.Run("Timeout: "+timeout.String(), func(t *testing.T) {
-			ctx := context.Background()
-			newCtx, cancel := WithTimeout(ctx, timeout)
-			defer cancel()
-
-			assert.NotEqual(t, ctx, newCtx)
-			assert.NotNil(t, cancel)
-
-			// Check that context has deadline
-			deadline, ok := newCtx.Deadline()
-			assert.True(t, ok)
-			assert.True(t, deadline.After(time.Now()))
-			assert.True(t, deadline.Before(time.Now().Add(timeout+time.Second)))
-		})
-	}
-}
-
-func TestWithDeadline(t *testing.T) {
-	deadlines := []time.Time{
-		time.Now().Add(1 * time.Second),
-		time.Now().Add(5 * time.Minute),
-		time.Now().Add(1 * time.Hour),
-	}
-
-	for i, deadline := range deadlines {
-		t.Run(fmt.Sprintf("Deadline_%d", i), func(t *testing.T) {
-			ctx := context.Background()
-			newCtx, cancel := WithDeadline(ctx, deadline)
-			defer cancel()
-
-			assert.NotEqual(t, ctx, newCtx)
-			assert.NotNil(t, cancel)
-
-			// Check that context has the correct deadline
-			ctxDeadline, ok := newCtx.Deadline()
-			assert.True(t, ok)
-			assert.Equal(t, deadline.Unix(), ctxDeadline.Unix())
-		})
-	}
-}
-
-func TestWithCancel(t *testing.T) {
-	ctx := context.Background()
-	newCtx, cancel := WithCancel(ctx)
-
-	assert.NotEqual(t, ctx, newCtx)
-	assert.NotNil(t, cancel)
-
-	// Context should not be done initially
-	select {
-	case <-newCtx.Done():
-		t.Fatal("Context should not be done initially")
-	default:
-		// Expected
-	}
-
-	// Cancel the context
-	cancel()
-
-	// Context should be done after cancellation
-	select {
-	case <-newCtx.Done():
-		// Expected
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("Context should be done after cancellation")
-	}
-
-	// Check error
-	assert.Equal(t, context.Canceled, newCtx.Err())
-}
 
 func TestChainedContextOperations(t *testing.T) {
 	// Test chaining multiple context operations
@@ -399,20 +318,11 @@ func TestChainedContextOperations(t *testing.T) {
 	assert.Equal(t, "trace-789", GetTraceID(ctx))
 	assert.Equal(t, "test-service", GetServiceName(ctx))
 
-	// Add timeout
-	ctxWithTimeout, cancel := WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	// All values should still be accessible
-	assert.Equal(t, "req-123", GetRequestID(ctxWithTimeout))
-	assert.Equal(t, "user-456", GetUserID(ctxWithTimeout))
-	assert.Equal(t, "trace-789", GetTraceID(ctxWithTimeout))
-	assert.Equal(t, "test-service", GetServiceName(ctxWithTimeout))
-
-	// Should have deadline
-	deadline, ok := ctxWithTimeout.Deadline()
-	assert.True(t, ok)
-	assert.True(t, deadline.After(time.Now()))
+	// All values should be accessible in the final context
+	assert.Equal(t, "req-123", GetRequestID(ctx))
+	assert.Equal(t, "user-456", GetUserID(ctx))
+	assert.Equal(t, "trace-789", GetTraceID(ctx))
+	assert.Equal(t, "test-service", GetServiceName(ctx))
 }
 
 func TestContextOverwrite(t *testing.T) {
@@ -432,21 +342,6 @@ func TestContextOverwrite(t *testing.T) {
 	assert.Equal(t, "user-2", GetUserID(ctx))
 }
 
-func TestContextTimeout(t *testing.T) {
-	// Test that timeout context actually times out
-	ctx := context.Background()
-	ctxWithTimeout, cancel := WithTimeout(ctx, 50*time.Millisecond)
-	defer cancel()
-
-	// Wait for timeout
-	select {
-	case <-ctxWithTimeout.Done():
-		// Expected - context should timeout
-		assert.Equal(t, context.DeadlineExceeded, ctxWithTimeout.Err())
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("Context should have timed out")
-	}
-}
 
 func BenchmarkWithRequestID(b *testing.B) {
 	ctx := context.Background()

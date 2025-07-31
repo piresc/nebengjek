@@ -27,12 +27,6 @@ func NewRideGW(client *natspkg.Client) rides.RideGW {
 
 // PublishRidePickup publishes a ride pickup event to JetStream with delivery guarantees
 func (g *RideGW) PublishRidePickup(ctx context.Context, ride *models.Ride) error {
-	logger.InfoCtx(ctx, "Preparing to publish ride pickup event to JetStream",
-		logger.String("ride_id", ride.RideID.String()),
-		logger.String("driver_id", ride.DriverID.String()),
-		logger.String("passenger_id", ride.PassengerID.String()),
-		logger.String("status", string(ride.Status)))
-
 	rideResponse := models.RideResp{
 		RideID:      ride.RideID.String(),
 		MatchID:     ride.MatchID.String(),
@@ -52,10 +46,6 @@ func (g *RideGW) PublishRidePickup(ctx context.Context, ride *models.Ride) error
 		return fmt.Errorf("failed to marshal ride pickup response: %w", err)
 	}
 
-	logger.InfoCtx(ctx, "Marshaled ride pickup event, publishing to JetStream",
-		logger.String("subject", constants.SubjectRidePickup),
-		logger.String("message_size", fmt.Sprintf("%d bytes", len(data))))
-
 	// Use JetStream publish with options for reliability
 	opts := natspkg.PublishOptions{
 		Subject: constants.SubjectRidePickup,
@@ -63,11 +53,6 @@ func (g *RideGW) PublishRidePickup(ctx context.Context, ride *models.Ride) error
 		MsgID:   fmt.Sprintf("ride-pickup-%s-%d", ride.RideID.String(), time.Now().UnixNano()),
 		Timeout: 15 * time.Second, // Longer timeout for critical ride events
 	}
-
-	logger.InfoCtx(ctx, "Publishing ride pickup event to JetStream with options",
-		logger.String("subject", opts.Subject),
-		logger.String("msg_id", opts.MsgID),
-		logger.String("timeout", opts.Timeout.String()))
 
 	if err := g.natsClient.PublishWithOptions(opts); err != nil {
 		logger.ErrorCtx(ctx, "Failed to publish ride pickup event to JetStream",
@@ -80,13 +65,9 @@ func (g *RideGW) PublishRidePickup(ctx context.Context, ride *models.Ride) error
 		return fmt.Errorf("failed to publish ride pickup event: %w", err)
 	}
 
-	logger.InfoCtx(ctx, "Successfully published ride pickup event to JetStream",
+	logger.InfoCtx(ctx, "Successfully published ride pickup event",
 		logger.String("ride_id", ride.RideID.String()),
-		logger.String("driver_id", ride.DriverID.String()),
-		logger.String("passenger_id", ride.PassengerID.String()),
-		logger.String("status", string(ride.Status)),
-		logger.String("subject", opts.Subject),
-		logger.String("msg_id", opts.MsgID))
+		logger.String("subject", opts.Subject))
 
 	return nil
 }

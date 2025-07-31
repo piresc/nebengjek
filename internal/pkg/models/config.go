@@ -15,6 +15,7 @@ type Config struct {
 	Match    MatchConfig
 	Location LocationConfig
 	Rides    RidesConfig
+	Users    UsersConfig
 	NewRelic NewRelicConfig
 	Logger   LoggerConfig
 }
@@ -115,7 +116,14 @@ type LocationConfig struct {
 
 // RidesConfig contains rides service specific configuration
 type RidesConfig struct {
-	MinDistanceKm float64 `json:"min_distance_km"` // Minimum distance in kilometers for billing
+	MinDistanceKm        float64 `json:"min_distance_km"`         // Minimum distance in kilometers for billing
+	MaxPickupDistanceM   float64 `json:"max_pickup_distance_m"`   // Maximum distance in meters for pickup validation
+}
+
+// UsersConfig contains users service specific configuration
+type UsersConfig struct {
+	FinderCacheTTLMinutes int `json:"finder_cache_ttl_minutes"` // TTL in minutes for finder event cache
+	BeaconCacheTTLMinutes int `json:"beacon_cache_ttl_minutes"` // TTL in minutes for beacon event cache
 }
 
 // NewRelicConfig contains New Relic monitoring configuration

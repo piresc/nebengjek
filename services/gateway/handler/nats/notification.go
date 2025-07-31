@@ -17,14 +17,14 @@ import (
 // GatewayNotificationHandler handles notification delivery events for the gateway
 type GatewayNotificationHandler struct {
 	natsClient      *natspkg.Client
-	wsHandler       *gatewaywebsocket.EchoWebSocketHandler
+	wsHandler       gatewaywebsocket.WebSocketNotifier
 	logger          *slog.Logger
 }
 
 // NewGatewayNotificationHandler creates a new gateway notification handler
 func NewGatewayNotificationHandler(
 	natsClient *natspkg.Client,
-	wsHandler *gatewaywebsocket.EchoWebSocketHandler,
+	wsHandler gatewaywebsocket.WebSocketNotifier,
 	logger *slog.Logger,
 ) *GatewayNotificationHandler {
 	return &GatewayNotificationHandler{

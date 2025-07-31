@@ -1,0 +1,56 @@
+# Version control
+.git
+.gitignore
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+/tmp/
+
+# Testing
+coverage.txt
+coverage.out
+*.test
+
+# Build artifacts
+/build/
+/dist/
+/bin/
+
+# Documentation
+README.md
+*.md
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.circleci/
+
+# Dependencies (will be downloaded in container)
+/vendor/
+
+# Temporary files
+*.tmp
+*.temp
+/tmp/

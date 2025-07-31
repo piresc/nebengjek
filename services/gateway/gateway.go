@@ -34,8 +34,4 @@ type GatewayGW interface {
 	CallMatchService(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*models.ProxyResponse, error)
 	CallRidesService(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*models.ProxyResponse, error)
 	CallLocationService(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*models.ProxyResponse, error)
-
-	// NATS Gateway operations
-	PublishNotification(ctx context.Context, notification *models.Notification) error
-	PublishEvent(ctx context.Context, subject string, data interface{}) error
 }

@@ -351,7 +351,7 @@ func TestVerifyOTP_OTPCodeMismatch(t *testing.T) {
 	// Assert
 	assert.Error(t, err)
 	assert.Nil(t, response)
-	assert.Contains(t, err.Error(), "invalid OTP code")
+	assert.Contains(t, err.Error(), "invalid OTP")
 }
 
 func TestVerifyOTP_CreateUserError(t *testing.T) {

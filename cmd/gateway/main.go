@@ -36,7 +36,7 @@ var (
 
 func main() {
 	appName := "gateway-service"
-	configPath := "/Users/pirescerullo/GitHub/assessment/nebengjek/config/gateway.env"
+	configPath := "config/gateway.env"
 	configs := config.InitConfig(configPath)
 
 	// Initialize New Relic
@@ -112,11 +112,6 @@ func main() {
 	}
 	slogLogger.Info("NATS notification consumer initialized successfully")
 
-	// Initialize other NATS consumers
-	if err := gatewayHandler.InitNATSConsumers(); err != nil {
-		slogLogger.Error("Failed to initialize NATS consumers", slog.Any("error", err))
-		os.Exit(1)
-	}
 
 	// Initialize Echo server
 	e := echo.New()

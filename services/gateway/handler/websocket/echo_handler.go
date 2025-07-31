@@ -19,6 +19,11 @@ import (
 	"golang.org/x/net/websocket"
 )
 
+// WebSocketNotifier defines the interface for WebSocket notification functionality
+type WebSocketNotifier interface {
+	NotifyClientWithError(userID string, event string, data interface{}) error
+}
+
 // EchoWebSocketHandler handles websocket connections using Echo's native support
 type EchoWebSocketHandler struct {
 	gatewayUC    gateway.GatewayUC

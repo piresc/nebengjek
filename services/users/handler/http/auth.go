@@ -1,12 +1,24 @@
 package http
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/internal/utils"
 	"github.com/piresc/nebengjek/services/users"
+	usererrors "github.com/piresc/nebengjek/services/users/errors"
+)
+
+const (
+	// MSISDN validation constants
+	MinMSISDNLength = 10
+	MaxMSISDNLength = 15
+
+	// OTP validation constants
+	OTPLength = 4
 )
 
 // AuthHandler handles authentication-related HTTP requests
@@ -34,20 +46,20 @@ func (h *AuthHandler) GenerateOTP(c echo.Context) error {
 	}
 
 	// Additional validation for MSISDN format
-	if len(request.MSISDN) < 10 || len(request.MSISDN) > 15 {
-		return utils.BadRequestResponse(c, "Invalid MSISDN format")
+	if len(request.MSISDN) < MinMSISDNLength || len(request.MSISDN) > MaxMSISDNLength {
+		return utils.BadRequestResponse(c, fmt.Sprintf("MSISDN must be between %d and %d digits", MinMSISDNLength, MaxMSISDNLength))
 	}
 
 	// Generate and send OTP via SMS
 	if err := h.userUC.GenerateOTP(c.Request().Context(), request.MSISDN); err != nil {
-		if err.Error() == "invalid MSISDN format or not a Telkomsel number" {
+		if errors.Is(err, usererrors.ErrInvalidTelkomselNumber) {
 			return utils.BadRequestResponse(c, "Invalid Telkomsel number")
 		}
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, "Failed to generate OTP")
 	}
 
 	return utils.SuccessResponse(c, http.StatusOK, "OTP sent successfully", map[string]interface{}{
-		"msisdn": request.MSISDN,
+		"msisdn":     request.MSISDN,
 		"expires_in": 300, // 5 minutes
 	})
 }
@@ -65,17 +77,17 @@ func (h *AuthHandler) VerifyOTP(c echo.Context) error {
 	}
 
 	// Validate OTP format (should be 4 digits)
-	if len(request.OTP) != 4 {
-		return utils.BadRequestResponse(c, "OTP must be 4 digits")
+	if len(request.OTP) != OTPLength {
+		return utils.BadRequestResponse(c, fmt.Sprintf("OTP must be %d digits", OTPLength))
 	}
 
 	// Verify OTP and generate JWT token
 	response, err := h.userUC.VerifyOTP(c.Request().Context(), request.MSISDN, request.OTP)
 	if err != nil {
-		if err.Error() == "invalid MSISDN format or not a Telkomsel number" {
+		if errors.Is(err, usererrors.ErrInvalidTelkomselNumber) {
 			return utils.BadRequestResponse(c, "Invalid Telkomsel number")
 		}
-		if err.Error() == "OTP not found or expired" {
+		if errors.Is(err, usererrors.ErrOTPNotFoundOrExpired) {
 			return utils.UnauthorizedResponse(c, "OTP expired or not found")
 		}
 		return utils.UnauthorizedResponse(c, "Invalid OTP")
