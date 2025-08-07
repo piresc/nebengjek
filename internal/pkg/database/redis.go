@@ -62,11 +62,6 @@ func (r *RedisClient) Delete(ctx context.Context, key string) error {
 	return r.Client.Del(ctx, key).Err()
 }
 
-// Exists checks if a key exists
-func (r *RedisClient) Keys(ctx context.Context, key string) error {
-	return r.Client.Keys(ctx, key).Err()
-}
-
 // GeoAdd adds geospatial data to a sorted set
 func (r *RedisClient) GeoAdd(ctx context.Context, key string, longitude, latitude float64, member string) error {
 	return r.Client.GeoAdd(ctx, key, &redis.GeoLocation{

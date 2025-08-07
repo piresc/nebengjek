@@ -149,7 +149,7 @@ func TestGenerateOTP_UseCaseError(t *testing.T) {
 	err = json.Unmarshal(rec.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.Equal(t, false, response["success"])
-	assert.Equal(t, "failed to generate OTP", response["error"])
+	assert.Equal(t, "Failed to generate OTP", response["error"])
 	assert.Equal(t, float64(http.StatusInternalServerError), response["code"])
 }
 
@@ -195,7 +195,7 @@ func TestVerifyOTP_Success(t *testing.T) {
 	err = json.Unmarshal(rec.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.Equal(t, true, response["success"])
-	assert.Equal(t, "OTP verified successfully", response["message"])
+	assert.Equal(t, "Authentication successful", response["message"])
 
 	data, ok := response["data"].(map[string]interface{})
 	assert.True(t, ok)

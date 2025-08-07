@@ -7,23 +7,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/models"
-	"github.com/piresc/nebengjek/services/rides/mocks"
 	"github.com/stretchr/testify/assert"
 )
 
 // Integration tests for NATS gateway functionality
 func TestNATSGateway_PublishRidePickupEvent_Success(t *testing.T) {
 	// Arrange
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockRideUC := mocks.NewMockRideUC(ctrl)
 	mockNATS := NewMockNATSPublisher()
-	gateway := NewNATSGateway(mockRideUC, mockNATS)
+	gateway := NewNATSGateway(mockNATS)
 
 	ctx := context.Background()
 	rideEvent := &models.RidePickupEvent{
@@ -59,13 +53,9 @@ func TestNATSGateway_PublishRidePickupEvent_Success(t *testing.T) {
 
 func TestNATSGateway_PublishRidePickupEvent_PublishError(t *testing.T) {
 	// Arrange
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockRideUC := mocks.NewMockRideUC(ctrl)
 	mockNATS := NewMockNATSPublisher()
 	mockNATS.SetPublishError(errors.New("NATS publish failed"))
-	gateway := NewNATSGateway(mockRideUC, mockNATS)
+	gateway := NewNATSGateway(mockNATS)
 
 	ctx := context.Background()
 	rideEvent := &models.RidePickupEvent{
@@ -89,12 +79,8 @@ func TestNATSGateway_PublishRidePickupEvent_PublishError(t *testing.T) {
 
 func TestNATSGateway_PublishRideCompleteEvent_Success(t *testing.T) {
 	// Arrange
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockRideUC := mocks.NewMockRideUC(ctrl)
 	mockNATS := NewMockNATSPublisher()
-	gateway := NewNATSGateway(mockRideUC, mockNATS)
+	gateway := NewNATSGateway(mockNATS)
 
 	ctx := context.Background()
 	completeEvent := &models.RideCompleteEvent{
@@ -121,173 +107,6 @@ func TestNATSGateway_PublishRideCompleteEvent_Success(t *testing.T) {
 	assert.Equal(t, completeEvent.AdjustmentFactor, publishedEvent.AdjustmentFactor)
 }
 
-func TestNATSGateway_HandleMatchEvent_Success(t *testing.T) {
-	// Arrange
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockRideUC := mocks.NewMockRideUC(ctrl)
-	mockNATS := NewMockNATSPublisher()
-	gateway := NewNATSGateway(mockRideUC, mockNATS)
-
-	matchEvent := &models.MatchProposal{
-		ID:          uuid.New().String(),
-		DriverID:    uuid.New().String(),
-		PassengerID: uuid.New().String(),
-		UserLocation: models.Location{
-			Latitude:  -6.2088,
-			Longitude: 106.8456,
-		},
-		DriverLocation: models.Location{
-			Latitude:  -6.2188,
-			Longitude: 106.8556,
-		},
-		MatchStatus: models.MatchStatusAccepted,
-	}
-
-	// Set up mock expectations
-	mockRideUC.EXPECT().
-		CreateRide(gomock.Any(), gomock.Any()).
-		Return(nil)
-
-	// Act
-	err := gateway.handleMatchEvent(context.Background(), *matchEvent)
-
-	// Assert
-	assert.NoError(t, err)
-}
-
-func TestNATSGateway_HandleMatchEvent_InvalidJSON(t *testing.T) {
-	// Arrange
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockRideUC := mocks.NewMockRideUC(ctrl)
-	mockNATS := NewMockNATSPublisher()
-	gateway := NewNATSGateway(mockRideUC, mockNATS)
-
-	invalidMatchEvent := models.MatchProposal{}
-
-	// Set up mock expectations - even invalid events will try to create ride
-	mockRideUC.EXPECT().
-		CreateRide(gomock.Any(), gomock.Any()).
-		Return(errors.New("validation error"))
-
-	// Act
-	err := gateway.handleMatchEvent(context.Background(), invalidMatchEvent)
-
-	// Assert
-	assert.Error(t, err)
-}
-
-func TestNATSGateway_HandleMatchEvent_CreateRideError(t *testing.T) {
-	// Arrange
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockRideUC := mocks.NewMockRideUC(ctrl)
-	mockNATS := NewMockNATSPublisher()
-	gateway := NewNATSGateway(mockRideUC, mockNATS)
-
-	matchEvent := models.MatchProposal{
-		ID:          uuid.New().String(),
-		DriverID:    uuid.New().String(),
-		PassengerID: uuid.New().String(),
-		MatchStatus: models.MatchStatusAccepted,
-	}
-
-	// Set up mock expectations
-	mockRideUC.EXPECT().
-		CreateRide(gomock.Any(), gomock.Any()).
-		Return(errors.New("database error"))
-
-	// Act
-	err := gateway.handleMatchEvent(context.Background(), matchEvent)
-
-	// Assert
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "database error")
-}
-
-func TestNATSGateway_HandleLocationEvent_Success(t *testing.T) {
-	// Arrange
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockRideUC := mocks.NewMockRideUC(ctrl)
-	mockNATS := NewMockNATSPublisher()
-	gateway := NewNATSGateway(mockRideUC, mockNATS)
-
-	locationEvent := models.LocationAggregate{
-		RideID:    uuid.New().String(),
-		Distance:  15.5,
-		Latitude:  -6.2088,
-		Longitude: 106.8456,
-	}
-
-	// Set up mock expectations
-	mockRideUC.EXPECT().
-		ProcessBillingUpdate(gomock.Any(), locationEvent.RideID, gomock.Any()).
-		Return(nil)
-
-	// Act
-	err := gateway.handleLocationEvent(context.Background(), locationEvent)
-
-	// Assert
-	assert.NoError(t, err)
-}
-
-func TestNATSGateway_HandleLocationEvent_InvalidJSON(t *testing.T) {
-	// Arrange
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockRideUC := mocks.NewMockRideUC(ctrl)
-	mockNATS := NewMockNATSPublisher()
-	gateway := NewNATSGateway(mockRideUC, mockNATS)
-
-	invalidLocationEvent := models.LocationAggregate{}
-
-	// Set up mock expectations - even invalid events will try to process billing
-	mockRideUC.EXPECT().
-		ProcessBillingUpdate(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(errors.New("validation error"))
-
-	// Act
-	err := gateway.handleLocationEvent(context.Background(), invalidLocationEvent)
-
-	// Assert
-	assert.Error(t, err)
-}
-
-func TestNATSGateway_HandleLocationEvent_UpdateError(t *testing.T) {
-	// Arrange
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockRideUC := mocks.NewMockRideUC(ctrl)
-	mockNATS := NewMockNATSPublisher()
-	gateway := NewNATSGateway(mockRideUC, mockNATS)
-
-	locationEvent := models.LocationAggregate{
-		RideID:    uuid.New().String(),
-		Distance:  15.5,
-		Latitude:  -6.2088,
-		Longitude: 106.8456,
-	}
-
-	// Set up mock expectations
-	mockRideUC.EXPECT().
-		ProcessBillingUpdate(gomock.Any(), locationEvent.RideID, gomock.Any()).
-		Return(errors.New("update failed"))
-
-	// Act
-	err := gateway.handleLocationEvent(context.Background(), locationEvent)
-
-	// Assert
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "update failed")
-}
 
 // MockNATSPublisher is a mock implementation for testing
 type MockNATSPublisher struct {

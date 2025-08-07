@@ -244,3 +244,31 @@ func (h *LocationHandler) GetPassengerLocation(c echo.Context) error {
 
 	return utils.SuccessResponse(c, http.StatusOK, "Passenger location retrieved", location)
 }
+
+// UpdateLocation handles location update requests
+func (h *LocationHandler) UpdateLocation(c echo.Context) error {
+	// Get transaction from Echo context using centralized package
+	txn := nrpkg.FromEchoContext(c)
+	nrpkg.SetTransactionName(txn, "Location.UpdateLocation")
+
+	var req models.LocationUpdate
+	if err := c.Bind(&req); err != nil {
+		nrpkg.NoticeTransactionError(txn, err)
+		logger.Error("Failed to bind request", logger.ErrorField(err))
+		return utils.BadRequestResponse(c, "invalid request body")
+	}
+
+	nrpkg.AddTransactionAttribute(txn, "endpoint", "update_location")
+	nrpkg.AddTransactionAttribute(txn, "ride_id", req.RideID)
+	nrpkg.AddTransactionAttribute(txn, "driver_id", req.DriverID)
+
+	if err := h.locationUC.StoreLocation(c.Request().Context(), req); err != nil {
+		nrpkg.NoticeTransactionError(txn, err)
+		logger.Error("Failed to update location",
+			logger.String("ride_id", req.RideID),
+			logger.ErrorField(err))
+		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, "failed to update location")
+	}
+
+	return utils.SuccessResponse(c, http.StatusOK, "Location updated successfully", map[string]string{"status": "success"})
+}

@@ -23,39 +23,39 @@ func (g *MatchGW) PublishMatchAccepted(ctx context.Context, matchProp models.Mat
 	return g.natsGateway.PublishMatchAccepted(ctx, matchProp)
 }
 
-// HTTP Gateway delegation methods
+// Redis Gateway delegation methods
 
-// AddAvailableDriver forwards to the HTTP gateway implementation
+// AddAvailableDriver forwards to the Redis gateway implementation
 func (g *MatchGW) AddAvailableDriver(ctx context.Context, driverID string, location *models.Location) error {
-	return g.httpGateway.AddAvailableDriver(ctx, driverID, location)
+	return g.redisGateway.AddAvailableDriver(ctx, driverID, location)
 }
 
-// RemoveAvailableDriver forwards to the HTTP gateway implementation
+// RemoveAvailableDriver forwards to the Redis gateway implementation
 func (g *MatchGW) RemoveAvailableDriver(ctx context.Context, driverID string) error {
-	return g.httpGateway.RemoveAvailableDriver(ctx, driverID)
+	return g.redisGateway.RemoveAvailableDriver(ctx, driverID)
 }
 
-// AddAvailablePassenger forwards to the HTTP gateway implementation
+// AddAvailablePassenger forwards to the Redis gateway implementation
 func (g *MatchGW) AddAvailablePassenger(ctx context.Context, passengerID string, location *models.Location) error {
-	return g.httpGateway.AddAvailablePassenger(ctx, passengerID, location)
+	return g.redisGateway.AddAvailablePassenger(ctx, passengerID, location)
 }
 
-// RemoveAvailablePassenger forwards to the HTTP gateway implementation
+// RemoveAvailablePassenger forwards to the Redis gateway implementation
 func (g *MatchGW) RemoveAvailablePassenger(ctx context.Context, passengerID string) error {
-	return g.httpGateway.RemoveAvailablePassenger(ctx, passengerID)
+	return g.redisGateway.RemoveAvailablePassenger(ctx, passengerID)
 }
 
-// FindNearbyDrivers forwards to the HTTP gateway implementation
+// FindNearbyDrivers forwards to the Redis gateway implementation
 func (g *MatchGW) FindNearbyDrivers(ctx context.Context, location *models.Location, radiusKm float64) ([]*models.NearbyUser, error) {
-	return g.httpGateway.FindNearbyDrivers(ctx, location, radiusKm)
+	return g.redisGateway.FindNearbyDrivers(ctx, location, radiusKm)
 }
 
-// GetDriverLocation forwards to the HTTP gateway implementation
+// GetDriverLocation forwards to the Redis gateway implementation
 func (g *MatchGW) GetDriverLocation(ctx context.Context, driverID string) (models.Location, error) {
-	return g.httpGateway.GetDriverLocation(ctx, driverID)
+	return g.redisGateway.GetDriverLocation(ctx, driverID)
 }
 
-// GetPassengerLocation forwards to the HTTP gateway implementation
+// GetPassengerLocation forwards to the Redis gateway implementation
 func (g *MatchGW) GetPassengerLocation(ctx context.Context, passengerID string) (models.Location, error) {
-	return g.httpGateway.GetPassengerLocation(ctx, passengerID)
+	return g.redisGateway.GetPassengerLocation(ctx, passengerID)
 }

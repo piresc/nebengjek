@@ -35,11 +35,6 @@ func NewRideUC(
 
 // CreateRide creates a new ride from a confirmed match
 func (uc *rideUC) CreateRide(ctx context.Context, mp models.MatchProposal) error {
-	logger.Info("Creating ride from match proposal",
-		logger.String("match_id", mp.ID),
-		logger.String("driver_id", mp.DriverID),
-		logger.String("passenger_id", mp.PassengerID))
-
 	// Parse UUIDs safely
 	matchID, err := uuid.Parse(mp.ID)
 	if err != nil {
@@ -65,12 +60,6 @@ func (uc *rideUC) CreateRide(ctx context.Context, mp models.MatchProposal) error
 		TotalCost:   0,                             // This will be calculated later
 	}
 
-	logger.Info("Creating ride in database",
-		logger.String("match_id", ride.MatchID.String()),
-		logger.String("driver_id", ride.DriverID.String()),
-		logger.String("passenger_id", ride.PassengerID.String()),
-		logger.String("status", string(ride.Status)))
-
 	// Delegate to repository
 	createdRide, err := uc.ridesRepo.CreateRide(ride)
 	if err != nil {
@@ -93,12 +82,6 @@ func (uc *rideUC) CreateRide(ctx context.Context, mp models.MatchProposal) error
 		return err
 	}
 
-	logger.Info("Ride created successfully in database, publishing pickup event",
-		logger.String("ride_id", createdRide.RideID.String()),
-		logger.String("driver_id", createdRide.DriverID.String()),
-		logger.String("passenger_id", createdRide.PassengerID.String()),
-		logger.String("status", string(createdRide.Status)))
-
 	err = uc.ridesGW.PublishRidePickup(context.Background(), createdRide)
 	if err != nil {
 		logger.Error("Failed to publish ride pickup event to NATS",
@@ -110,9 +93,7 @@ func (uc *rideUC) CreateRide(ctx context.Context, mp models.MatchProposal) error
 	}
 
 	logger.Info("Successfully created ride and published pickup event",
-		logger.String("ride_id", createdRide.RideID.String()),
-		logger.String("driver_id", createdRide.DriverID.String()),
-		logger.String("passenger_id", createdRide.PassengerID.String()))
+		logger.String("ride_id", createdRide.RideID.String()))
 	return nil
 }
 
@@ -158,11 +139,6 @@ func (uc *rideUC) ProcessBillingUpdate(ctx context.Context, rideID string, entry
 
 // StartRide updates a ride from driver_pickup to ongoing status
 func (uc *rideUC) StartRide(ctx context.Context, req models.RideStartRequest) (*models.Ride, error) {
-	logger.Info("Starting ride request",
-		logger.String("ride_id", req.RideID),
-		logger.Any("driver_location", req.DriverLocation),
-		logger.Any("passenger_location", req.PassengerLocation))
-
 	// Get current ride to verify it exists and is in pickup state
 	ride, err := uc.ridesRepo.GetRide(ctx, req.RideID)
 	if err != nil {
@@ -171,12 +147,6 @@ func (uc *rideUC) StartRide(ctx context.Context, req models.RideStartRequest) (*
 			logger.ErrorField(err))
 		return &models.Ride{}, fmt.Errorf("failed to get ride: %w", err)
 	}
-
-	logger.Info("Retrieved ride for start request",
-		logger.String("ride_id", req.RideID),
-		logger.String("current_status", string(ride.Status)),
-		logger.String("driver_id", ride.DriverID.String()),
-		logger.String("passenger_id", ride.PassengerID.String()))
 
 	if ride.Status != models.RideStatusDriverPickup {
 		logger.Error("Cannot start ride - invalid status",
@@ -197,23 +167,17 @@ func (uc *rideUC) StartRide(ctx context.Context, req models.RideStartRequest) (*
 		Longitude: req.PassengerLocation.Longitude,
 	}
 
-	// Verify driver is close to passenger (within 100 meters)
+	// Verify driver is close to passenger (within configured distance)
 	distanceKm := utils.CalculateDistance(driverLoc, passLoc)
 	distanceMeters := distanceKm * 1000
+	maxPickupDistance := uc.cfg.Rides.MaxPickupDistanceM
 
-	logger.Info("Calculated distance between driver and passenger",
-		logger.String("ride_id", req.RideID),
-		logger.Float64("distance_meters", distanceMeters),
-		logger.Float64("max_allowed_meters", 100))
-
-	// Check if driver is close enough to passenger (within 100 meters)
-	if distanceMeters > 100 {
+	// Check if driver is close enough to passenger
+	if distanceMeters > maxPickupDistance {
 		logger.Error("Driver too far from passenger",
 			logger.String("ride_id", req.RideID),
 			logger.Float64("distance_meters", distanceMeters),
-			logger.Float64("max_allowed_meters", 100),
-			logger.Any("driver_location", req.DriverLocation),
-			logger.Any("passenger_location", req.PassengerLocation))
+			logger.Float64("max_allowed_meters", maxPickupDistance))
 		err := fmt.Errorf("driver is too far from passenger (%.2f meters)", distanceMeters)
 		return &models.Ride{}, err
 	}
@@ -284,6 +248,7 @@ func (uc *rideUC) RideArrived(ctx context.Context, req models.RideArrivalReq) (*
 	paymentRequest := &models.PaymentRequest{
 		RideID:      req.RideID,
 		PassengerID: ride.PassengerID.String(),
+		DriverID:    ride.DriverID.String(),
 		TotalCost:   adjustedCost,
 		QRCodeURL:   qrCodeURL,
 	}
@@ -332,6 +297,10 @@ func (uc *rideUC) ProcessPayment(ctx context.Context, req models.PaymentProccess
 	if err != nil {
 		return nil, fmt.Errorf("failed to update payment status: %w", err)
 	}
+
+	// Populate driver and passenger IDs for WebSocket notifications
+	payment.DriverID = ride.DriverID
+	payment.PassengerID = ride.PassengerID
 
 	// Payment status needs to be accepted for ride to be completed
 	if req.Status == models.PaymentStatusAccepted {

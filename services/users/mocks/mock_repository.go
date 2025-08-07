@@ -7,6 +7,7 @@ package mocks
 import (
 	context "context"
 	reflect "reflect"
+	time "time"
 
 	gomock "github.com/golang/mock/gomock"
 	models "github.com/piresc/nebengjek/internal/pkg/models"
@@ -120,6 +121,21 @@ func (m *MockUserRepo) MarkOTPVerified(arg0 context.Context, arg1, arg2 string) 
 func (mr *MockUserRepoMockRecorder) MarkOTPVerified(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkOTPVerified", reflect.TypeOf((*MockUserRepo)(nil).MarkOTPVerified), arg0, arg1, arg2)
+}
+
+// SetEventCacheWithTTL mocks base method.
+func (m *MockUserRepo) SetEventCacheWithTTL(arg0 context.Context, arg1, arg2 string, arg3 interface{}, arg4 time.Duration) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetEventCacheWithTTL", arg0, arg1, arg2, arg3, arg4)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SetEventCacheWithTTL indicates an expected call of SetEventCacheWithTTL.
+func (mr *MockUserRepoMockRecorder) SetEventCacheWithTTL(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetEventCacheWithTTL", reflect.TypeOf((*MockUserRepo)(nil).SetEventCacheWithTTL), arg0, arg1, arg2, arg3, arg4)
 }
 
 // UpdateToDriver mocks base method.

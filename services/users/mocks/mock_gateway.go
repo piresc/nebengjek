@@ -35,36 +35,6 @@ func (m *MockUserGW) EXPECT() *MockUserGWMockRecorder {
 	return m.recorder
 }
 
-// MatchConfirm mocks base method.
-func (m *MockUserGW) MatchConfirm(arg0 context.Context, arg1 *models.MatchConfirmRequest) (*models.MatchProposal, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MatchConfirm", arg0, arg1)
-	ret0, _ := ret[0].(*models.MatchProposal)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// MatchConfirm indicates an expected call of MatchConfirm.
-func (mr *MockUserGWMockRecorder) MatchConfirm(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MatchConfirm", reflect.TypeOf((*MockUserGW)(nil).MatchConfirm), arg0, arg1)
-}
-
-// ProcessPayment mocks base method.
-func (m *MockUserGW) ProcessPayment(arg0 context.Context, arg1 *models.PaymentProccessRequest) (*models.Payment, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProcessPayment", arg0, arg1)
-	ret0, _ := ret[0].(*models.Payment)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ProcessPayment indicates an expected call of ProcessPayment.
-func (mr *MockUserGWMockRecorder) ProcessPayment(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessPayment", reflect.TypeOf((*MockUserGW)(nil).ProcessPayment), arg0, arg1)
-}
-
 // PublishBeaconEvent mocks base method.
 func (m *MockUserGW) PublishBeaconEvent(arg0 context.Context, arg1 *models.BeaconEvent) error {
 	m.ctrl.T.Helper()
@@ -91,62 +61,4 @@ func (m *MockUserGW) PublishFinderEvent(arg0 context.Context, arg1 *models.Finde
 func (mr *MockUserGWMockRecorder) PublishFinderEvent(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishFinderEvent", reflect.TypeOf((*MockUserGW)(nil).PublishFinderEvent), arg0, arg1)
-}
-
-// PublishLocationUpdate mocks base method.
-func (m *MockUserGW) PublishLocationUpdate(arg0 context.Context, arg1 *models.LocationUpdate) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PublishLocationUpdate", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// PublishLocationUpdate indicates an expected call of PublishLocationUpdate.
-func (mr *MockUserGWMockRecorder) PublishLocationUpdate(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishLocationUpdate", reflect.TypeOf((*MockUserGW)(nil).PublishLocationUpdate), arg0, arg1)
-}
-
-// PublishRideStart mocks base method.
-func (m *MockUserGW) PublishRideStart(arg0 context.Context, arg1 *models.RideStartTripEvent) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PublishRideStart", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// PublishRideStart indicates an expected call of PublishRideStart.
-func (mr *MockUserGWMockRecorder) PublishRideStart(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishRideStart", reflect.TypeOf((*MockUserGW)(nil).PublishRideStart), arg0, arg1)
-}
-
-// RideArrived mocks base method.
-func (m *MockUserGW) RideArrived(arg0 context.Context, arg1 *models.RideArrivalReq) (*models.PaymentRequest, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RideArrived", arg0, arg1)
-	ret0, _ := ret[0].(*models.PaymentRequest)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// RideArrived indicates an expected call of RideArrived.
-func (mr *MockUserGWMockRecorder) RideArrived(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RideArrived", reflect.TypeOf((*MockUserGW)(nil).RideArrived), arg0, arg1)
-}
-
-// StartRide mocks base method.
-func (m *MockUserGW) StartRide(arg0 context.Context, arg1 *models.RideStartRequest) (*models.Ride, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StartRide", arg0, arg1)
-	ret0, _ := ret[0].(*models.Ride)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// StartRide indicates an expected call of StartRide.
-func (mr *MockUserGWMockRecorder) StartRide(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartRide", reflect.TypeOf((*MockUserGW)(nil).StartRide), arg0, arg1)
 }

@@ -2,7 +2,6 @@ package context
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -76,17 +75,3 @@ func GetServiceName(ctx context.Context) string {
 	return ""
 }
 
-// WithTimeout creates a context with timeout for operations
-func WithTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(ctx, timeout)
-}
-
-// WithDeadline creates a context with deadline for operations
-func WithDeadline(ctx context.Context, deadline time.Time) (context.Context, context.CancelFunc) {
-	return context.WithDeadline(ctx, deadline)
-}
-
-// WithCancel creates a cancellable context
-func WithCancel(ctx context.Context) (context.Context, context.CancelFunc) {
-	return context.WithCancel(ctx)
-}

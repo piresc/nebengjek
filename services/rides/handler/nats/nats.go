@@ -43,17 +43,11 @@ func NewRidesHandler(
 
 // InitNATSConsumers initializes all JetStream consumers for the rides service
 func (h *RidesHandler) InitNATSConsumers() error {
-	logger.Info("Initializing JetStream consumers for rides service")
-
 	// Create JetStream consumers for rides service
 	consumerConfigs := natspkg.DefaultConsumerConfigs()
 
 	// Create match accepted consumer (using service-specific naming pattern)
 	matchAcceptedConfig := consumerConfigs["match_accepted_rides"]
-	logger.Info("Creating match accepted consumer for rides service",
-		logger.String("stream", matchAcceptedConfig.StreamName),
-		logger.String("consumer", matchAcceptedConfig.ConsumerName),
-		logger.String("filter_subject", matchAcceptedConfig.FilterSubject))
 
 	if err := h.natsClient.CreateConsumer(matchAcceptedConfig); err != nil {
 		logger.Error("Failed to create match accepted consumer for rides service",
@@ -61,11 +55,6 @@ func (h *RidesHandler) InitNATSConsumers() error {
 			logger.ErrorField(err))
 		return fmt.Errorf("failed to create match accepted consumer: %w", err)
 	}
-
-	// Start consuming match accepted events
-	logger.Info("Starting to consume match accepted events for rides service",
-		logger.String("stream", "MATCH_STREAM"),
-		logger.String("consumer", "match_accepted_rides"))
 
 	if err := h.natsClient.ConsumeMessages("MATCH_STREAM", "match_accepted_rides", h.handleMatchAcceptedJS); err != nil {
 		logger.Error("Failed to start consuming match accepted events for rides service",
@@ -75,9 +64,6 @@ func (h *RidesHandler) InitNATSConsumers() error {
 
 	// Create location aggregate consumer
 	locationAggregateConfig := consumerConfigs["location_aggregate_rides"]
-	logger.Info("Creating location aggregate consumer for rides service",
-		logger.String("stream", locationAggregateConfig.StreamName),
-		logger.String("consumer", locationAggregateConfig.ConsumerName))
 
 	if err := h.natsClient.CreateConsumer(locationAggregateConfig); err != nil {
 		logger.Error("Failed to create location aggregate consumer for rides service",
@@ -85,7 +71,6 @@ func (h *RidesHandler) InitNATSConsumers() error {
 		return fmt.Errorf("failed to create location aggregate consumer: %w", err)
 	}
 
-	// Start consuming location aggregate events
 	if err := h.natsClient.ConsumeMessages("LOCATION_STREAM", "location_aggregate_rides", h.handleLocationAggregateJS); err != nil {
 		logger.Error("Failed to start consuming location aggregate events for rides service",
 			logger.ErrorField(err))
@@ -152,9 +137,6 @@ func (h *RidesHandler) handleLocationAggregateJS(msg jetstream.Msg) error {
 
 // handleMatchAccepted processes match acceptance events to create rides
 func (h *RidesHandler) handleMatchAccepted(ctx context.Context, msg []byte) error {
-	logger.InfoCtx(ctx, "Processing match accepted event from JetStream",
-		logger.String("message_size", fmt.Sprintf("%d bytes", len(msg))))
-
 	var matchProposal models.MatchProposal
 	if err := json.Unmarshal(msg, &matchProposal); err != nil {
 		logger.ErrorCtx(ctx, "Failed to unmarshal match proposal",
@@ -170,11 +152,6 @@ func (h *RidesHandler) handleMatchAccepted(ctx context.Context, msg []byte) erro
 		nrpkg.AddTransactionAttribute(txn, "passenger.id", matchProposal.PassengerID)
 	}
 
-	logger.InfoCtx(ctx, "Successfully parsed match accepted event, creating ride",
-		logger.String("match_id", matchProposal.ID),
-		logger.String("driver_id", matchProposal.DriverID),
-		logger.String("passenger_id", matchProposal.PassengerID))
-
 	// Create a ride from the match proposal
 	if err := h.ridesUC.CreateRide(ctx, matchProposal); err != nil {
 		logger.ErrorCtx(ctx, "Failed to create ride from match proposal",
@@ -185,7 +162,7 @@ func (h *RidesHandler) handleMatchAccepted(ctx context.Context, msg []byte) erro
 		return err
 	}
 
-	logger.InfoCtx(ctx, "Successfully processed match accepted event and created ride",
+	logger.InfoCtx(ctx, "Successfully processed match accepted event",
 		logger.String("match_id", matchProposal.ID))
 	return nil
 }

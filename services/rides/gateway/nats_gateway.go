@@ -4,12 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/models"
-	"github.com/piresc/nebengjek/services/rides"
 )
 
 // NATSPublisher interface for publishing messages
@@ -19,14 +16,12 @@ type NATSPublisher interface {
 
 // NATSGateway handles NATS events and integrates with ride use cases
 type NATSGateway struct {
-	rideUC    rides.RideUC
 	publisher NATSPublisher
 }
 
 // NewNATSGateway creates a new NATS gateway
-func NewNATSGateway(rideUC rides.RideUC, publisher NATSPublisher) *NATSGateway {
+func NewNATSGateway(publisher NATSPublisher) *NATSGateway {
 	return &NATSGateway{
-		rideUC:    rideUC,
 		publisher: publisher,
 	}
 }
@@ -49,22 +44,4 @@ func (g *NATSGateway) PublishRideCompleteEvent(ctx context.Context, event *model
 	}
 
 	return g.publisher.Publish(constants.SubjectRideCompleted, data)
-}
-
-// handleMatchEvent handles incoming match events
-func (g *NATSGateway) handleMatchEvent(ctx context.Context, matchEvent models.MatchProposal) error {
-	// Create a ride from the match using the ride usecase
-	return g.rideUC.CreateRide(ctx, matchEvent)
-}
-
-// handleLocationEvent handles incoming location events
-func (g *NATSGateway) handleLocationEvent(ctx context.Context, locationEvent models.LocationAggregate) error {
-	// Process billing update from location data
-	billingUpdate := &models.BillingLedger{
-		EntryID:   uuid.New(),
-		Distance:  locationEvent.Distance,
-		CreatedAt: time.Now(),
-	}
-
-	return g.rideUC.ProcessBillingUpdate(ctx, locationEvent.RideID, billingUpdate)
 }

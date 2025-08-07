@@ -22,15 +22,13 @@ import (
 	"github.com/piresc/nebengjek/services/users/gateway"
 	"github.com/piresc/nebengjek/services/users/handler"
 	httpHandler "github.com/piresc/nebengjek/services/users/handler/http"
-	natsHandler "github.com/piresc/nebengjek/services/users/handler/nats"
-	wsHandler "github.com/piresc/nebengjek/services/users/handler/websocket"
 	"github.com/piresc/nebengjek/services/users/repository"
 	"github.com/piresc/nebengjek/services/users/usecase"
 )
 
 func main() {
 	appName := "users-service"
-	configPath := "config/users.env"
+	configPath := "/Users/pirescerullo/GitHub/assessment/nebengjek/config/users.env"
 	configs := config.InitConfig(configPath)
 
 	// Initialize New Relic
@@ -92,8 +90,8 @@ func main() {
 	// Initialize repository
 	userRepo := repository.NewUserRepo(configs, postgresClient.GetDB(), redisClient)
 
-	// Initialize gateway with API key support and tracer
-	userGW := gateway.NewUserGW(natsClient, configs.Services.MatchServiceURL, configs.Services.RidesServiceURL, &configs.APIKey, tracer)
+	// Initialize gateway
+	userGW := gateway.NewUserGW(natsClient)
 
 	// Initialize usecase
 	userUC := usecase.NewUserUC(userRepo, userGW, configs)
@@ -102,20 +100,8 @@ func main() {
 	userHandler := httpHandler.NewUserHandler(userUC)
 	authHandler := httpHandler.NewAuthHandler(userUC)
 
-	// Initialize Echo WebSocket handler (migrated from manual implementation)
-	echoWSHandler := wsHandler.NewEchoWebSocketHandler(userUC)
-
-	// Initialize NATS handler with Echo WebSocket handler
-	natsHandler := natsHandler.NewNatsHandler(echoWSHandler, natsClient)
-
-	// Initialize NATS consumers
-	if err := natsHandler.InitConsumers(); err != nil {
-		slogLogger.Error("Failed to initialize NATS consumers", slog.Any("error", err))
-		os.Exit(1)
-	}
-
 	// Initialize handlers
-	Handler := handler.NewHandler(userHandler, authHandler, echoWSHandler, natsHandler, configs)
+	Handler := handler.NewHandler(userHandler, authHandler, configs)
 
 	// Initialize Echo server
 	e := echo.New()
@@ -127,17 +113,7 @@ func main() {
 	healthService.AddChecker("nats", health.NewNATSHealthChecker(natsClient))
 
 	// Initialize middleware
-	MW := middleware.NewMiddleware(middleware.Config{
-		Logger: slogLogger,
-		Tracer: tracer,
-		APIKeys: map[string]string{
-			"user-service":     configs.APIKey.UserService,
-			"match-service":    configs.APIKey.MatchService,
-			"rides-service":    configs.APIKey.RidesService,
-			"location-service": configs.APIKey.LocationService,
-		},
-		ServiceName: appName,
-	})
+	MW := middleware.NewMiddleware(configs, slogLogger, tracer)
 
 	// Register enhanced health endpoints BEFORE applying middleware
 	health.RegisterEnhancedHealthEndpoints(e, appName, configs.App.Version, healthService)

@@ -1,4 +1,35 @@
 services:
+  # Gateway Service (API Gateway + WebSocket Hub)
+  gateway-service:
+    image: ${DOCKER_USERNAME:-piresc16}/nebengjek-gateway:latest
+    container_name: nebengjek-gateway-service
+    ports:
+      - "9999:9999"  # HTTP API Gateway
+    environment:
+      - VERSION=${VERSION:-latest}
+      - GIT_COMMIT=${GIT_COMMIT:-unknown}
+      - BUILD_TIME=${BUILD_TIME:-unknown}
+    env_file:
+      - ./config/gateway.env
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    networks:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9999/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
   # Users Service
   users-service:
     image: ${DOCKER_USERNAME:-piresc16}/nebengjek-users:latest
@@ -29,7 +60,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-
+      
   # Location Service
   location-service:
     image: ${DOCKER_USERNAME:-piresc16}/nebengjek-location:latest
@@ -118,6 +149,35 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9992/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Notification Service
+  notification-service:
+    image: ${DOCKER_USERNAME:-piresc16}/nebengjek-notification:latest
+    container_name: nebengjek-notification-service
+    ports:
+      - "9991:9991"
+    environment:
+      - VERSION=${VERSION:-latest}
+      - GIT_COMMIT=${GIT_COMMIT:-unknown}
+      - BUILD_TIME=${BUILD_TIME:-unknown}
+    env_file:
+      - ./config/notification.env
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    networks:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9991/ping"]
       interval: 30s
       timeout: 10s
       retries: 3

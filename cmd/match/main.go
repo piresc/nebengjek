@@ -89,14 +89,14 @@ func main() {
 	// Initialize repositories
 	matchRepo := repository.NewMatchRepository(configs, postgresClient.GetDB(), redisClient)
 
-	// Initialize  gateway with tracer and logger
-	matchGW := gateway.NewMatchGW(natsClient, configs.Services.LocationServiceURL, &configs.APIKey, tracer, slogLogger)
+	// Initialize gateway with NATS and Redis clients
+	matchGW := gateway.NewMatchGW(natsClient, redisClient)
 
 	// Initialize usecase
 	matchUC := usecase.NewMatchUC(configs, matchRepo, matchGW)
 
 	// Initialize handlers
-	handler := handler.NewHandler(matchUC, natsClient, nrApp)
+	handler := handler.NewHandler(matchUC, natsClient, configs)
 
 	// Initialize NATS consumers
 	if err := handler.InitNATSConsumers(); err != nil {
@@ -114,18 +114,7 @@ func main() {
 	healthService.AddChecker("nats", health.NewNATSHealthChecker(natsClient))
 
 	// Initialize middleware
-	MW := middleware.NewMiddleware(middleware.Config{
-		Logger: slogLogger,
-		Tracer: tracer,
-		APIKeys: map[string]string{
-			"user-service":     configs.APIKey.UserService,
-			"match-service":    configs.APIKey.MatchService,
-			"rides-service":    configs.APIKey.RidesService,
-			"location-service": configs.APIKey.LocationService,
-		},
-		ServiceName: appName,
-	})
-
+	MW := middleware.NewMiddleware(configs, slogLogger, tracer)
 	// Register enhanced health endpoints BEFORE applying middleware
 	health.RegisterEnhancedHealthEndpoints(e, appName, configs.App.Version, healthService)
 

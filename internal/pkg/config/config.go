@@ -82,6 +82,11 @@ func loadConfigFromEnv() *models.Config {
 
 	// Rides config
 	configs.Rides.MinDistanceKm = GetEnvAsFloat("RIDES_MIN_DISTANCE_KM", 1.0)
+	configs.Rides.MaxPickupDistanceM = GetEnvAsFloat("RIDES_MAX_PICKUP_DISTANCE_M", 100.0)
+
+	// Users config
+	configs.Users.FinderCacheTTLMinutes = GetEnvAsInt("USERS_FINDER_CACHE_TTL_MINUTES", 5)
+	configs.Users.BeaconCacheTTLMinutes = GetEnvAsInt("USERS_BEACON_CACHE_TTL_MINUTES", 5)
 
 	// Payment config
 	configs.Payment.QRCodeBaseURL = GetEnv("PAYMENT_QR_CODE_BASE_URL", "https://payment.nebengjek.com/qr")
@@ -102,6 +107,8 @@ func loadConfigFromEnv() *models.Config {
 	configs.APIKey.MatchService = GetEnv("API_KEY_MATCH_SERVICE", "")
 	configs.APIKey.RidesService = GetEnv("API_KEY_RIDES_SERVICE", "")
 	configs.APIKey.LocationService = GetEnv("API_KEY_LOCATION_SERVICE", "")
+	configs.APIKey.GatewayService = GetEnv("API_KEY_GATEWAY_SERVICE", "")
+	configs.APIKey.NotificationService = GetEnv("API_KEY_NOTIFICATION_SERVICE", "")
 
 	// Logger config
 	configs.Logger.Level = GetEnv("LOG_LEVEL", "info")

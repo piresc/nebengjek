@@ -302,8 +302,7 @@ func (r *locationRepo) GetDriverLocation(ctx context.Context, driverID string) (
 	}
 
 	// If not in Redis, return error since location service doesn't have database access
-	locationErr := fmt.Errorf("no location data found for driver %s", driverID)
-	return models.Location{}, locationErr
+	return models.Location{}, fmt.Errorf("no location data found for driver %s", driverID)
 }
 
 // GetPassengerLocation retrieves a passenger's last known location

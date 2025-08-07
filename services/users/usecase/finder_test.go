@@ -46,6 +46,7 @@ func TestUpdateFinderStatus_Success(t *testing.T) {
 	}
 
 	mockRepo.EXPECT().GetUserByMSISDN(gomock.Any(), "+628123456789").Return(expectedUser, nil)
+	mockRepo.EXPECT().SetEventCacheWithTTL(gomock.Any(), "finder_update", expectedUser.ID.String(), gomock.Any(), gomock.Any()).Return(true, nil)
 	mockGW.EXPECT().PublishFinderEvent(gomock.Any(), gomock.Any()).Return(nil)
 
 	// Act
@@ -90,6 +91,7 @@ func TestUpdateFinderStatus_GatewayError(t *testing.T) {
 
 	expectedError := errors.New("gateway error")
 	mockRepo.EXPECT().GetUserByMSISDN(gomock.Any(), "+628123456789").Return(expectedUser, nil)
+	mockRepo.EXPECT().SetEventCacheWithTTL(gomock.Any(), "finder_update", expectedUser.ID.String(), gomock.Any(), gomock.Any()).Return(true, nil)
 	mockGW.EXPECT().PublishFinderEvent(gomock.Any(), gomock.Any()).Return(expectedError)
 
 	// Act
@@ -170,6 +172,7 @@ func TestUpdateFinderStatus_DeactivateFinder(t *testing.T) {
 	}
 
 	mockRepo.EXPECT().GetUserByMSISDN(gomock.Any(), "+628123456789").Return(expectedUser, nil)
+	mockRepo.EXPECT().SetEventCacheWithTTL(gomock.Any(), "finder_update", expectedUser.ID.String(), gomock.Any(), gomock.Any()).Return(true, nil)
 	mockGW.EXPECT().PublishFinderEvent(gomock.Any(), gomock.Any()).Return(nil)
 
 	// Act

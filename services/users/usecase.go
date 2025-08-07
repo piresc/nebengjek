@@ -10,6 +10,7 @@ import (
 
 // UserUsecase represents the user usecase interface
 type UserUC interface {
+	// User operations
 	RegisterUser(ctx context.Context, user *models.User) error
 	GetUserByID(ctx context.Context, id string) (*models.User, error)
 
@@ -20,18 +21,6 @@ type UserUC interface {
 	// register driver
 	RegisterDriver(ctx context.Context, user *models.User) error
 
-	// handle match
 	UpdateBeaconStatus(ctx context.Context, beaconReq *models.BeaconRequest) error
 	UpdateFinderStatus(ctx context.Context, finderReq *models.FinderRequest) error
-
-	// handle match confirmation
-	ConfirmMatch(ctx context.Context, mp *models.MatchConfirmRequest) (*models.MatchProposal, error)
-
-	// handle location
-	UpdateUserLocation(ctx context.Context, location *models.LocationUpdate) error
-
-	// handle ride events
-	RideStart(ctx context.Context, event *models.RideStartRequest) (*models.Ride, error)
-	RideArrived(ctx context.Context, req *models.RideArrivalReq) (*models.PaymentRequest, error)
-	ProcessPayment(ctx context.Context, paymentReq *models.PaymentProccessRequest) (*models.Payment, error)
 }

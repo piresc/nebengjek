@@ -11,27 +11,28 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
+	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
+	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/internal/pkg/observability"
 )
 
-// Config holds configuration for the middleware
-type Config struct {
-	Logger      *slog.Logger
-	Tracer      observability.Tracer
-	APIKeys     map[string]string
-	ServiceName string
-}
-
 // Middleware combines multiple middleware into a single, efficient handler
 type Middleware struct {
-	config Config
+	config *models.Config
+	logger *slog.Logger
+	tracer observability.Tracer
 }
 
 // NewMiddleware creates a new middleware instance
-func NewMiddleware(config Config) *Middleware {
-	return &Middleware{config: config}
+func NewMiddleware(config *models.Config, logger *slog.Logger, tracer observability.Tracer) *Middleware {
+	return &Middleware{
+		config: config,
+		logger: logger,
+		tracer: tracer,
+	}
 }
 
 // RegisterHealthEndpoints is a helper method to register health endpoints before applying middleware
@@ -122,13 +123,13 @@ func (m *Middleware) Handler() echo.MiddlewareFunc {
 
 			// 2. Add to context for easy access
 			ctx := context.WithValue(c.Request().Context(), "request_id", requestID)
-			ctx = context.WithValue(ctx, "service_name", m.config.ServiceName)
+			ctx = context.WithValue(ctx, "service_name", "gateway")
 			c.SetRequest(c.Request().WithContext(ctx))
 
 			// 3. Setup APM transaction (if tracer is enabled)
 			var txn observability.Transaction
-			if m.config.Tracer != nil {
-				txn = m.config.Tracer.StartTransaction(c.Request().URL.Path)
+			if m.tracer != nil {
+				txn = m.tracer.StartTransaction(c.Request().URL.Path)
 				defer txn.End()
 				txn.SetWebRequest(c.Request())
 
@@ -172,7 +173,7 @@ func (m *Middleware) Handler() echo.MiddlewareFunc {
 }
 
 // APIKeyHandler returns middleware for API key validation
-func (m *Middleware) APIKeyHandler(allowedServices ...string) echo.MiddlewareFunc {
+func (m *Middleware) APIKeyHandler(allowedService string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			apiKey := c.Request().Header.Get("X-API-Key")
@@ -180,19 +181,31 @@ func (m *Middleware) APIKeyHandler(allowedServices ...string) echo.MiddlewareFun
 				return echo.NewHTTPError(http.StatusUnauthorized, "API key required")
 			}
 
-			// Validate API key against allowed services
-			valid := false
-			for _, service := range allowedServices {
-				if expectedKey, exists := m.config.APIKeys[service]; exists && expectedKey == apiKey {
-					valid = true
-					c.Set("api_service", service)
-					break
-				}
+			// Get expected API key based on service name
+			var expectedKey string
+			switch allowedService {
+			case "users-service":
+				expectedKey = m.config.APIKey.UserService
+			case "match-service":
+				expectedKey = m.config.APIKey.MatchService
+			case "rides-service":
+				expectedKey = m.config.APIKey.RidesService
+			case "location-service":
+				expectedKey = m.config.APIKey.LocationService
+			case "gateway-service":
+				expectedKey = m.config.APIKey.GatewayService
+			case "notification-service":
+				expectedKey = m.config.APIKey.NotificationService
+			default:
+				return echo.NewHTTPError(http.StatusUnauthorized, "Unknown service")
 			}
 
-			if !valid {
+			// Validate API key
+			if expectedKey == "" || expectedKey != apiKey {
 				return echo.NewHTTPError(http.StatusUnauthorized, "Invalid API key")
 			}
+
+			c.Set("api_service", allowedService)
 
 			return next(c)
 		}
@@ -204,7 +217,7 @@ func (m *Middleware) handlePanic(c echo.Context, r interface{}, requestID string
 	stack := debug.Stack()
 
 	// Enhanced diagnostic logging for WebSocket hijack failures
-	if m.config.Logger != nil {
+	if m.logger != nil {
 		logFields := []slog.Attr{
 			slog.Any("panic", r),
 			slog.String("request_id", requestID),
@@ -256,7 +269,7 @@ func (m *Middleware) handlePanic(c echo.Context, r interface{}, requestID string
 			args[i*2+1] = attr.Value
 		}
 
-		m.config.Logger.ErrorContext(c.Request().Context(), "Panic recovered", args...)
+		m.logger.ErrorContext(c.Request().Context(), "Panic recovered", args...)
 	}
 
 	// Report to APM if enabled
@@ -276,7 +289,7 @@ func (m *Middleware) handlePanic(c echo.Context, r interface{}, requestID string
 
 // logRequest logs the HTTP request with essential information
 func (m *Middleware) logRequest(c echo.Context, requestID string, duration time.Duration, err error, responseBody []byte) {
-	if m.config.Logger == nil {
+	if m.logger == nil {
 		return
 	}
 
@@ -284,7 +297,7 @@ func (m *Middleware) logRequest(c echo.Context, requestID string, duration time.
 
 	// Handle cases where we have a Go error
 	if err != nil {
-		m.config.Logger.ErrorContext(c.Request().Context(), "Request failed",
+		m.logger.ErrorContext(c.Request().Context(), "Request failed",
 			slog.String("request_id", requestID),
 			slog.String("method", c.Request().Method),
 			slog.String("path", c.Request().URL.Path),
@@ -311,7 +324,7 @@ func (m *Middleware) logRequest(c echo.Context, requestID string, duration time.
 
 		if errorDetails != "" {
 			if status >= 500 {
-				m.config.Logger.ErrorContext(c.Request().Context(), logMessage,
+				m.logger.ErrorContext(c.Request().Context(), logMessage,
 					slog.String("request_id", requestID),
 					slog.String("method", c.Request().Method),
 					slog.String("path", c.Request().URL.Path),
@@ -322,7 +335,7 @@ func (m *Middleware) logRequest(c echo.Context, requestID string, duration time.
 					slog.String("error_details", errorDetails),
 				)
 			} else {
-				m.config.Logger.WarnContext(c.Request().Context(), logMessage,
+				m.logger.WarnContext(c.Request().Context(), logMessage,
 					slog.String("request_id", requestID),
 					slog.String("method", c.Request().Method),
 					slog.String("path", c.Request().URL.Path),
@@ -335,7 +348,7 @@ func (m *Middleware) logRequest(c echo.Context, requestID string, duration time.
 			}
 		} else {
 			if status >= 500 {
-				m.config.Logger.ErrorContext(c.Request().Context(), logMessage,
+				m.logger.ErrorContext(c.Request().Context(), logMessage,
 					slog.String("request_id", requestID),
 					slog.String("method", c.Request().Method),
 					slog.String("path", c.Request().URL.Path),
@@ -345,7 +358,7 @@ func (m *Middleware) logRequest(c echo.Context, requestID string, duration time.
 					slog.Int64("bytes_out", c.Response().Size),
 				)
 			} else {
-				m.config.Logger.WarnContext(c.Request().Context(), logMessage,
+				m.logger.WarnContext(c.Request().Context(), logMessage,
 					slog.String("request_id", requestID),
 					slog.String("method", c.Request().Method),
 					slog.String("path", c.Request().URL.Path),
@@ -358,7 +371,7 @@ func (m *Middleware) logRequest(c echo.Context, requestID string, duration time.
 		}
 	} else {
 		// Log successful requests at debug level to reduce noise
-		m.config.Logger.DebugContext(c.Request().Context(), "Request completed",
+		m.logger.DebugContext(c.Request().Context(), "Request completed",
 			slog.String("request_id", requestID),
 			slog.String("method", c.Request().Method),
 			slog.String("path", c.Request().URL.Path),
@@ -442,4 +455,27 @@ func (m *Middleware) extractErrorFromResponse(responseBody []byte, status int) s
 	}
 
 	return string(jsonStr)
+}
+
+// JWTHandler returns middleware for JWT token validation
+func (m *Middleware) JWTHandler() echo.MiddlewareFunc {
+	return echojwt.WithConfig(echojwt.Config{
+		SigningKey: []byte(m.config.JWT.Secret),
+		SuccessHandler: func(c echo.Context) {
+			// Get validated token from context (set by echo-jwt)
+			token, ok := c.Get("user").(*jwt.Token)
+			if !ok || !token.Valid {
+				return
+			}
+			
+			if claims, ok := token.Claims.(jwt.MapClaims); ok {
+				if userID, exists := claims["user_id"]; exists {
+					c.Set("user_id", userID)
+				}
+				if role, exists := claims["role"]; exists {
+					c.Set("role", role)
+				}
+			}
+		},
+	})
 }

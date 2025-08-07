@@ -91,7 +91,7 @@ func NewConsumerConfigBuilder(streamName, consumerName string) *ConsumerConfigBu
 		config: ConsumerConfig{
 			StreamName:    streamName,
 			ConsumerName:  consumerName,
-			DeliverPolicy: jetstream.DeliverAllPolicy,
+			DeliverPolicy: jetstream.DeliverNewPolicy,  // Default to new messages only
 			AckPolicy:     jetstream.AckExplicitPolicy,
 			AckWait:       30 * time.Second,
 			MaxDeliver:    3,
@@ -192,6 +192,15 @@ func DefaultStreamConfigs() []StreamConfig {
 			WithMaxBytes(100 * 1024 * 1024).
 			WithMaxMsgs(1000000).
 			Build(),
+
+		NewStreamConfigBuilder("NOTIFICATION_STREAM").
+			WithSubjects("NOTIFICATION.deliver").
+			WithRetention(jetstream.LimitsPolicy).
+			WithStorage(jetstream.FileStorage).
+			WithMaxAge(24 * time.Hour).
+			WithMaxBytes(50 * 1024 * 1024).
+			WithMaxMsgs(500000).
+			Build(),
 	}
 }
 
@@ -201,14 +210,14 @@ func DefaultConsumerConfigs() map[string]ConsumerConfig {
 		// USER_STREAM consumers - user.beacon (dual consumption: users + match)
 		"user_beacon_users": NewConsumerConfigBuilder("USER_STREAM", "user_beacon_users").
 			WithSubject("user.beacon").
-			WithDeliverPolicy(jetstream.DeliverAllPolicy).
+			WithDeliverPolicy(jetstream.DeliverNewPolicy).
 			WithAckPolicy(jetstream.AckExplicitPolicy).
 			WithMaxDeliver(3).
 			Build(),
 
 		"user_beacon_match": NewConsumerConfigBuilder("USER_STREAM", "user_beacon_match").
 			WithSubject("user.beacon").
-			WithDeliverPolicy(jetstream.DeliverAllPolicy).
+			WithDeliverPolicy(jetstream.DeliverNewPolicy).
 			WithAckPolicy(jetstream.AckExplicitPolicy).
 			WithMaxDeliver(3).
 			Build(),
@@ -216,14 +225,14 @@ func DefaultConsumerConfigs() map[string]ConsumerConfig {
 		// USER_STREAM consumers - user.finder (dual consumption: users + match)
 		"user_finder_users": NewConsumerConfigBuilder("USER_STREAM", "user_finder_users").
 			WithSubject("user.finder").
-			WithDeliverPolicy(jetstream.DeliverAllPolicy).
+			WithDeliverPolicy(jetstream.DeliverNewPolicy).
 			WithAckPolicy(jetstream.AckExplicitPolicy).
 			WithMaxDeliver(3).
 			Build(),
 
 		"user_finder_match": NewConsumerConfigBuilder("USER_STREAM", "user_finder_match").
 			WithSubject("user.finder").
-			WithDeliverPolicy(jetstream.DeliverAllPolicy).
+			WithDeliverPolicy(jetstream.DeliverNewPolicy).
 			WithAckPolicy(jetstream.AckExplicitPolicy).
 			WithMaxDeliver(3).
 			Build(),
@@ -231,7 +240,7 @@ func DefaultConsumerConfigs() map[string]ConsumerConfig {
 		// MATCH_STREAM consumers - match.found (single consumption: users)
 		"match_found_users": NewConsumerConfigBuilder("MATCH_STREAM", "match_found_users").
 			WithSubject("match.found").
-			WithDeliverPolicy(jetstream.DeliverAllPolicy).
+			WithDeliverPolicy(jetstream.DeliverNewPolicy).
 			WithAckPolicy(jetstream.AckExplicitPolicy).
 			WithMaxDeliver(5). // Higher retry for critical match events
 			Build(),
@@ -239,14 +248,14 @@ func DefaultConsumerConfigs() map[string]ConsumerConfig {
 		// MATCH_STREAM consumers - match.accepted (dual consumption: users + rides)
 		"match_accepted_users": NewConsumerConfigBuilder("MATCH_STREAM", "match_accepted_users").
 			WithSubject("match.accepted").
-			WithDeliverPolicy(jetstream.DeliverAllPolicy).
+			WithDeliverPolicy(jetstream.DeliverNewPolicy).
 			WithAckPolicy(jetstream.AckExplicitPolicy).
 			WithMaxDeliver(5).
 			Build(),
 
 		"match_accepted_rides": NewConsumerConfigBuilder("MATCH_STREAM", "match_accepted_rides").
 			WithSubject("match.accepted").
-			WithDeliverPolicy(jetstream.DeliverAllPolicy).
+			WithDeliverPolicy(jetstream.DeliverNewPolicy).
 			WithAckPolicy(jetstream.AckExplicitPolicy).
 			WithMaxDeliver(5).
 			Build(),
@@ -254,7 +263,7 @@ func DefaultConsumerConfigs() map[string]ConsumerConfig {
 		// MATCH_STREAM consumers - match.rejected (single consumption: users)
 		"match_rejected_users": NewConsumerConfigBuilder("MATCH_STREAM", "match_rejected_users").
 			WithSubject("match.rejected").
-			WithDeliverPolicy(jetstream.DeliverAllPolicy).
+			WithDeliverPolicy(jetstream.DeliverNewPolicy).
 			WithAckPolicy(jetstream.AckExplicitPolicy).
 			WithMaxDeliver(3).
 			Build(),
@@ -308,7 +317,7 @@ func DefaultConsumerConfigs() map[string]ConsumerConfig {
 		// LOCATION_STREAM consumers - location.aggregate (single consumption: rides)
 		"location_aggregate_rides": NewConsumerConfigBuilder("LOCATION_STREAM", "location_aggregate_rides").
 			WithSubject("location.aggregate").
-			WithDeliverPolicy(jetstream.DeliverAllPolicy).
+			WithDeliverPolicy(jetstream.DeliverNewPolicy).
 			WithAckPolicy(jetstream.AckExplicitPolicy).
 			WithMaxDeliver(3).
 			Build(),
@@ -326,6 +335,8 @@ func GetStreamForSubject(subject string) string {
 		return "RIDE_STREAM"
 	case subject == "location.update" || subject == "location.aggregate":
 		return "LOCATION_STREAM"
+	case subject == "NOTIFICATION.deliver":
+		return "NOTIFICATION_STREAM"
 	default:
 		return ""
 	}

@@ -124,7 +124,7 @@ func NewJetStreamPullConsumer(client *Client, config ConsumerConfig) (*Consumer,
 
 	// Ensure pull-based configuration
 	config.AckPolicy = jetstream.AckExplicitPolicy
-	config.DeliverPolicy = jetstream.DeliverAllPolicy
+	config.DeliverPolicy = jetstream.DeliverNewPolicy  // Default to new messages only
 
 	// Create the consumer if it doesn't exist
 	if err := client.CreateConsumer(config); err != nil {

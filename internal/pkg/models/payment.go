@@ -18,6 +18,7 @@ const (
 type PaymentRequest struct {
 	RideID      string `json:"ride_id"`
 	PassengerID string `json:"passenger_id"`
+	DriverID    string `json:"driver_id"`
 	TotalCost   int    `json:"total_cost"`
 	QRCodeURL   string `json:"qr_code_url"` // URL to QR code image for payment processing
 }
