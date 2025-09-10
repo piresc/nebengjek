@@ -1,9 +1,16 @@
 package constants
 
+import "time"
+
 // WebSocket event types
 const (
 	// Common events
 	EventError = "error"
+
+	// Heartbeat events (leveraging coder/websocket built-in ping/pong)
+	EventPing      = "ping"
+	EventPong      = "pong"
+	EventHeartbeat = "heartbeat"
 
 	// User events
 	EventBeaconUpdate = "beacon_update"
@@ -23,6 +30,13 @@ const (
 	EventPaymentRequest   = "payment_request"   // When payment request is generated after arrival
 	EventPaymentProcessed = "payment_processed" // When payment is processed
 	EventRideCompleted    = "ride_completed"    // When ride is completed and payment processed
+)
+
+// Heartbeat configuration leveraging coder/websocket capabilities
+const (
+	HeartbeatInterval = 30 * time.Second  // Send ping every 30 seconds using conn.Ping()
+	HeartbeatTimeout  = 90 * time.Second  // Consider connection dead after 90 seconds
+	MaxMissedPings    = 3                 // Max consecutive missed pongs (handled automatically)
 )
 
 // WebSocket error codes

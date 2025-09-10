@@ -6,7 +6,6 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models"
-	nrpkg "github.com/piresc/nebengjek/internal/pkg/newrelic"
 	"github.com/piresc/nebengjek/internal/utils"
 	"github.com/piresc/nebengjek/services/rides"
 )
@@ -25,10 +24,6 @@ func NewRidesHandler(rideUC rides.RideUC) *RidesHandler {
 
 // StartRide handles the start trip request for a ride
 func (h *RidesHandler) StartRide(c echo.Context) error {
-	// Get transaction from Echo context using centralized package
-	txn := nrpkg.FromEchoContext(c)
-	nrpkg.SetTransactionName(txn, "Rides.StartRide")
-
 	rideID := c.Param("rideID")
 	if rideID == "" {
 		return utils.BadRequestResponse(c, "Ride ID is required")
@@ -36,7 +31,6 @@ func (h *RidesHandler) StartRide(c echo.Context) error {
 
 	var req models.RideStartRequest
 	if err := c.Bind(&req); err != nil {
-		nrpkg.NoticeTransactionError(txn, err)
 		return utils.BadRequestResponse(c, "Invalid request body: "+err.Error())
 	}
 
@@ -63,7 +57,6 @@ func (h *RidesHandler) StartRide(c echo.Context) error {
 		logger.Error("Failed to start ride in handler",
 			logger.String("ride_id", rideID),
 			logger.ErrorField(err))
-		nrpkg.NoticeTransactionError(txn, err)
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, "Failed to start trip: "+err.Error())
 	}
 
@@ -76,27 +69,18 @@ func (h *RidesHandler) StartRide(c echo.Context) error {
 
 // RideArrived handles the ride arrival notification
 func (h *RidesHandler) RideArrived(c echo.Context) error {
-	// Get transaction from Echo context using centralized package
-	txn := nrpkg.FromEchoContext(c)
-	nrpkg.SetTransactionName(txn, "Rides.RideArrived")
-
 	rideID := c.Param("rideID")
 	if rideID == "" {
 		return utils.BadRequestResponse(c, "Ride ID is required")
 	}
 
-	nrpkg.AddTransactionAttribute(txn, "endpoint", "ride_arrived")
-	nrpkg.AddTransactionAttribute(txn, "ride.id", rideID)
-
 	var req models.RideArrivalReq
 	if err := c.Bind(&req); err != nil {
-		nrpkg.NoticeTransactionError(txn, err)
 		return utils.BadRequestResponse(c, "Invalid request body: "+err.Error())
 	}
 
 	paymentReq, err := h.rideUC.RideArrived(c.Request().Context(), req)
 	if err != nil {
-		nrpkg.NoticeTransactionError(txn, err)
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, "Failed to process ride arrival: "+err.Error())
 	}
 
@@ -105,21 +89,13 @@ func (h *RidesHandler) RideArrived(c echo.Context) error {
 
 // ProcessPayment handles the payment processing for a completed ride
 func (h *RidesHandler) ProcessPayment(c echo.Context) error {
-	// Get transaction from Echo context using centralized package
-	txn := nrpkg.FromEchoContext(c)
-	nrpkg.SetTransactionName(txn, "Rides.ProcessPayment")
-
 	rideID := c.Param("rideID")
 	if rideID == "" {
 		return utils.BadRequestResponse(c, "Ride ID is required")
 	}
 
-	nrpkg.AddTransactionAttribute(txn, "endpoint", "process_payment")
-	nrpkg.AddTransactionAttribute(txn, "ride.id", rideID)
-
 	var req models.PaymentProccessRequest
 	if err := c.Bind(&req); err != nil {
-		nrpkg.NoticeTransactionError(txn, err)
 		return utils.BadRequestResponse(c, "Invalid request body: "+err.Error())
 	}
 
@@ -127,7 +103,6 @@ func (h *RidesHandler) ProcessPayment(c echo.Context) error {
 
 	payment, err := h.rideUC.ProcessPayment(c.Request().Context(), req)
 	if err != nil {
-		nrpkg.NoticeTransactionError(txn, err)
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, "Failed to process payment: "+err.Error())
 	}
 

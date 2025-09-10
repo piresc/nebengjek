@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -16,7 +15,8 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/services/gateway"
 	"github.com/piresc/nebengjek/services/users"
-	"golang.org/x/net/websocket"
+	"github.com/coder/websocket"
+	"github.com/coder/websocket/wsjson"
 )
 
 // WebSocketNotifier defines the interface for WebSocket notification functionality
@@ -24,26 +24,38 @@ type WebSocketNotifier interface {
 	NotifyClientWithError(userID string, event string, data interface{}) error
 }
 
-// EchoWebSocketHandler handles websocket connections using Echo's native support
+// EchoWebSocketHandler handles websocket connections with heartbeat support
 type EchoWebSocketHandler struct {
-	gatewayUC    gateway.GatewayUC
-	userUC       users.UserUC
-	clients      map[string]*websocket.Conn
-	lastActivity map[string]time.Time
-	mu           sync.RWMutex
+	gatewayUC       gateway.GatewayUC
+	userUC          users.UserUC
+	sessionRepo     models.WSConnectionRegistry
+	serverID        string
+	clients         map[string]*websocket.Conn
+	lastActivity    map[string]time.Time
+	lastPing        map[string]time.Time      // Track last ping sent using conn.Ping()
+	missedPings     map[string]int            // Count failed pings
+	connectedSince  map[string]time.Time      // Connection start time
+	heartbeatCancel map[string]context.CancelFunc // Cancel heartbeat goroutines
+	mu              sync.RWMutex
 }
 
-// NewEchoWebSocketHandler creates a new Echo-based websocket handler
-func NewEchoWebSocketHandler(gatewayUC gateway.GatewayUC, userUC users.UserUC) *EchoWebSocketHandler {
+// NewEchoWebSocketHandler creates a new WebSocket handler with heartbeat support
+func NewEchoWebSocketHandler(gatewayUC gateway.GatewayUC, userUC users.UserUC, sessionRepo models.WSConnectionRegistry, serverID string) *EchoWebSocketHandler {
 	return &EchoWebSocketHandler{
-		gatewayUC:    gatewayUC,
-		userUC:       userUC,
-		clients:      make(map[string]*websocket.Conn),
-		lastActivity: make(map[string]time.Time),
+		gatewayUC:       gatewayUC,
+		userUC:          userUC,
+		sessionRepo:     sessionRepo,
+		serverID:        serverID,
+		clients:         make(map[string]*websocket.Conn),
+		lastActivity:    make(map[string]time.Time),
+		lastPing:        make(map[string]time.Time),
+		missedPings:     make(map[string]int),
+		connectedSince:  make(map[string]time.Time),
+		heartbeatCancel: make(map[string]context.CancelFunc),
 	}
 }
 
-// HandleWebSocket handles websocket connections using Echo's native websocket support
+// HandleWebSocket handles websocket connections using github.com/coder/websocket
 func (h *EchoWebSocketHandler) HandleWebSocket(c echo.Context) error {
 	// Extract user info from JWT token (already validated by middleware)
 	userIDRaw := c.Get("user_id")
@@ -65,82 +77,157 @@ func (h *EchoWebSocketHandler) HandleWebSocket(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusUnauthorized, "Invalid user credentials in token")
 	}
 
-	// Create WebSocket server with proper configuration
-	wsServer := &websocket.Server{
-		Handler: func(ws *websocket.Conn) {
-			defer ws.Close()
+	// Upgrade to WebSocket using coder/websocket with optimized settings for gateway service
+	ws, err := websocket.Accept(c.Response(), c.Request(), &websocket.AcceptOptions{
+		// Enable compression for mobile clients (reduces bandwidth)
+		CompressionMode: websocket.CompressionContextTakeover,
+		// Accept any origin for development (configure properly for production)
+		InsecureSkipVerify: true,
+	})
+	if err != nil {
+		logger.Error("Failed to upgrade WebSocket connection",
+			logger.String("user_id", userID),
+			logger.ErrorField(err))
+		return echo.NewHTTPError(http.StatusBadRequest, "WebSocket upgrade failed")
+	}
+	defer ws.Close(websocket.StatusNormalClosure, "connection closed")
 
-			// Register client
-			h.addClient(userID, ws)
-			defer h.removeClient(userID)
+	// Register client with Redis session storage
+	if err := h.addClient(userID, role, ws); err != nil {
+		logger.Error("Failed to register WebSocket client in Redis",
+			logger.String("user_id", userID),
+			logger.String("role", role),
+			logger.ErrorField(err))
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to register client")
+	}
+	defer h.removeClient(userID)
 
-			logger.Info("WebSocket client connected",
-				logger.String("user_id", userID),
-				logger.String("role", role))
+	logger.Info("WebSocket client connected",
+		logger.String("user_id", userID),
+		logger.String("role", role),
+		logger.String("server_id", h.serverID))
 
-			// Message handling loop
-			for {
-				var msg models.WSMessage
-				if err := websocket.JSON.Receive(ws, &msg); err != nil {
-					if err == io.EOF {
-						logger.Info("WebSocket client disconnected",
-							logger.String("user_id", userID))
-						break
-					}
-					logger.Error("Error receiving websocket message",
-						logger.String("user_id", userID),
-						logger.ErrorField(err))
-					break
-				}
-
-				if err := h.handleMessage(userID, role, ws, &msg); err != nil {
-					logger.Error("Error handling message",
-						logger.String("user_id", userID),
-						logger.String("event", msg.Event),
-						logger.ErrorField(err))
-				}
+	// Create context for connection lifecycle management
+	ctx := c.Request().Context()
+	
+	// Message handling loop with proper context handling
+	for {
+		var msg models.WSMessage
+		if err := wsjson.Read(ctx, ws, &msg); err != nil {
+			// Check for normal closure
+			if websocket.CloseStatus(err) == websocket.StatusNormalClosure ||
+			   websocket.CloseStatus(err) == websocket.StatusGoingAway {
+				logger.Info("WebSocket client disconnected normally",
+					logger.String("user_id", userID))
+				break
 			}
-		},
-		// Configure WebSocket to accept any origin to avoid CORS issues
-		Handshake: func(config *websocket.Config, req *http.Request) error {
-			config.Origin = config.Location
-			return nil
-		},
+			logger.Error("Error receiving websocket message",
+				logger.String("user_id", userID),
+				logger.ErrorField(err))
+			break
+		}
+
+		if err := h.handleMessage(ctx, userID, role, ws, &msg); err != nil {
+			logger.Error("Error handling message",
+				logger.String("user_id", userID),
+				logger.String("event", msg.Event),
+				logger.ErrorField(err))
+		}
 	}
 
-	wsServer.ServeHTTP(c.Response(), c.Request())
 	return nil
 }
 
-// addClient safely adds a client to the manager
-func (h *EchoWebSocketHandler) addClient(userID string, ws *websocket.Conn) {
+// addClient safely adds a client with heartbeat monitoring and Redis session storage
+func (h *EchoWebSocketHandler) addClient(userID string, role string, ws *websocket.Conn) error {
 	h.mu.Lock()
-	defer h.mu.Unlock()
+	now := time.Now()
 	h.clients[userID] = ws
-	h.lastActivity[userID] = time.Now()
+	h.lastActivity[userID] = now
+	h.lastPing[userID] = now
+	h.missedPings[userID] = 0
+	h.connectedSince[userID] = now
+	h.mu.Unlock()
+	
+	// Create session data for Redis storage
+	session := &models.WSSessionData{
+		UserID:       userID,
+		Role:         role,
+		ServerID:     h.serverID,
+		ConnectedAt:  now,
+		LastActivity: now,
+		LastPing:     now,
+		LastPong:     now,
+		MissedPings:  0,
+		IsHealthy:    true,
+	}
+	
+	// Store session in Redis
+	if err := h.sessionRepo.RegisterConnection(context.Background(), userID, session); err != nil {
+		h.mu.Lock()
+		delete(h.clients, userID)
+		delete(h.lastActivity, userID)
+		delete(h.lastPing, userID)
+		delete(h.missedPings, userID)
+		delete(h.connectedSince, userID)
+		h.mu.Unlock()
+		return fmt.Errorf("failed to register session in Redis: %w", err)
+	}
+	
+	// Start heartbeat routine using coder/websocket's built-in ping
+	h.startHeartbeat(userID, ws)
+	
+	return nil
 }
 
-// removeClient safely removes a client from the manager
+// removeClient safely removes a client and stops heartbeat
 func (h *EchoWebSocketHandler) removeClient(userID string) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
+	// Cancel heartbeat routine
+	if cancel, exists := h.heartbeatCancel[userID]; exists {
+		cancel()
+		delete(h.heartbeatCancel, userID)
+	}
+	// Clean up all tracking data
 	delete(h.clients, userID)
 	delete(h.lastActivity, userID)
+	delete(h.lastPing, userID)
+	delete(h.missedPings, userID)
+	delete(h.connectedSince, userID)
+	h.mu.Unlock()
+	
+	// Remove from Redis session storage
+	if err := h.sessionRepo.UnregisterConnection(context.Background(), userID); err != nil {
+		logger.Error("Failed to unregister session from Redis",
+			logger.String("user_id", userID),
+			logger.String("server_id", h.serverID),
+			logger.ErrorField(err))
+	}
 }
 
 // IsUserConnected checks if a user is currently connected
 func (h *EchoWebSocketHandler) IsUserConnected(userID string) bool {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	_, exists := h.clients[userID]
-	return exists
+	connected, err := h.sessionRepo.IsUserConnected(context.Background(), userID)
+	if err != nil {
+		logger.Error("Failed to check connection status in Redis",
+			logger.String("user_id", userID),
+			logger.String("server_id", h.serverID),
+			logger.ErrorField(err))
+		return false
+	}
+	return connected
 }
 
 // GetConnectedUsersCount returns the number of connected users
 func (h *EchoWebSocketHandler) GetConnectedUsersCount() int {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return len(h.clients)
+	count, err := h.sessionRepo.GetConnectionCount(context.Background())
+	if err != nil {
+		logger.Error("Failed to get connection count from Redis",
+			logger.String("server_id", h.serverID),
+			logger.ErrorField(err))
+		return 0
+	}
+	return count
 }
 
 // GetUserLastActivity returns the last activity time for a user
@@ -180,7 +267,11 @@ func (h *EchoWebSocketHandler) NotifyClient(userID string, event string, data in
 		Data:  rawData,
 	}
 
-	if err := websocket.JSON.Send(ws, response); err != nil {
+	// Use context with timeout for notification delivery
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := wsjson.Write(timeoutCtx, ws, response); err != nil {
 		logger.Warn("Error sending message to client",
 			logger.String("user_id", userID),
 			logger.String("event", event),
@@ -219,7 +310,11 @@ func (h *EchoWebSocketHandler) NotifyClientWithError(userID string, event string
 		Data:  rawData,
 	}
 
-	if err := websocket.JSON.Send(ws, response); err != nil {
+	// Use context with timeout for notification delivery with error handling
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := wsjson.Write(timeoutCtx, ws, response); err != nil {
 		logger.Warn("Error sending message to client",
 			logger.String("user_id", userID),
 			logger.String("event", event),
@@ -234,7 +329,7 @@ func (h *EchoWebSocketHandler) NotifyClientWithError(userID string, event string
 }
 
 // sendError sends an error message to the client
-func (h *EchoWebSocketHandler) sendError(ws *websocket.Conn, userID string, err error, code string, severity constants.ErrorSeverity) {
+func (h *EchoWebSocketHandler) sendError(ctx context.Context, ws *websocket.Conn, userID string, err error, code string, severity constants.ErrorSeverity) {
 	// Always log detailed error server-side
 	logger.Error("WebSocket operation failed",
 		logger.String("user_id", userID),
@@ -272,7 +367,7 @@ func (h *EchoWebSocketHandler) sendError(ws *websocket.Conn, userID string, err 
 		Data:  json.RawMessage(errorDataBytes),
 	}
 
-	if err := websocket.JSON.Send(ws, errorResponse); err != nil {
+	if err := wsjson.Write(ctx, ws, errorResponse); err != nil {
 		logger.Error("Failed to send error message",
 			logger.String("user_id", userID),
 			logger.ErrorField(err))
@@ -319,25 +414,25 @@ func (h *EchoWebSocketHandler) extractCleanErrorMessage(errorStr string) string 
 }
 
 // handleMessage processes incoming WebSocket messages with preserved business logic
-func (h *EchoWebSocketHandler) handleMessage(userID, role string, ws *websocket.Conn, msg *models.WSMessage) error {
+func (h *EchoWebSocketHandler) handleMessage(ctx context.Context, userID, role string, ws *websocket.Conn, msg *models.WSMessage) error {
 	switch msg.Event {
 	case constants.EventBeaconUpdate:
-		return h.handleBeaconUpdate(userID, ws, msg.Data)
+		return h.handleBeaconUpdate(ctx, userID, ws, msg.Data)
 	case constants.EventFinderUpdate:
-		return h.handleFinderUpdate(userID, ws, msg.Data)
+		return h.handleFinderUpdate(ctx, userID, ws, msg.Data)
 	case constants.EventMatchConfirm:
-		return h.handleMatchConfirmation(userID, ws, msg.Data)
+		return h.handleMatchConfirmation(ctx, userID, ws, msg.Data)
 	case constants.EventLocationUpdate:
-		return h.handleLocationUpdate(userID, ws, msg.Data)
+		return h.handleLocationUpdate(ctx, userID, ws, msg.Data)
 	case constants.EventRideStarted:
-		return h.handleRideStart(userID, ws, msg.Data)
+		return h.handleRideStart(ctx, userID, ws, msg.Data)
 	case constants.EventRideArrived:
-		return h.handleRideArrived(userID, ws, msg.Data)
+		return h.handleRideArrived(ctx, userID, ws, msg.Data)
 	case constants.EventPaymentProcessed:
-		return h.handleProcessPayment(userID, ws, msg.Data)
+		return h.handleProcessPayment(ctx, userID, ws, msg.Data)
 	default:
 		unknownEventErr := fmt.Errorf("unknown event type: %s", msg.Event)
-		h.sendError(ws, userID, unknownEventErr, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
+		h.sendError(ctx, ws, userID, unknownEventErr, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
 		return nil // Don't break connection for unknown events
 	}
 }
@@ -345,16 +440,16 @@ func (h *EchoWebSocketHandler) handleMessage(userID, role string, ws *websocket.
 // Business logic handlers - preserving exact same logic as original implementation
 
 // handleBeaconUpdate processes beacon status updates
-func (h *EchoWebSocketHandler) handleBeaconUpdate(userID string, ws *websocket.Conn, data json.RawMessage) error {
+func (h *EchoWebSocketHandler) handleBeaconUpdate(ctx context.Context, userID string, ws *websocket.Conn, data json.RawMessage) error {
 	var req models.BeaconRequest
 	if err := json.Unmarshal(data, &req); err != nil {
-		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
+		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
 		return nil
 	}
 
 	// Use ProxyToUsersService directly to get the actual response from the microservice
 	resp, err := h.gatewayUC.ProxyToUsersService(
-		context.Background(),
+		ctx,
 		"POST",
 		"/beacon/update",
 		req,
@@ -362,12 +457,12 @@ func (h *EchoWebSocketHandler) handleBeaconUpdate(userID string, ws *websocket.C
 		nil,
 	)
 	if err != nil {
-		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 		return nil
 	}
 
 	if resp.StatusCode >= 400 {
-		h.sendError(ws, userID, fmt.Errorf("users service returned error: %s", string(resp.Body)), constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+		h.sendError(ctx, ws, userID, fmt.Errorf("users service returned error: %s", string(resp.Body)), constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 		return nil
 	}
 
@@ -384,20 +479,20 @@ func (h *EchoWebSocketHandler) handleBeaconUpdate(userID string, ws *websocket.C
 		Data:  json.RawMessage(successDataBytes),
 	}
 
-	return websocket.JSON.Send(ws, response)
+	return wsjson.Write(ctx, ws, response)
 }
 
 // handleFinderUpdate processes finder status updates
-func (h *EchoWebSocketHandler) handleFinderUpdate(userID string, ws *websocket.Conn, data json.RawMessage) error {
+func (h *EchoWebSocketHandler) handleFinderUpdate(ctx context.Context, userID string, ws *websocket.Conn, data json.RawMessage) error {
 	var req models.FinderRequest
 	if err := json.Unmarshal(data, &req); err != nil {
-		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
+		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
 		return nil
 	}
 
 	// Use ProxyToUsersService directly to get the actual response from the microservice
 	resp, err := h.gatewayUC.ProxyToUsersService(
-		context.Background(),
+		ctx,
 		"POST",
 		"/finder/update",
 		req,
@@ -405,12 +500,12 @@ func (h *EchoWebSocketHandler) handleFinderUpdate(userID string, ws *websocket.C
 		nil,
 	)
 	if err != nil {
-		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 		return nil
 	}
 
 	if resp.StatusCode >= 400 {
-		h.sendError(ws, userID, fmt.Errorf("users service returned error: %s", string(resp.Body)), constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+		h.sendError(ctx, ws, userID, fmt.Errorf("users service returned error: %s", string(resp.Body)), constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 		return nil
 	}
 
@@ -427,23 +522,23 @@ func (h *EchoWebSocketHandler) handleFinderUpdate(userID string, ws *websocket.C
 		Data:  json.RawMessage(successDataBytes),
 	}
 
-	return websocket.JSON.Send(ws, response)
+	return wsjson.Write(ctx, ws, response)
 }
 
 // handleMatchConfirmation processes match confirmation with dual notification
-func (h *EchoWebSocketHandler) handleMatchConfirmation(userID string, ws *websocket.Conn, data json.RawMessage) error {
+func (h *EchoWebSocketHandler) handleMatchConfirmation(ctx context.Context, userID string, ws *websocket.Conn, data json.RawMessage) error {
 	var req models.MatchConfirmRequest
 	if err := json.Unmarshal(data, &req); err != nil {
-		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
+		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
 		return nil
 	}
 
 	// Critical: Set UserID from client context
 	req.UserID = userID
 
-	result, err := h.gatewayUC.ConfirmMatch(context.Background(), &req)
+	result, err := h.gatewayUC.ConfirmMatch(ctx, &req)
 	if err != nil {
-		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 		return nil
 	}
 
@@ -464,14 +559,14 @@ func (h *EchoWebSocketHandler) handleMatchConfirmation(userID string, ws *websoc
 		Data:  json.RawMessage(successDataBytes),
 	}
 
-	return websocket.JSON.Send(ws, response)
+	return wsjson.Write(ctx, ws, response)
 }
 
 // handleLocationUpdate processes location updates with timestamp addition
-func (h *EchoWebSocketHandler) handleLocationUpdate(userID string, ws *websocket.Conn, data json.RawMessage) error {
+func (h *EchoWebSocketHandler) handleLocationUpdate(ctx context.Context, userID string, ws *websocket.Conn, data json.RawMessage) error {
 	var req models.LocationUpdate
 	if err := json.Unmarshal(data, &req); err != nil {
-		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
+		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
 		return nil
 	}
 	req.DriverID = userID // Ensure DriverID is set from client context
@@ -479,8 +574,8 @@ func (h *EchoWebSocketHandler) handleLocationUpdate(userID string, ws *websocket
 	// Critical: Add timestamp to location data (preserved business logic)
 	// This logic is handled inside the use case, but we ensure the call is made
 
-	if err := h.gatewayUC.UpdateUserLocation(context.Background(), &req); err != nil {
-		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+	if err := h.gatewayUC.UpdateUserLocation(ctx, &req); err != nil {
+		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 		return nil
 	}
 
@@ -497,20 +592,20 @@ func (h *EchoWebSocketHandler) handleLocationUpdate(userID string, ws *websocket
 		Data:  json.RawMessage(successDataBytes),
 	}
 
-	return websocket.JSON.Send(ws, response)
+	return wsjson.Write(ctx, ws, response)
 }
 
 // handleRideStart processes ride start with dual notification
-func (h *EchoWebSocketHandler) handleRideStart(userID string, ws *websocket.Conn, data json.RawMessage) error {
+func (h *EchoWebSocketHandler) handleRideStart(ctx context.Context, userID string, ws *websocket.Conn, data json.RawMessage) error {
 	var req models.RideStartRequest
 	if err := json.Unmarshal(data, &req); err != nil {
-		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
+		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
 		return nil
 	}
 
-	resp, err := h.gatewayUC.RideStart(context.Background(), &req)
+	resp, err := h.gatewayUC.RideStart(ctx, &req)
 	if err != nil {
-		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 		return nil
 	}
 
@@ -531,20 +626,20 @@ func (h *EchoWebSocketHandler) handleRideStart(userID string, ws *websocket.Conn
 		Data:  json.RawMessage(successDataBytes),
 	}
 
-	return websocket.JSON.Send(ws, response)
+	return wsjson.Write(ctx, ws, response)
 }
 
 // handleRideArrived processes ride arrival with event type transformation
-func (h *EchoWebSocketHandler) handleRideArrived(userID string, ws *websocket.Conn, data json.RawMessage) error {
+func (h *EchoWebSocketHandler) handleRideArrived(ctx context.Context, userID string, ws *websocket.Conn, data json.RawMessage) error {
 	var req models.RideArrivalReq
 	if err := json.Unmarshal(data, &req); err != nil {
-		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
+		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
 		return nil
 	}
 
-	paymentReq, err := h.gatewayUC.RideArrived(context.Background(), &req)
+	paymentReq, err := h.gatewayUC.RideArrived(ctx, &req)
 	if err != nil {
-		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 		return nil
 	}
 
@@ -572,27 +667,27 @@ func (h *EchoWebSocketHandler) handleRideArrived(userID string, ws *websocket.Co
 		Data:  json.RawMessage(successDataBytes),
 	}
 
-	return websocket.JSON.Send(ws, response)
+	return wsjson.Write(ctx, ws, response)
 }
 
 // handleProcessPayment processes payment with status validation
-func (h *EchoWebSocketHandler) handleProcessPayment(userID string, ws *websocket.Conn, data json.RawMessage) error {
+func (h *EchoWebSocketHandler) handleProcessPayment(ctx context.Context, userID string, ws *websocket.Conn, data json.RawMessage) error {
 	var req models.PaymentProccessRequest
 	if err := json.Unmarshal(data, &req); err != nil {
-		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
+		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
 		return nil
 	}
 
 	// Critical: Payment status validation
 	if req.Status != models.PaymentStatusAccepted && req.Status != models.PaymentStatusRejected {
 		validationErr := fmt.Errorf("invalid payment status: %s", req.Status)
-		h.sendError(ws, userID, validationErr, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
+		h.sendError(ctx, ws, userID, validationErr, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
 		return nil
 	}
 
-	_, err := h.gatewayUC.ProcessPayment(context.Background(), &req)
+	_, err := h.gatewayUC.ProcessPayment(ctx, &req)
 	if err != nil {
-		h.sendError(ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
 		return nil
 	}
 
@@ -611,5 +706,188 @@ func (h *EchoWebSocketHandler) handleProcessPayment(userID string, ws *websocket
 
 	// Payment processing successful - NATS event will also handle separate notifications
 	// The notification service will send payment_processed events via NATS to both users
-	return websocket.JSON.Send(ws, response)
+	return wsjson.Write(ctx, ws, response)
+}
+
+// Heartbeat implementation using coder/websocket built-in capabilities
+
+// startHeartbeat starts heartbeat monitoring using coder/websocket's built-in ping
+func (h *EchoWebSocketHandler) startHeartbeat(userID string, ws *websocket.Conn) {
+	ctx, cancel := context.WithCancel(context.Background())
+	
+	h.mu.Lock()
+	h.heartbeatCancel[userID] = cancel
+	h.mu.Unlock()
+
+	go func() {
+		ticker := time.NewTicker(constants.HeartbeatInterval)
+		defer ticker.Stop()
+		sequence := int64(0)
+
+		for {
+			select {
+			case <-ctx.Done():
+				logger.Debug("Heartbeat routine stopped",
+					logger.String("user_id", userID))
+				return
+			case <-ticker.C:
+				sequence++
+				if err := h.sendPing(userID, ws, sequence); err != nil {
+					logger.Error("Ping failed, connection may be dead",
+						logger.String("user_id", userID),
+						logger.ErrorField(err))
+					
+					h.mu.Lock()
+					h.missedPings[userID]++
+					missedCount := h.missedPings[userID]
+					h.mu.Unlock()
+
+					if missedCount >= constants.MaxMissedPings {
+						logger.Warn("Connection appears dead, closing",
+							logger.String("user_id", userID),
+							logger.Int("missed_pings", missedCount))
+						
+						// Close connection and clean up
+						ws.Close(websocket.StatusInternalError, "heartbeat timeout")
+						h.removeClient(userID)
+						return
+					}
+				} else {
+					// Reset missed pings on successful ping (coder/websocket handles pong automatically)
+					h.mu.Lock()
+					h.missedPings[userID] = 0
+					h.mu.Unlock()
+				}
+			}
+		}
+	}()
+}
+
+// sendPing sends a ping using coder/websocket's built-in ping method
+func (h *EchoWebSocketHandler) sendPing(userID string, ws *websocket.Conn, sequence int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Use coder/websocket's built-in ping method (pong is handled automatically)
+	if err := ws.Ping(ctx); err != nil {
+		return fmt.Errorf("ping failed: %w", err)
+	}
+
+	// Update ping tracking
+	h.mu.Lock()
+	h.lastPing[userID] = time.Now()
+	h.mu.Unlock()
+
+	logger.Debug("Ping sent successfully",
+		logger.String("user_id", userID),
+		logger.Int64("sequence", sequence))
+	
+	return nil
+}
+
+// checkConnectionHealth evaluates connection health using heartbeat data
+func (h *EchoWebSocketHandler) checkConnectionHealth(userID string) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	lastPing, exists := h.lastPing[userID]
+	if !exists {
+		return false
+	}
+
+	missedCount := h.missedPings[userID]
+	timeSinceLastPing := time.Since(lastPing)
+
+	// Connection is unhealthy if:
+	// 1. Too many missed pings, OR
+	// 2. No ping response within timeout period
+	isUnhealthy := missedCount >= constants.MaxMissedPings ||
+				   timeSinceLastPing > constants.HeartbeatTimeout
+
+	return !isUnhealthy
+}
+
+// Health monitoring endpoints for heartbeat status
+
+// GetConnectionHealth returns detailed health status for a specific user
+func (h *EchoWebSocketHandler) GetConnectionHealth(userID string) *models.WSConnectionHealth {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	health := &models.WSConnectionHealth{
+		UserID:    userID,
+		IsHealthy: false,
+	}
+
+	if lastActivity, exists := h.lastActivity[userID]; exists {
+		health.LastActivity = lastActivity
+		health.ConnectedSince = h.connectedSince[userID]
+		health.LastPing = h.lastPing[userID]
+		health.MissedPings = h.missedPings[userID]
+		health.IsHealthy = h.checkConnectionHealth(userID)
+	}
+
+	return health
+}
+
+// GetAllConnectionsHealth returns health status for all connected users
+func (h *EchoWebSocketHandler) GetAllConnectionsHealth() map[string]*models.WSConnectionHealth {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	result := make(map[string]*models.WSConnectionHealth)
+	for userID := range h.clients {
+		result[userID] = &models.WSConnectionHealth{
+			UserID:         userID,
+			LastActivity:   h.lastActivity[userID],
+			LastPing:       h.lastPing[userID],
+			MissedPings:    h.missedPings[userID],
+			ConnectedSince: h.connectedSince[userID],
+			IsHealthy:      h.checkConnectionHealth(userID),
+		}
+	}
+
+	return result
+}
+
+// GetHealthyConnectionsCount returns count of healthy connections
+func (h *EchoWebSocketHandler) GetHealthyConnectionsCount() int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	healthyCount := 0
+	for userID := range h.clients {
+		if h.checkConnectionHealth(userID) {
+			healthyCount++
+		}
+	}
+
+	return healthyCount
+}
+
+// GetHeartbeatStats returns overall heartbeat statistics
+func (h *EchoWebSocketHandler) GetHeartbeatStats() map[string]interface{} {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	totalConnections := len(h.clients)
+	healthyConnections := 0
+	totalMissedPings := 0
+
+	for userID := range h.clients {
+		if h.checkConnectionHealth(userID) {
+			healthyConnections++
+		}
+		totalMissedPings += h.missedPings[userID]
+	}
+
+	return map[string]interface{}{
+		"total_connections":   totalConnections,
+		"healthy_connections": healthyConnections,
+		"unhealthy_connections": totalConnections - healthyConnections,
+		"total_missed_pings":  totalMissedPings,
+		"heartbeat_interval":  constants.HeartbeatInterval.String(),
+		"heartbeat_timeout":   constants.HeartbeatTimeout.String(),
+		"max_missed_pings":    constants.MaxMissedPings,
+	}
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/services/gateway"
 	gatewaywebsocket "github.com/piresc/nebengjek/services/gateway/handler/websocket"
+	"github.com/piresc/nebengjek/services/gateway/repository"
 )
 
 // Handler coordinates all protocol handlers for the gateway service
@@ -16,10 +17,12 @@ type Handler struct {
 	nrApp        *newrelic.Application
 	wsHandler    *gatewaywebsocket.EchoWebSocketHandler
 	proxyHandler *ProxyHandler
+	sessionRepo  *repository.WSSessionRepository
+	serverID     string
 }
 
 // NewHandler creates and initializes all handlers following clean architecture
-func NewHandler(gatewayUC gateway.GatewayUC, cfg *models.Config, nrApp *newrelic.Application, wsHandler *gatewaywebsocket.EchoWebSocketHandler) *Handler {
+func NewHandler(gatewayUC gateway.GatewayUC, cfg *models.Config, nrApp *newrelic.Application, wsHandler *gatewaywebsocket.EchoWebSocketHandler, sessionRepo *repository.WSSessionRepository, serverID string) *Handler {
 	// Create proxy handler with UseCase dependency injection
 	proxyHandler := NewProxyHandler(gatewayUC)
 
@@ -29,6 +32,8 @@ func NewHandler(gatewayUC gateway.GatewayUC, cfg *models.Config, nrApp *newrelic
 		nrApp:        nrApp,
 		wsHandler:    wsHandler,
 		proxyHandler: proxyHandler,
+		sessionRepo:  sessionRepo,
+		serverID:     serverID,
 	}
 }
 

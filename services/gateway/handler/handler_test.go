@@ -11,6 +11,7 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	"github.com/piresc/nebengjek/services/gateway/mocks"
 	gatewaywebsocket "github.com/piresc/nebengjek/services/gateway/handler/websocket"
+	"github.com/piresc/nebengjek/services/gateway/repository"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,14 +27,18 @@ func TestNewHandler(t *testing.T) {
 	}
 	nrApp := &newrelic.Application{}
 	wsHandler := &gatewaywebsocket.EchoWebSocketHandler{}
+	sessionRepo := &repository.WSSessionRepository{}
+	serverID := "test-server"
 
-	handler := NewHandler(mockGatewayUC, cfg, nrApp, wsHandler)
+	handler := NewHandler(mockGatewayUC, cfg, nrApp, wsHandler, sessionRepo, serverID)
 
 	assert.NotNil(t, handler)
 	assert.Equal(t, mockGatewayUC, handler.gatewayUC)
 	assert.Equal(t, cfg, handler.cfg)
 	assert.Equal(t, nrApp, handler.nrApp)
 	assert.Equal(t, wsHandler, handler.wsHandler)
+	assert.Equal(t, sessionRepo, handler.sessionRepo)
+	assert.Equal(t, serverID, handler.serverID)
 	assert.NotNil(t, handler.proxyHandler)
 }
 
@@ -128,7 +133,7 @@ func TestHandler_GetWebSocketJWTMiddleware(t *testing.T) {
 			nrApp := &newrelic.Application{}
 			wsHandler := &gatewaywebsocket.EchoWebSocketHandler{}
 
-			handler := NewHandler(mockGatewayUC, cfg, nrApp, wsHandler)
+			handler := NewHandler(mockGatewayUC, cfg, nrApp, wsHandler, nil, "test-server")
 
 			// Create a dummy next handler
 			nextCalled := false
@@ -187,7 +192,7 @@ func TestHandler_GetWebSocketJWTMiddleware_SuccessfulTokenParsing(t *testing.T) 
 	nrApp := &newrelic.Application{}
 	wsHandler := &gatewaywebsocket.EchoWebSocketHandler{}
 
-	handler := NewHandler(mockGatewayUC, cfg, nrApp, wsHandler)
+	handler := NewHandler(mockGatewayUC, cfg, nrApp, wsHandler, nil, "test-server")
 
 	// Create a valid JWT token
 	claims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -238,7 +243,7 @@ func TestHandler_GetWebSocketJWTMiddleware_InvalidClaims(t *testing.T) {
 	nrApp := &newrelic.Application{}
 	wsHandler := &gatewaywebsocket.EchoWebSocketHandler{}
 
-	handler := NewHandler(mockGatewayUC, cfg, nrApp, wsHandler)
+	handler := NewHandler(mockGatewayUC, cfg, nrApp, wsHandler, nil, "test-server")
 
 	// Create a token with valid structure but empty MapClaims (this should succeed)
 	claims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{})

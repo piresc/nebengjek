@@ -16,18 +16,18 @@ import (
 	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/models"
-	"github.com/piresc/nebengjek/internal/pkg/observability"
+	"github.com/piresc/nebengjek/internal/pkg/tracing"
 )
 
 // Middleware combines multiple middleware into a single, efficient handler
 type Middleware struct {
 	config *models.Config
 	logger *slog.Logger
-	tracer observability.Tracer
+	tracer tracing.Tracer
 }
 
 // NewMiddleware creates a new middleware instance
-func NewMiddleware(config *models.Config, logger *slog.Logger, tracer observability.Tracer) *Middleware {
+func NewMiddleware(config *models.Config, logger *slog.Logger, tracer tracing.Tracer) *Middleware {
 	return &Middleware{
 		config: config,
 		logger: logger,
@@ -127,14 +127,31 @@ func (m *Middleware) Handler() echo.MiddlewareFunc {
 			c.SetRequest(c.Request().WithContext(ctx))
 
 			// 3. Setup APM transaction (if tracer is enabled)
-			var txn observability.Transaction
-			if m.tracer != nil {
-				txn = m.tracer.StartTransaction(c.Request().URL.Path)
+			var txn tracing.HTTPTransaction
+			if m.tracer != nil && m.tracer.IsEnabled() {
+				ctx, txn = m.tracer.StartHTTPRequest(c.Request())
 				defer txn.End()
-				txn.SetWebRequest(c.Request())
 
-				// Add transaction context - this ensures New Relic context is available for logging
-				ctx = txn.GetContext()
+				// Set transaction name based on route
+				route := c.Path()
+				if route == "" {
+					route = c.Request().URL.Path
+				}
+				txn.SetName(formatTransactionName(c.Request().Method, route))
+
+				// Add standard attributes
+				txn.AddAttribute("http.method", c.Request().Method)
+				txn.AddAttribute("http.url", c.Request().URL.String())
+				txn.AddAttribute("http.route", route)
+				txn.AddAttribute("user_agent", c.Request().UserAgent())
+				txn.AddAttribute("remote_addr", c.RealIP())
+
+				// Add request ID if available
+				if requestID := c.Request().Header.Get("X-Request-ID"); requestID != "" {
+					txn.AddAttribute("request.id", requestID)
+				}
+
+				// Set request context for downstream calls
 				c.SetRequest(c.Request().WithContext(ctx))
 
 				// Store transaction in Echo context for easy access
@@ -162,9 +179,19 @@ func (m *Middleware) Handler() echo.MiddlewareFunc {
 			duration := time.Since(start)
 			m.logRequest(c, requestID, duration, err, responseCapture.body)
 
-			// 8. Set APM response (if enabled)
+			// 8. Handle transaction error status (if enabled)
 			if txn != nil {
-				txn.SetWebResponse(c.Response().Writer)
+				if err != nil {
+					txn.AddError(err)
+					txn.AddAttribute("http.status_code", "500")
+					txn.AddAttribute("error.message", err.Error())
+				} else {
+					status := c.Response().Status
+					if status == 0 {
+						status = 200 // Default to 200 if not set
+					}
+					txn.AddAttribute("http.status_code", http.StatusText(status))
+				}
 			}
 
 			return err
@@ -213,7 +240,7 @@ func (m *Middleware) APIKeyHandler(allowedService string) echo.MiddlewareFunc {
 }
 
 // handlePanic handles panic recovery with enhanced diagnostic logging
-func (m *Middleware) handlePanic(c echo.Context, r interface{}, requestID string, txn observability.Transaction) {
+func (m *Middleware) handlePanic(c echo.Context, r interface{}, requestID string, txn tracing.HTTPTransaction) {
 	stack := debug.Stack()
 
 	// Enhanced diagnostic logging for WebSocket hijack failures
@@ -274,7 +301,7 @@ func (m *Middleware) handlePanic(c echo.Context, r interface{}, requestID string
 
 	// Report to APM if enabled
 	if txn != nil {
-		txn.NoticeError(fmt.Errorf("panic: %v", r))
+		txn.AddError(fmt.Errorf("panic: %v", r))
 	}
 
 	// Send simple error response
@@ -479,3 +506,4 @@ func (m *Middleware) JWTHandler() echo.MiddlewareFunc {
 		},
 	})
 }
+

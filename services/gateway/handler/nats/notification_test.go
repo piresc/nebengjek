@@ -12,6 +12,7 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	gatewaywebsocket "github.com/piresc/nebengjek/services/gateway/handler/websocket"
+	"github.com/piresc/nebengjek/services/gateway/repository"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -39,9 +40,10 @@ func (m *MockWebSocketHandler) NotifyClientWithError(userID string, event string
 func TestNewGatewayNotificationHandler(t *testing.T) {
 	natsClient := &natspkg.Client{}
 	wsHandler := &gatewaywebsocket.EchoWebSocketHandler{}
+	sessionRepo := &repository.WSSessionRepository{}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	handler := NewGatewayNotificationHandler(natsClient, wsHandler, logger)
+	handler := NewGatewayNotificationHandler(natsClient, wsHandler, sessionRepo, logger, "test-server")
 
 	assert.NotNil(t, handler)
 	assert.Equal(t, natsClient, handler.natsClient)

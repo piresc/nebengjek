@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/notification"
@@ -316,51 +317,143 @@ func (uc *NotificationUC) MarkNotificationDelivered(ctx context.Context, notific
 	return uc.notificationRepo.MarkNotificationDelivered(ctx, notificationID)
 }
 
-// SendNotificationToGateway sends a notification to the gateway via NATS JetStream
+// SendNotificationToGateway sends a notification to all gateways via multi-gateway broadcasting
 func (uc *NotificationUC) SendNotificationToGateway(ctx context.Context, notification *models.UserNotification) error {
-	deliveryEvent := &models.NotificationDeliveryEvent{
-		UserID:     notification.UserID,
-		Type:       notification.Type,
-		Data:       notification.Data,
-		Timestamp:  notification.Timestamp,
-		DeliveryID: uuid.New(),
-	}
-
-	// Marshal the event data
-	eventData, err := json.Marshal(deliveryEvent)
+	// Map notification type to WebSocket event
+	wsEvent := uc.mapNotificationToWSEvent(notification.Type)
+	
+	// Marshal notification data to JSON
+	notificationData, err := json.Marshal(notification.Data)
 	if err != nil {
-		return fmt.Errorf("failed to marshal delivery event: %w", err)
+		return fmt.Errorf("failed to marshal notification data: %w", err)
 	}
-
-	// Use JetStream publish with options for reliability
+	
+	// Create user-targeted broadcast message
+	broadcastMsg := &models.WSUserBroadcast{
+		WSBroadcastMessage: models.WSBroadcastMessage{
+			MessageID: uuid.New().String(),
+			Event:     wsEvent,
+			Data:      json.RawMessage(notificationData),
+			Timestamp: time.Now(),
+			Source:    "notification-service",
+			Priority:  5,
+		},
+		TargetUsers: []string{notification.UserID.String()},
+	}
+	
+	// Serialize broadcast message
+	data, err := json.Marshal(broadcastMsg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal broadcast message: %w", err)
+	}
+	
+	// Publish to multi-gateway subject (all gateways will receive this)
 	opts := natspkg.PublishOptions{
-		Subject: "NOTIFICATION.deliver",
-		Data:    eventData,
-		MsgID:   fmt.Sprintf("notification-deliver-%s-%d", deliveryEvent.DeliveryID.String(), time.Now().UnixNano()),
+		Subject: constants.SubjectWSBroadcastUser,
+		Data:    data,
+		MsgID:   broadcastMsg.MessageID,
 		Timeout: 10 * time.Second,
 	}
-
-	uc.logger.Info("Publishing notification to gateway via JetStream",
-		slog.String("subject", opts.Subject),
-		slog.String("user_id", notification.UserID.String()),
-		slog.String("type", notification.Type),
-		slog.String("msg_id", opts.MsgID))
-
+	
 	if err := uc.natsClient.PublishWithOptions(opts); err != nil {
-		uc.logger.Error("Failed to publish notification to JetStream",
-			slog.String("subject", opts.Subject),
+		uc.logger.Error("Failed to publish multi-gateway notification",
 			slog.String("user_id", notification.UserID.String()),
-			slog.String("msg_id", opts.MsgID),
+			slog.String("event", wsEvent),
 			slog.Any("error", err))
-		return fmt.Errorf("failed to publish notification to JetStream: %w", err)
+		return fmt.Errorf("failed to publish notification: %w", err)
 	}
-
-	uc.logger.Info("Successfully published notification to JetStream",
-		slog.String("subject", opts.Subject),
+	
+	uc.logger.Info("Multi-gateway notification published successfully",
 		slog.String("user_id", notification.UserID.String()),
-		slog.String("msg_id", opts.MsgID))
-
+		slog.String("event", wsEvent),
+		slog.String("message_id", broadcastMsg.MessageID))
+	
 	return nil
+}
+
+// mapNotificationToWSEvent maps notification types to WebSocket events
+func (uc *NotificationUC) mapNotificationToWSEvent(notificationType string) string {
+	eventMap := map[string]string{
+		models.NotificationTypeMatchProposal:  constants.EventMatchConfirm,
+		models.NotificationTypeMatchAccepted:  constants.EventMatchConfirm,
+		models.NotificationTypeMatchRejected:  constants.EventMatchRejected,
+		models.NotificationTypeRideStarted:    constants.EventRideStarted,
+		models.NotificationTypeRideCompleted:  constants.EventRideCompleted,
+		models.NotificationTypePaymentProcessed: constants.EventPaymentProcessed,
+		// Add more mappings as needed
+	}
+	
+	if event, exists := eventMap[notificationType]; exists {
+		return event
+	}
+	
+	// Default fallback
+	return "notification"
+}
+
+// BroadcastToRole sends notifications to all users with specific roles across all gateways
+func (uc *NotificationUC) BroadcastToRole(ctx context.Context, roles []string, event string, data interface{}) error {
+	dataBytes, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal broadcast data: %w", err)
+	}
+	
+	broadcastMsg := &models.WSRoleBroadcast{
+		WSBroadcastMessage: models.WSBroadcastMessage{
+			MessageID: uuid.New().String(),
+			Event:     event,
+			Data:      json.RawMessage(dataBytes),
+			Timestamp: time.Now(),
+			Source:    "notification-service",
+			Priority:  5,
+		},
+		TargetRoles: roles,
+	}
+	
+	msgData, err := json.Marshal(broadcastMsg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal role broadcast: %w", err)
+	}
+	
+	opts := natspkg.PublishOptions{
+		Subject: constants.SubjectWSBroadcastRole,
+		Data:    msgData,
+		MsgID:   broadcastMsg.MessageID,
+		Timeout: 10 * time.Second,
+	}
+	
+	return uc.natsClient.PublishWithOptions(opts)
+}
+
+// BroadcastToAll sends notifications to all connected users across all gateways
+func (uc *NotificationUC) BroadcastToAll(ctx context.Context, event string, data interface{}) error {
+	dataBytes, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal broadcast data: %w", err)
+	}
+	
+	broadcastMsg := &models.WSBroadcastMessage{
+		MessageID: uuid.New().String(),
+		Event:     event,
+		Data:      json.RawMessage(dataBytes),
+		Timestamp: time.Now(),
+		Source:    "notification-service",
+		Priority:  5,
+	}
+	
+	msgData, err := json.Marshal(broadcastMsg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal all broadcast: %w", err)
+	}
+	
+	opts := natspkg.PublishOptions{
+		Subject: constants.SubjectWSBroadcastAll,
+		Data:    msgData,
+		MsgID:   broadcastMsg.MessageID,
+		Timeout: 10 * time.Second,
+	}
+	
+	return uc.natsClient.PublishWithOptions(opts)
 }
 
 // processAndStoreNotification is a helper method to process and store notifications

@@ -9,7 +9,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
-	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/location/mocks"
@@ -24,16 +23,14 @@ func TestLocationHandler_Constructor(t *testing.T) {
 
 	mockLocationUC := mocks.NewMockLocationUC(ctrl)
 	mockNATSClient := &natspkg.Client{}
-	mockNRApp := &newrelic.Application{}
 
 	// Act
-	handler := NewLocationHandler(mockLocationUC, mockNATSClient, mockNRApp)
+	handler := NewLocationHandler(mockLocationUC, mockNATSClient)
 
 	// Assert
 	assert.NotNil(t, handler)
 	assert.Equal(t, mockLocationUC, handler.locationUC)
 	assert.Equal(t, mockNATSClient, handler.natsClient)
-	assert.Equal(t, mockNRApp, handler.nrApp)
 	assert.NotNil(t, handler.subs)
 	assert.Empty(t, handler.subs)
 }
@@ -106,8 +103,7 @@ func TestLocationHandler_handleLocationUpdate(t *testing.T) {
 			tt.setupMock(mockLocationUC)
 
 			mockNATSClient := &natspkg.Client{}
-			mockNRApp := &newrelic.Application{}
-			handler := NewLocationHandler(mockLocationUC, mockNATSClient, mockNRApp)
+			handler := NewLocationHandler(mockLocationUC, mockNATSClient)
 
 			// Act
 			err := handler.handleLocationUpdate(context.Background(), tt.eventData)

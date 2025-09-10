@@ -5,7 +5,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/models"
-	nrpkg "github.com/piresc/nebengjek/internal/pkg/newrelic"
 	"github.com/piresc/nebengjek/internal/utils"
 	"github.com/piresc/nebengjek/services/match"
 )
@@ -24,10 +23,6 @@ func NewMatchHandler(matchUC match.MatchUC) *MatchHandler {
 
 // ConfirmMatch handles the confirmation of a match by a user
 func (h *MatchHandler) ConfirmMatch(c echo.Context) error {
-	// Get transaction from Echo context using centralized package
-	txn := nrpkg.FromEchoContext(c)
-	nrpkg.SetTransactionName(txn, "Match.ConfirmMatch")
-
 	matchID := c.Param("matchID")
 	if matchID == "" {
 		return utils.BadRequestResponse(c, "Match ID is required")
@@ -35,7 +30,6 @@ func (h *MatchHandler) ConfirmMatch(c echo.Context) error {
 
 	var req models.MatchConfirmRequest
 	if err := c.Bind(&req); err != nil {
-		nrpkg.NoticeTransactionError(txn, err)
 		return utils.BadRequestResponse(c, "Invalid request body: "+err.Error())
 	}
 
@@ -49,15 +43,8 @@ func (h *MatchHandler) ConfirmMatch(c echo.Context) error {
 		return utils.BadRequestResponse(c, "Status must be either ACCEPTED or REJECTED")
 	}
 
-	// Add transaction attributes for better tracing
-	nrpkg.AddTransactionAttribute(txn, "endpoint", "confirm_match")
-	nrpkg.AddTransactionAttribute(txn, "match.id", matchID)
-	nrpkg.AddTransactionAttribute(txn, "user.id", req.UserID)
-	nrpkg.AddTransactionAttribute(txn, "match.status", req.Status)
-
 	result, err := h.matchUC.ConfirmMatchStatus(c.Request().Context(), &req)
 	if err != nil {
-		nrpkg.NoticeTransactionError(txn, err)
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, "Failed to confirm match: "+err.Error())
 	}
 

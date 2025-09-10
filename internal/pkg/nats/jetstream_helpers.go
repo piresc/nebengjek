@@ -1,9 +1,12 @@
 package nats
 
 import (
+	"context"
+	"fmt"
 	"time"
 
 	"github.com/nats-io/nats.go/jetstream"
+	"github.com/piresc/nebengjek/internal/pkg/constants"
 )
 
 // StreamConfigBuilder helps build stream configurations
@@ -381,6 +384,51 @@ func CreateDefaultConsumersForService(client *Client, serviceName string) error 
 	for _, config := range relevantConfigs {
 		if err := client.CreateConsumer(config); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+// ConfigureWebSocketStreams sets up the required NATS streams for WebSocket broadcasting
+func ConfigureWebSocketStreams(ctx context.Context, natsClient *Client) error {
+	streams := []StreamConfig{
+		{
+			Name: constants.StreamWebSocket,
+			Subjects: []string{
+				constants.SubjectWSBroadcastUser,
+				constants.SubjectWSBroadcastRole,
+				constants.SubjectWSBroadcastAll,
+				constants.SubjectWSRouteUser,
+			},
+			Retention: jetstream.InterestPolicy,
+			Storage:   jetstream.FileStorage,
+			Replicas:  1,
+			MaxAge:    1 * time.Hour,   // Messages older than 1 hour are deleted
+			MaxBytes:  100 * 1024 * 1024, // 100MB max stream size
+			MaxMsgs:   100000,          // Max 100k messages
+			Discard:   jetstream.DiscardOld,
+		},
+		{
+			Name: constants.StreamWSServer,
+			Subjects: []string{
+				constants.SubjectWSServerRegister,
+				constants.SubjectWSServerUnregister,
+				constants.SubjectWSServerHeartbeat,
+			},
+			Retention: jetstream.WorkQueuePolicy,
+			Storage:   jetstream.MemoryStorage,
+			Replicas:  1,
+			MaxAge:    10 * time.Minute,
+			MaxBytes:  10 * 1024 * 1024, // 10MB max
+			MaxMsgs:   1000,
+			Discard:   jetstream.DiscardOld,
+		},
+	}
+
+	for _, streamConfig := range streams {
+		if err := natsClient.CreateOrUpdateStream(streamConfig); err != nil {
+			return fmt.Errorf("failed to create stream %s: %w", streamConfig.Name, err)
 		}
 	}
 

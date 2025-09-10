@@ -2,7 +2,6 @@ package handler
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/piresc/nebengjek/internal/pkg/middleware"
 	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
@@ -23,11 +22,10 @@ func NewHandler(
 	ridesUC rides.RideUC,
 	natsClient *natspkg.Client,
 	cfg *models.Config,
-	nrApp *newrelic.Application,
 ) *Handler {
 	return &Handler{
 		ridesHTTP: httpHandler.NewRidesHandler(ridesUC),
-		ridesNATS: natsHandler.NewRidesHandler(ridesUC, natsClient, cfg, nrApp),
+		ridesNATS: natsHandler.NewRidesHandler(ridesUC, natsClient, cfg),
 		cfg:       cfg,
 	}
 }

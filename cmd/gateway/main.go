@@ -17,12 +17,15 @@ import (
 	slogpkg "github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/middleware"
 	"github.com/piresc/nebengjek/internal/pkg/nats"
+	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	nrpkg "github.com/piresc/nebengjek/internal/pkg/newrelic"
-	"github.com/piresc/nebengjek/internal/pkg/observability"
+	"github.com/piresc/nebengjek/internal/pkg/tracing"
+	newrelictracer "github.com/piresc/nebengjek/internal/pkg/tracing/newrelic"
 	gatewaygateway "github.com/piresc/nebengjek/services/gateway/gateway"
 	"github.com/piresc/nebengjek/services/gateway/handler"
 	gatewaynats "github.com/piresc/nebengjek/services/gateway/handler/nats"
 	gatewaywebsocket "github.com/piresc/nebengjek/services/gateway/handler/websocket"
+	gatewayrepo "github.com/piresc/nebengjek/services/gateway/repository"
 	gatewayusecase "github.com/piresc/nebengjek/services/gateway/usecase"
 	userrepo "github.com/piresc/nebengjek/services/users/repository"
 	useruc "github.com/piresc/nebengjek/services/users/usecase"
@@ -50,9 +53,11 @@ func main() {
 		Format:      "json",
 	})
 
-	// Initialize observability tracer
-	tracerFactory := observability.NewTracerFactory()
-	tracer := tracerFactory.CreateTracer(nrApp)
+	// Initialize unified tracer
+	tracer := newrelictracer.NewTracer(&tracing.Config{
+		Enabled:     configs.NewRelic.Enabled,
+		ServiceName: appName,
+	}, nrApp)
 
 	// Log startup
 	slogLogger.Info("Starting application",
@@ -69,6 +74,9 @@ func main() {
 	}
 	defer redisClient.Close()
 
+	// Wrap Redis client with tracing
+	tracedRedisClient := database.NewTracedRedisClient(redisClient, tracer)
+
 	// Initialize JetStream-enabled NATS client for notification consumption
 	natsClient, err := nats.NewClient(configs.NATS.URL)
 	if err != nil {
@@ -76,6 +84,9 @@ func main() {
 		os.Exit(1)
 	}
 	defer natsClient.Close()
+
+	// Wrap NATS client with tracing
+	tracedNatsClient := nats.NewTracedClient(natsClient, tracer)
 
 	// Verify JetStream is available
 	if !natsClient.IsConnected() {
@@ -87,8 +98,13 @@ func main() {
 		slog.String("url", configs.NATS.URL),
 		slog.Bool("connected", natsClient.IsConnected()))
 
+	// Generate unique server ID for multi-gateway support
+	hostname, _ := os.Hostname()
+	serverID := fmt.Sprintf("gateway-%s-%d", hostname, time.Now().Unix())
+
 	// Initialize repositories
-	userRepo := userrepo.NewUserRepo(configs, nil, redisClient)
+	userRepo := userrepo.NewUserRepo(configs, nil, tracedRedisClient.RedisClient)
+	sessionRepo := gatewayrepo.NewWSSessionRepository(tracedRedisClient.RedisClient, serverID)
 
 	// Initialize gateways
 	gatewayGW := gatewaygateway.NewHTTPGateway(configs)
@@ -97,12 +113,12 @@ func main() {
 	userUC := useruc.NewUserUC(userRepo, nil, configs)
 	gatewayUC := gatewayusecase.NewGatewayUC(userUC, gatewayGW)
 
-	// Initialize handlers
-	wsHandler := gatewaywebsocket.NewEchoWebSocketHandler(gatewayUC, userUC)
-	gatewayHandler := handler.NewHandler(gatewayUC, configs, nrApp, wsHandler)
+	// Initialize handlers with multi-gateway support
+	wsHandler := gatewaywebsocket.NewEchoWebSocketHandler(gatewayUC, userUC, sessionRepo, serverID)
+	gatewayHandler := handler.NewHandler(gatewayUC, configs, nrApp, wsHandler, sessionRepo, serverID)
 
-	// Initialize notification handler for consuming notification delivery events
-	notificationHandler := gatewaynats.NewGatewayNotificationHandler(natsClient, wsHandler, slogLogger)
+	// Initialize notification handler for multi-gateway broadcasting
+	notificationHandler := gatewaynats.NewGatewayNotificationHandler(tracedNatsClient.GetClient(), wsHandler, sessionRepo, slogLogger, serverID)
 
 	// Initialize NATS consumers for notifications
 	slogLogger.Info("Initializing NATS consumers for gateway...")
@@ -111,6 +127,22 @@ func main() {
 		os.Exit(1)
 	}
 	slogLogger.Info("NATS notification consumer initialized successfully")
+
+	// Configure WebSocket streams for multi-gateway broadcasting
+	slogLogger.Info("Configuring WebSocket streams for multi-gateway broadcasting...")
+	if err := natspkg.ConfigureWebSocketStreams(context.Background(), tracedNatsClient.GetClient()); err != nil {
+		slogLogger.Error("Failed to configure WebSocket streams", slog.Any("error", err))
+		os.Exit(1)
+	}
+	slogLogger.Info("WebSocket streams configured successfully")
+
+	// Initialize multi-gateway consumers for WebSocket broadcasting
+	slogLogger.Info("Initializing multi-gateway WebSocket consumers...")
+	if err := notificationHandler.InitMultiGatewayConsumers(); err != nil {
+		slogLogger.Error("Failed to initialize multi-gateway consumers", slog.Any("error", err))
+		os.Exit(1)
+	}
+	slogLogger.Info("Multi-gateway WebSocket consumers initialized successfully")
 
 
 	// Initialize Echo server
@@ -121,8 +153,12 @@ func main() {
 	healthService.AddChecker("redis", health.NewRedisHealthChecker(redisClient))
 	healthService.AddChecker("nats", health.NewNATSHealthChecker(natsClient))
 
-	// Initialize middleware
+	// Initialize middleware with tracing
 	MW := middleware.NewMiddleware(configs, slogLogger, tracer)
+	tracingMiddleware := middleware.NewTracingMiddleware(&tracing.Config{
+		Enabled:     configs.NewRelic.Enabled,
+		ServiceName: appName,
+	}, tracer)
 
 	// Register enhanced health endpoints BEFORE applying middleware
 	health.RegisterEnhancedHealthEndpoints(e, appName, Version, healthService)
@@ -133,6 +169,7 @@ func main() {
 		return c.JSON(http.StatusOK, map[string]interface{}{"status": "ok"})
 	})
 
+	e.Use(tracingMiddleware.Handler())
 	e.Use(MW.Handler())
 
 	// Register service routes

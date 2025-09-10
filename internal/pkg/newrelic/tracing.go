@@ -11,6 +11,9 @@ import (
 // FromEchoContext extracts New Relic transaction from Echo context
 // This is the standard way to get transactions in HTTP handlers
 func FromEchoContext(c echo.Context) *newrelic.Transaction {
+	if c == nil {
+		return nil
+	}
 	return nrecho.FromContext(c)
 }
 

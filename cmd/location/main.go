@@ -18,7 +18,8 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/middleware"
 	"github.com/piresc/nebengjek/internal/pkg/nats"
 	nrpkg "github.com/piresc/nebengjek/internal/pkg/newrelic"
-	"github.com/piresc/nebengjek/internal/pkg/observability"
+	newrelictracer "github.com/piresc/nebengjek/internal/pkg/tracing/newrelic"
+	"github.com/piresc/nebengjek/internal/pkg/tracing"
 	"github.com/piresc/nebengjek/services/location/gateway"
 	"github.com/piresc/nebengjek/services/location/handler"
 	"github.com/piresc/nebengjek/services/location/repository"
@@ -41,9 +42,11 @@ func main() {
 		Format:      "json",
 	})
 
-	// Initialize observability tracer
-	tracerFactory := observability.NewTracerFactory()
-	tracer := tracerFactory.CreateTracer(nrApp)
+	// Initialize unified tracer
+	tracer := newrelictracer.NewTracer(&tracing.Config{
+		Enabled:     configs.NewRelic.Enabled,
+		ServiceName: appName,
+	}, nrApp)
 
 	// Log startup
 	slogLogger.Info("Starting application",
@@ -60,6 +63,9 @@ func main() {
 	}
 	defer redisClient.Close()
 
+	// Wrap Redis client with tracing
+	tracedRedisClient := database.NewTracedRedisClient(redisClient, tracer)
+
 	// Initialize JetStream-enabled NATS client
 	natsClient, err := nats.NewClient(configs.NATS.URL)
 	if err != nil {
@@ -67,6 +73,9 @@ func main() {
 		os.Exit(1)
 	}
 	defer natsClient.Close()
+
+	// Wrap NATS client with tracing
+	tracedNatsClient := nats.NewTracedClient(natsClient, tracer)
 
 	// Verify JetStream is available
 	if !natsClient.IsConnected() {
@@ -78,17 +87,17 @@ func main() {
 		slog.String("url", configs.NATS.URL),
 		slog.Bool("connected", natsClient.IsConnected()))
 
-	// Initialize repository
-	locationRepo := repository.NewLocationRepository(redisClient, configs)
+	// Initialize repository with traced client
+	locationRepo := repository.NewLocationRepository(tracedRedisClient.RedisClient, configs)
 
-	// Initialize gateway
-	locationGW := gateway.NewLocationGW(natsClient)
+	// Initialize gateway with traced client
+	locationGW := gateway.NewLocationGW(tracedNatsClient)
 
 	// Initialize usecase
 	locationUC := usecase.NewLocationUC(locationRepo, locationGW)
 
 	// Initialize handlers
-	locationHandler := handler.NewHTTPHandler(locationUC, natsClient, configs, nrApp)
+	locationHandler := handler.NewHTTPHandler(locationUC, natsClient, configs)
 
 	// Initialize NATS consumers
 	if err := locationHandler.InitNATSConsumers(); err != nil {
@@ -104,8 +113,12 @@ func main() {
 	healthService.AddChecker("redis", health.NewRedisHealthChecker(redisClient))
 	healthService.AddChecker("nats", health.NewNATSHealthChecker(natsClient))
 
-	// Initialize middleware
+	// Initialize middleware with tracing
 	MW := middleware.NewMiddleware(configs, slogLogger, tracer)
+	tracingMiddleware := middleware.NewTracingMiddleware(&tracing.Config{
+		Enabled:     configs.NewRelic.Enabled,
+		ServiceName: appName,
+	}, tracer)
 	// Register enhanced health endpoints BEFORE applying middleware
 	health.RegisterEnhancedHealthEndpoints(e, appName, configs.App.Version, healthService)
 
@@ -115,6 +128,7 @@ func main() {
 		return c.JSON(http.StatusOK, map[string]interface{}{"status": "ok"})
 	})
 
+	e.Use(tracingMiddleware.Handler())
 	e.Use(MW.Handler())
 
 	// Register service routes

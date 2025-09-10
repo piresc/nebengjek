@@ -7,16 +7,19 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
+
+	"github.com/piresc/nebengjek/internal/pkg/tracing"
 )
 
-// Client provides a simple HTTP client with API key support and basic retry
-// This replaces both EnhancedClient and APIKeyClient with a simpler implementation
+// Client provides a simple HTTP client with API key support, basic retry, and automatic tracing
 type Client struct {
 	httpClient *http.Client
 	apiKey     string
 	baseURL    string
 	timeout    time.Duration
+	tracer     tracing.Tracer
 }
 
 // Config holds configuration for the HTTP client
@@ -24,9 +27,10 @@ type Config struct {
 	APIKey  string
 	BaseURL string
 	Timeout time.Duration
+	Tracer  tracing.Tracer
 }
 
-// NewClient creates a new simplified HTTP client
+// NewClient creates a new simplified HTTP client with automatic tracing
 func NewClient(config Config) *Client {
 	if config.Timeout == 0 {
 		config.Timeout = 30 * time.Second
@@ -37,10 +41,11 @@ func NewClient(config Config) *Client {
 		apiKey:     config.APIKey,
 		baseURL:    config.BaseURL,
 		timeout:    config.Timeout,
+		tracer:     config.Tracer,
 	}
 }
 
-// Do executes an HTTP request with simple retry logic
+// Do executes an HTTP request with simple retry logic and automatic tracing
 func (c *Client) Do(ctx context.Context, method, endpoint string, body interface{}) (*http.Response, error) {
 	url := c.baseURL + endpoint
 
@@ -71,10 +76,28 @@ func (c *Client) Do(ctx context.Context, method, endpoint string, body interface
 		req.Header.Set("X-Request-ID", fmt.Sprintf("%v", requestID))
 	}
 
+	// Auto-tracing: inject distributed tracing headers
+	if c.tracer != nil && c.tracer.IsEnabled() {
+		c.tracer.InjectContext(ctx, req.Header)
+	}
+
 	// Simple retry logic (3 attempts with exponential backoff)
 	var resp *http.Response
 	for attempt := 0; attempt < 3; attempt++ {
-		resp, err = c.httpClient.Do(req)
+		// Auto-tracing: create external call segment
+		var endSegment func()
+		if c.tracer != nil && c.tracer.IsEnabled() {
+			host := c.extractHost(url)
+			ctx, endSegment = c.tracer.StartExternalCall(ctx, host, method)
+		}
+
+		resp, err = c.httpClient.Do(req.WithContext(ctx))
+		
+		// End tracing segment
+		if endSegment != nil {
+			endSegment()
+		}
+
 		if err == nil && resp.StatusCode < 500 {
 			return resp, nil
 		}
@@ -284,4 +307,21 @@ func (c *Client) PutJSON(ctx context.Context, endpoint string, body, result inte
 func (c *Client) Close() error {
 	// HTTP client doesn't need explicit closing
 	return nil
+}
+
+// extractHost extracts the host from a URL for tracing
+func (c *Client) extractHost(url string) string {
+	// Remove protocol and path to get host
+	if strings.HasPrefix(url, "http://") {
+		url = strings.TrimPrefix(url, "http://")
+	} else if strings.HasPrefix(url, "https://") {
+		url = strings.TrimPrefix(url, "https://")
+	}
+	
+	// Find the first slash to separate host from path
+	if slashIndex := strings.Index(url, "/"); slashIndex != -1 {
+		return url[:slashIndex]
+	}
+	
+	return url
 }

@@ -110,6 +110,186 @@ func (g *TestableNATSGateway) PublishLocationUpdate(ctx context.Context, locatio
 // Ensure natspkg.Client implements our interface
 var _ NATSClientInterface = (*natspkg.Client)(nil)
 
+// TestNewNATSGateway tests the constructor function
+func TestNewNATSGateway(t *testing.T) {
+	// Arrange
+	mockClient := &natspkg.Client{}
+
+	// Act
+	gateway := NewNATSGateway(mockClient)
+
+	// Assert
+	assert.NotNil(t, gateway)
+	assert.Equal(t, mockClient, gateway.client)
+}
+
+// TestNewNATSGateway_NilClient tests constructor with nil client
+func TestNewNATSGateway_NilClient(t *testing.T) {
+	// Arrange & Act
+	gateway := NewNATSGateway(nil)
+
+	// Assert
+	assert.NotNil(t, gateway)
+	assert.Nil(t, gateway.client)
+}
+
+// TestNATSGateway_PublishBeaconEvent_NilClient tests publishing with nil client
+func TestNATSGateway_PublishBeaconEvent_NilClient(t *testing.T) {
+	// Arrange
+	gateway := NewNATSGateway(nil)
+
+	ctx := context.Background()
+	event := &models.BeaconEvent{
+		UserID:   "test-user-id",
+		IsActive: true,
+		Location: models.Location{
+			Latitude:  -6.2088,
+			Longitude: 106.8456,
+		},
+		Timestamp: time.Now(),
+	}
+
+	// Act & Assert - Should panic due to nil client
+	assert.Panics(t, func() {
+		gateway.PublishBeaconEvent(ctx, event)
+	})
+}
+
+// TestNATSGateway_PublishFinderEvent_NilClient tests publishing with nil client
+func TestNATSGateway_PublishFinderEvent_NilClient(t *testing.T) {
+	// Arrange
+	gateway := NewNATSGateway(nil)
+
+	ctx := context.Background()
+	event := &models.FinderEvent{
+		UserID:   "test-user-id",
+		IsActive: true,
+		Location: models.Location{
+			Latitude:  -6.2088,
+			Longitude: 106.8456,
+		},
+		TargetLocation: models.Location{
+			Latitude:  -6.2297,
+			Longitude: 106.8295,
+		},
+		Timestamp: time.Now(),
+	}
+
+	// Act & Assert - Should panic due to nil client
+	assert.Panics(t, func() {
+		gateway.PublishFinderEvent(ctx, event)
+	})
+}
+
+// TestNATSGateway_PublishBeaconEvent_NilEvent tests publishing with nil event
+func TestNATSGateway_PublishBeaconEvent_NilEvent(t *testing.T) {
+	// Arrange
+	gateway := NewNATSGateway(nil)
+
+	ctx := context.Background()
+
+	// Act & Assert - Should panic due to nil client and nil event
+	assert.Panics(t, func() {
+		gateway.PublishBeaconEvent(ctx, nil)
+	})
+}
+
+// TestNATSGateway_PublishFinderEvent_NilEvent tests publishing with nil event
+func TestNATSGateway_PublishFinderEvent_NilEvent(t *testing.T) {
+	// Arrange
+	gateway := NewNATSGateway(nil)
+
+	ctx := context.Background()
+
+	// Act & Assert - Should panic due to nil client and nil event
+	assert.Panics(t, func() {
+		gateway.PublishFinderEvent(ctx, nil)
+	})
+}
+
+// TestNATSGateway_ContextCancellation tests publishing with cancelled context
+func TestNATSGateway_ContextCancellation(t *testing.T) {
+	// Arrange
+	gateway := NewNATSGateway(nil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel the context before using it
+
+	beaconEvent := &models.BeaconEvent{
+		UserID:   "test-user-id",
+		IsActive: true,
+		Location: models.Location{
+			Latitude:  -6.2088,
+			Longitude: 106.8456,
+		},
+		Timestamp: time.Now(),
+	}
+
+	finderEvent := &models.FinderEvent{
+		UserID:   "test-user-id",
+		IsActive: true,
+		Location: models.Location{
+			Latitude:  -6.2088,
+			Longitude: 106.8456,
+		},
+		TargetLocation: models.Location{
+			Latitude:  -6.2297,
+			Longitude: 106.8295,
+		},
+		Timestamp: time.Now(),
+	}
+
+	// Act & Assert - Should panic due to nil client
+	assert.Panics(t, func() {
+		gateway.PublishBeaconEvent(ctx, beaconEvent)
+	})
+
+	assert.Panics(t, func() {
+		gateway.PublishFinderEvent(ctx, finderEvent)
+	})
+}
+
+// TestNATSGateway_WithRealClient tests with real NATS client (but no server)
+func TestNATSGateway_WithRealClient(t *testing.T) {
+	// Arrange
+	mockClient := &natspkg.Client{}
+	gateway := NewNATSGateway(mockClient)
+
+	ctx := context.Background()
+	beaconEvent := &models.BeaconEvent{
+		UserID:   "test-user-id",
+		IsActive: true,
+		Location: models.Location{
+			Latitude:  -6.2088,
+			Longitude: 106.8456,
+		},
+		Timestamp: time.Now(),
+	}
+
+	finderEvent := &models.FinderEvent{
+		UserID:   "test-user-id",
+		IsActive: true,
+		Location: models.Location{
+			Latitude:  -6.2088,
+			Longitude: 106.8456,
+		},
+		TargetLocation: models.Location{
+			Latitude:  -6.2297,
+			Longitude: 106.8295,
+		},
+		Timestamp: time.Now(),
+	}
+
+	// Act & Assert - Should panic due to nil NATS client connection
+	assert.Panics(t, func() {
+		gateway.PublishBeaconEvent(ctx, beaconEvent)
+	})
+
+	assert.Panics(t, func() {
+		gateway.PublishFinderEvent(ctx, finderEvent)
+	})
+}
+
 // TestPublishBeaconEvent_Success tests successful publishing of beacon events
 func TestPublishBeaconEvent_Success(t *testing.T) {
 	// Arrange

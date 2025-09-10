@@ -206,4 +206,4 @@ sequenceDiagram
 
 ---
 
-**Note**: This notification service will be implemented AFTER the WebSocket migration is complete. The current migration plan focuses on moving WebSocket handling from users service to gateway service.
+**Note**: This notification service works with the existing WebSocket implementation in the gateway service. The gateway service handles all WebSocket connections and real-time communication.

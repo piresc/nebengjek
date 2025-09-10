@@ -26,6 +26,14 @@ const (
 	// Active rides tracking - used by match service to prevent matching during active rides
 	KeyActiveRideDriver    = "active_ride:driver:%s"    // Format: active_ride:driver:{driver_id} -> ride_id
 	KeyActiveRidePassenger = "active_ride:passenger:%s" // Format: active_ride:passenger:{passenger_id} -> ride_id
+
+	// WebSocket Session Keys
+	KeyWSConnection        = "ws:connection:%s"         // Format: ws:connection:{user_id}
+	KeyWSActivity          = "ws:activity:%s"           // Format: ws:activity:{user_id}
+	KeyWSHeartbeat         = "ws:heartbeat:%s"          // Format: ws:heartbeat:{user_id}
+	KeyWSSession           = "ws:session:%s"            // Format: ws:session:{user_id}
+	KeyWSConnections       = "ws:connections"           // Set of all connected user IDs
+	KeyWSServerConnections = "ws:server:%s:connections" // Format: ws:server:{server_id}:connections
 )
 
 // Redis hash fields
@@ -41,4 +49,15 @@ const (
 	FieldPrice       = "price"
 	FieldDistance    = "distance"
 	FieldDuration    = "duration"
+
+	// WebSocket session hash fields
+	FieldUserID        = "user_id"
+	FieldRole          = "role"
+	FieldServerID      = "server_id"
+	FieldConnectedAt   = "connected_at"
+	FieldLastActivity  = "last_activity"
+	FieldLastPing      = "last_ping"
+	FieldLastPong      = "last_pong"
+	FieldMissedPings   = "missed_pings"
+	FieldIsHealthy     = "is_healthy"
 )

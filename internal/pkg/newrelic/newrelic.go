@@ -8,7 +8,7 @@ import (
 
 // InitNewRelic initializes New Relic application based on configuration
 func InitNewRelic(configs *models.Config) *newrelic.Application {
-	if !configs.NewRelic.Enabled || configs.NewRelic.LicenseKey == "" {
+	if configs == nil || !configs.NewRelic.Enabled || configs.NewRelic.LicenseKey == "" {
 		logger.Info("New Relic is disabled or license key not provided")
 		return nil
 	}

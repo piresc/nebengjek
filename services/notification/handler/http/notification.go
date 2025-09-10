@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/labstack/echo/v4"
-	nrpkg "github.com/piresc/nebengjek/internal/pkg/newrelic"
 	"github.com/piresc/nebengjek/internal/utils"
 	"github.com/piresc/nebengjek/services/notification"
 )
@@ -24,10 +23,6 @@ func NewNotificationHandler(notificationUC notification.NotificationUC) *Notific
 
 // GetNotificationHistory handles notification history retrieval requests
 func (h *NotificationHandler) GetNotificationHistory(c echo.Context) error {
-	// Get transaction from Echo context using centralized package
-	txn := nrpkg.FromEchoContext(c)
-	nrpkg.SetTransactionName(txn, "GetNotificationHistory")
-
 	userID := c.Param("user_id")
 	if userID == "" {
 		return utils.BadRequestResponse(c, "Invalid user ID")
@@ -52,13 +47,8 @@ func (h *NotificationHandler) GetNotificationHistory(c echo.Context) error {
 		}
 	}
 
-	nrpkg.AddTransactionAttribute(txn, "user.id", userID)
-	nrpkg.AddTransactionAttribute(txn, "query.limit", limit)
-	nrpkg.AddTransactionAttribute(txn, "query.offset", offset)
-
 	notifications, err := h.notificationUC.GetNotificationHistory(c.Request().Context(), userID, limit, offset)
 	if err != nil {
-		nrpkg.NoticeTransactionError(txn, err)
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, "Failed to retrieve notification history")
 	}
 
@@ -67,20 +57,13 @@ func (h *NotificationHandler) GetNotificationHistory(c echo.Context) error {
 
 // GetUndeliveredNotifications handles undelivered notifications retrieval requests
 func (h *NotificationHandler) GetUndeliveredNotifications(c echo.Context) error {
-	// Get transaction from Echo context using centralized package
-	txn := nrpkg.FromEchoContext(c)
-	nrpkg.SetTransactionName(txn, "GetUndeliveredNotifications")
-
 	userID := c.Param("user_id")
 	if userID == "" {
 		return utils.BadRequestResponse(c, "Invalid user ID")
 	}
 
-	nrpkg.AddTransactionAttribute(txn, "user.id", userID)
-
 	notifications, err := h.notificationUC.GetUndeliveredNotifications(c.Request().Context(), userID)
 	if err != nil {
-		nrpkg.NoticeTransactionError(txn, err)
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, "Failed to retrieve undelivered notifications")
 	}
 
@@ -89,20 +72,13 @@ func (h *NotificationHandler) GetUndeliveredNotifications(c echo.Context) error 
 
 // MarkNotificationDelivered handles marking notifications as delivered
 func (h *NotificationHandler) MarkNotificationDelivered(c echo.Context) error {
-	// Get transaction from Echo context using centralized package
-	txn := nrpkg.FromEchoContext(c)
-	nrpkg.SetTransactionName(txn, "MarkNotificationDelivered")
-
 	notificationID := c.Param("notification_id")
 	if notificationID == "" {
 		return utils.BadRequestResponse(c, "Invalid notification ID")
 	}
 
-	nrpkg.AddTransactionAttribute(txn, "notification.id", notificationID)
-
 	err := h.notificationUC.MarkNotificationDelivered(c.Request().Context(), notificationID)
 	if err != nil {
-		nrpkg.NoticeTransactionError(txn, err)
 		return utils.ErrorResponseHandler(c, http.StatusInternalServerError, "Failed to mark notification as delivered")
 	}
 
