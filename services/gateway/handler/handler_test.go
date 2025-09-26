@@ -8,7 +8,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/labstack/echo/v4"
 	"github.com/newrelic/go-agent/v3/newrelic"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
 	"github.com/piresc/nebengjek/services/gateway/mocks"
 	gatewaywebsocket "github.com/piresc/nebengjek/services/gateway/handler/websocket"
 	"github.com/piresc/nebengjek/services/gateway/repository"
@@ -20,8 +20,8 @@ func TestNewHandler(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockGatewayUC := mocks.NewMockGatewayUC(ctrl)
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret: "test-secret",
 		},
 	}
@@ -125,8 +125,8 @@ func TestHandler_GetWebSocketJWTMiddleware(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockGatewayUC := mocks.NewMockGatewayUC(ctrl)
-			cfg := &models.Config{
-				JWT: models.JWTConfig{
+			cfg := &coremodels.Config{
+				JWT: coremodels.JWTConfig{
 					Secret: tt.jwtSecret,
 				},
 			}
@@ -184,8 +184,8 @@ func TestHandler_GetWebSocketJWTMiddleware_SuccessfulTokenParsing(t *testing.T) 
 	defer ctrl.Finish()
 
 	mockGatewayUC := mocks.NewMockGatewayUC(ctrl)
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret: "test-secret",
 		},
 	}
@@ -235,8 +235,8 @@ func TestHandler_GetWebSocketJWTMiddleware_InvalidClaims(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockGatewayUC := mocks.NewMockGatewayUC(ctrl)
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret: "test-secret",
 		},
 	}

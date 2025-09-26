@@ -6,8 +6,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go/jetstream"
-	"github.com/piresc/nebengjek/internal/pkg/constants"
-)
+	)
 
 // StreamConfigBuilder helps build stream configurations
 type StreamConfigBuilder struct {
@@ -394,12 +393,12 @@ func CreateDefaultConsumersForService(client *Client, serviceName string) error 
 func ConfigureWebSocketStreams(ctx context.Context, natsClient *Client) error {
 	streams := []StreamConfig{
 		{
-			Name: constants.StreamWebSocket,
+			Name: StreamWebSocket,
 			Subjects: []string{
-				constants.SubjectWSBroadcastUser,
-				constants.SubjectWSBroadcastRole,
-				constants.SubjectWSBroadcastAll,
-				constants.SubjectWSRouteUser,
+				SubjectWSBroadcastUser,
+				SubjectWSBroadcastRole,
+				SubjectWSBroadcastAll,
+				SubjectWSRouteUser,
 			},
 			Retention: jetstream.InterestPolicy,
 			Storage:   jetstream.FileStorage,
@@ -410,11 +409,11 @@ func ConfigureWebSocketStreams(ctx context.Context, natsClient *Client) error {
 			Discard:   jetstream.DiscardOld,
 		},
 		{
-			Name: constants.StreamWSServer,
+			Name: StreamWSServer,
 			Subjects: []string{
-				constants.SubjectWSServerRegister,
-				constants.SubjectWSServerUnregister,
-				constants.SubjectWSServerHeartbeat,
+				SubjectWSServerRegister,
+				SubjectWSServerUnregister,
+				SubjectWSServerHeartbeat,
 			},
 			Retention: jetstream.WorkQueuePolicy,
 			Storage:   jetstream.MemoryStorage,

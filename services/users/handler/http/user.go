@@ -4,7 +4,8 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
+	"github.com/piresc/nebengjek/internal/pkg/models/user"
 	"github.com/piresc/nebengjek/internal/utils"
 	"github.com/piresc/nebengjek/services/users"
 )
@@ -25,7 +26,7 @@ func NewUserHandler(
 
 // CreateUser handles user creation requests
 func (h *UserHandler) CreateUser(c echo.Context) error {
-	var user models.User
+	var user user.User
 	if err := c.Bind(&user); err != nil {
 		return utils.BadRequestResponse(c, "Invalid request payload")
 	}
@@ -55,7 +56,7 @@ func (h *UserHandler) GetUser(c echo.Context) error {
 
 // RegisterDriver handles driver registration requests
 func (h *UserHandler) RegisterDriver(c echo.Context) error {
-	var user models.User
+	var user user.User
 	if err := c.Bind(&user); err != nil {
 		return utils.BadRequestResponse(c, "Invalid request payload")
 	}
@@ -70,7 +71,7 @@ func (h *UserHandler) RegisterDriver(c echo.Context) error {
 
 // UpdateFinderStatus handles finder status update requests
 func (h *UserHandler) UpdateFinderStatus(c echo.Context) error {
-	var finderReq models.FinderRequest
+	var finderReq core.FinderRequest
 	if err := c.Bind(&finderReq); err != nil {
 		return utils.BadRequestResponse(c, "Invalid request payload")
 	}
@@ -85,7 +86,7 @@ func (h *UserHandler) UpdateFinderStatus(c echo.Context) error {
 
 // UpdateBeaconStatus handles beacon status update requests
 func (h *UserHandler) UpdateBeaconStatus(c echo.Context) error {
-	var beaconReq models.BeaconRequest
+	var beaconReq core.BeaconRequest
 	if err := c.Bind(&beaconReq); err != nil {
 		return utils.BadRequestResponse(c, "Invalid request payload")
 	}

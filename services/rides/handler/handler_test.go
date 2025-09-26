@@ -6,7 +6,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/middleware"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/rides/mocks"
 	"github.com/stretchr/testify/assert"
@@ -19,7 +19,7 @@ func TestNewHandler(t *testing.T) {
 
 	mockRideUC := mocks.NewMockRideUC(ctrl)
 	mockNatsClient := &natspkg.Client{}
-	cfg := &models.Config{}
+	cfg := &coremodels.Config{}
 
 	// Act
 	handler := NewHandler(mockRideUC, mockNatsClient, cfg)
@@ -38,7 +38,7 @@ func TestHandler_RegisterRoutes(t *testing.T) {
 
 	mockRideUC := mocks.NewMockRideUC(ctrl)
 	mockNatsClient := &natspkg.Client{}
-	cfg := &models.Config{}
+	cfg := &coremodels.Config{}
 
 	handler := NewHandler(mockRideUC, mockNatsClient, cfg)
 	
@@ -97,7 +97,7 @@ func TestHandler_InitNATSConsumers_Success(t *testing.T) {
 
 	mockRideUC := mocks.NewMockRideUC(ctrl)
 	mockNatsClient := &natspkg.Client{}
-	cfg := &models.Config{}
+	cfg := &coremodels.Config{}
 
 	handler := NewHandler(mockRideUC, mockNatsClient, cfg)
 
@@ -117,7 +117,7 @@ func TestHandler_InitNATSConsumers_NilNATSClient(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRideUC := mocks.NewMockRideUC(ctrl)
-	cfg := &models.Config{}
+	cfg := &coremodels.Config{}
 
 	handler := NewHandler(mockRideUC, nil, cfg)
 
@@ -134,7 +134,7 @@ func TestHandler_ComponentsNotNil(t *testing.T) {
 
 	mockRideUC := mocks.NewMockRideUC(ctrl)
 	mockNatsClient := &natspkg.Client{}
-	cfg := &models.Config{}
+	cfg := &coremodels.Config{}
 
 	handler := NewHandler(mockRideUC, mockNatsClient, cfg)
 

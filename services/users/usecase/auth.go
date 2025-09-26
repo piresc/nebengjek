@@ -8,7 +8,8 @@ import (
 	"github.com/google/uuid"
 	jwtpkg "github.com/piresc/nebengjek/internal/pkg/jwt"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
+	usermodels "github.com/piresc/nebengjek/internal/pkg/models/user"
 	"github.com/piresc/nebengjek/internal/utils"
 	usererrors "github.com/piresc/nebengjek/services/users/errors"
 )
@@ -25,7 +26,7 @@ func (u *UserUC) GenerateOTP(ctx context.Context, msisdn string) error {
 	code := utils.GenerateDummyOTP(formattedMSISDN)
 
 	// Create OTP record
-	otp := &models.OTP{
+	otp := &core.OTP{
 		ID:     uuid.New().String(),
 		MSISDN: formattedMSISDN,
 		Code:   code,
@@ -46,7 +47,7 @@ func (u *UserUC) GenerateOTP(ctx context.Context, msisdn string) error {
 }
 
 // VerifyOTP verifies the OTP for the given MSISDN
-func (u *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*models.AuthResponse, error) {
+func (u *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*core.AuthResponse, error) {
 	// Validate MSISDN format
 	isValid, formattedMSISDN, err := utils.ValidateMSISDN(msisdn)
 	if err != nil || !isValid {
@@ -69,7 +70,7 @@ func (u *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*models.Au
 	user, err := u.userRepo.GetUserByMSISDN(ctx, formattedMSISDN)
 	if err != nil {
 		// User doesn't exist, create a new one
-		user = &models.User{
+		user = &usermodels.User{
 			MSISDN:    formattedMSISDN,
 			Role:      "passenger", // Default role is passenger
 			CreatedAt: time.Now(),
@@ -94,7 +95,7 @@ func (u *UserUC) VerifyOTP(ctx context.Context, msisdn, code string) (*models.Au
 	}
 
 	// Return auth response
-	return &models.AuthResponse{
+	return &core.AuthResponse{
 		Token:     token,
 		UserID:    user.ID.String(),
 		Role:      user.Role,

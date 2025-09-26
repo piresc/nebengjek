@@ -4,7 +4,7 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/newrelic/go-agent/v3/newrelic"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 	"github.com/piresc/nebengjek/services/gateway"
 	gatewaywebsocket "github.com/piresc/nebengjek/services/gateway/handler/websocket"
 	"github.com/piresc/nebengjek/services/gateway/repository"
@@ -13,7 +13,7 @@ import (
 // Handler coordinates all protocol handlers for the gateway service
 type Handler struct {
 	gatewayUC    gateway.GatewayUC
-	cfg          *models.Config
+	cfg          *core.Config
 	nrApp        *newrelic.Application
 	wsHandler    *gatewaywebsocket.EchoWebSocketHandler
 	proxyHandler *ProxyHandler
@@ -22,7 +22,7 @@ type Handler struct {
 }
 
 // NewHandler creates and initializes all handlers following clean architecture
-func NewHandler(gatewayUC gateway.GatewayUC, cfg *models.Config, nrApp *newrelic.Application, wsHandler *gatewaywebsocket.EchoWebSocketHandler, sessionRepo *repository.WSSessionRepository, serverID string) *Handler {
+func NewHandler(gatewayUC gateway.GatewayUC, cfg *core.Config, nrApp *newrelic.Application, wsHandler *gatewaywebsocket.EchoWebSocketHandler, sessionRepo *repository.WSSessionRepository, serverID string) *Handler {
 	// Create proxy handler with UseCase dependency injection
 	proxyHandler := NewProxyHandler(gatewayUC)
 

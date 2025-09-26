@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	notificationmodels "github.com/piresc/nebengjek/internal/pkg/models/notification"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	gatewaywebsocket "github.com/piresc/nebengjek/services/gateway/handler/websocket"
 	"github.com/piresc/nebengjek/services/gateway/repository"
@@ -60,14 +60,14 @@ func TestGatewayNotificationHandler_mapNotificationTypeToWSEvent(t *testing.T) {
 		notificationType string
 		expectedEvent    string
 	}{
-		{models.NotificationTypeMatchProposal, "match_proposal"},
-		{models.NotificationTypeMatchAccepted, "match_accepted"},
-		{models.NotificationTypeMatchRejected, "match_rejected"},
-		{models.NotificationTypeRideStarted, "ride_started"},
-		{models.NotificationTypeRidePickupArrived, "ride_pickup_arrived"},
-		{models.NotificationTypeRideCompleted, "ride_completed"},
-		{models.NotificationTypeRideCancelled, "ride_cancelled"},
-		{models.NotificationTypePaymentProcessed, "payment_processed"},
+		{notificationmodels.NotificationTypeMatchProposal, "match_proposal"},
+		{notificationmodels.NotificationTypeMatchAccepted, "match_accepted"},
+		{notificationmodels.NotificationTypeMatchRejected, "match_rejected"},
+		{notificationmodels.NotificationTypeRideStarted, "ride_started"},
+		{notificationmodels.NotificationTypeRidePickupArrived, "ride_pickup_arrived"},
+		{notificationmodels.NotificationTypeRideCompleted, "ride_completed"},
+		{notificationmodels.NotificationTypeRideCancelled, "ride_cancelled"},
+		{notificationmodels.NotificationTypePaymentProcessed, "payment_processed"},
 		{"unknown_type", "notification"},
 	}
 
@@ -90,10 +90,10 @@ func TestGatewayNotificationHandler_handleNotificationDelivery(t *testing.T) {
 		{
 			name: "successful notification delivery",
 			msgData: func() []byte {
-				event := models.NotificationDeliveryEvent{
+				event := notificationmodels.NotificationDeliveryEvent{
 					DeliveryID: uuid.New(),
 					UserID:     uuid.New(),
-					Type:       models.NotificationTypeMatchProposal,
+					Type:       notificationmodels.NotificationTypeMatchProposal,
 					Data:       json.RawMessage(`{"match_id": "123"}`),
 				}
 				data, _ := json.Marshal(event)
@@ -110,10 +110,10 @@ func TestGatewayNotificationHandler_handleNotificationDelivery(t *testing.T) {
 		{
 			name: "websocket delivery failure",
 			msgData: func() []byte {
-				event := models.NotificationDeliveryEvent{
+				event := notificationmodels.NotificationDeliveryEvent{
 					DeliveryID: uuid.New(),
 					UserID:     uuid.New(),
-					Type:       models.NotificationTypeRideStarted,
+					Type:       notificationmodels.NotificationTypeRideStarted,
 					Data:       json.RawMessage(`{"ride_id": "456"}`),
 				}
 				data, _ := json.Marshal(event)
@@ -126,10 +126,10 @@ func TestGatewayNotificationHandler_handleNotificationDelivery(t *testing.T) {
 		{
 			name: "client not connected",
 			msgData: func() []byte {
-				event := models.NotificationDeliveryEvent{
+				event := notificationmodels.NotificationDeliveryEvent{
 					DeliveryID: uuid.New(),
 					UserID:     uuid.New(),
-					Type:       models.NotificationTypePaymentProcessed,
+					Type:       notificationmodels.NotificationTypePaymentProcessed,
 					Data:       json.RawMessage(`{"payment_id": "789"}`),
 				}
 				data, _ := json.Marshal(event)
@@ -194,7 +194,7 @@ func TestGatewayNotificationHandler_handleNotificationDelivery_EdgeCases(t *test
 		// Create event with missing UserID
 		incompleteEvent := map[string]interface{}{
 			"delivery_id": uuid.New().String(),
-			"type":        models.NotificationTypeMatchProposal,
+			"type":        notificationmodels.NotificationTypeMatchProposal,
 			"data":        json.RawMessage(`{"test": "data"}`),
 		}
 		msgData, _ := json.Marshal(incompleteEvent)
@@ -219,10 +219,10 @@ func TestGatewayNotificationHandler_handleNotificationDelivery_EdgeCases(t *test
 			logger:    slog.New(slog.NewTextHandler(os.Stdout, nil)),
 		}
 
-		event := models.NotificationDeliveryEvent{
+		event := notificationmodels.NotificationDeliveryEvent{
 			DeliveryID: uuid.New(),
 			UserID:     uuid.New(),
-			Type:       models.NotificationTypeMatchProposal,
+			Type:       notificationmodels.NotificationTypeMatchProposal,
 			Data:       json.RawMessage(`{"match_id": "123"}`),
 		}
 		msgData, _ := json.Marshal(event)
@@ -253,10 +253,10 @@ func TestGatewayNotificationHandler_Integration(t *testing.T) {
 		}
 		rawData, _ := json.Marshal(matchData)
 
-		event := models.NotificationDeliveryEvent{
+		event := notificationmodels.NotificationDeliveryEvent{
 			DeliveryID: deliveryID,
 			UserID:     userID,
-			Type:       models.NotificationTypeMatchAccepted,
+			Type:       notificationmodels.NotificationTypeMatchAccepted,
 			Data:       json.RawMessage(rawData),
 		}
 		msgData, _ := json.Marshal(event)
@@ -266,10 +266,10 @@ func TestGatewayNotificationHandler_Integration(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, mockWSHandler.notificationsSent, 1)
 
-		notification := mockWSHandler.notificationsSent[0]
-		assert.Equal(t, userID.String(), notification.UserID)
-		assert.Equal(t, "match_accepted", notification.Event)
+		notificationCall := mockWSHandler.notificationsSent[0]
+		assert.Equal(t, userID.String(), notificationCall.UserID)
+		assert.Equal(t, "match_accepted", notificationCall.Event)
 		// The data is passed as json.RawMessage from the event, so check that we have data
-		assert.NotNil(t, notification.Data)
+		assert.NotNil(t, notificationCall.Data)
 	})
 }

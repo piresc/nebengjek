@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/match"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 )
 
@@ -25,7 +24,7 @@ func NewNATSGateway(client *natspkg.Client) *NATSGateway {
 }
 
 // PublishMatchFound publishes a match found event to JetStream with delivery guarantees
-func (g *NATSGateway) PublishMatchFound(ctx context.Context, matchProp models.MatchProposal) error {
+func (g *NATSGateway) PublishMatchFound(ctx context.Context, matchProp match.MatchProposal) error {
 	data, err := json.Marshal(matchProp)
 	if err != nil {
 		return fmt.Errorf("failed to marshal match proposal: %w", err)
@@ -33,7 +32,7 @@ func (g *NATSGateway) PublishMatchFound(ctx context.Context, matchProp models.Ma
 
 	// Use JetStream publish with options for reliability
 	opts := natspkg.PublishOptions{
-		Subject: constants.SubjectMatchFound,
+		Subject: natspkg.SubjectMatchFound,
 		Data:    data,
 		MsgID:   fmt.Sprintf("match-found-%s-%d", matchProp.ID, time.Now().UnixNano()),
 		Timeout: 10 * time.Second,
@@ -57,7 +56,7 @@ func (g *NATSGateway) PublishMatchFound(ctx context.Context, matchProp models.Ma
 }
 
 // PublishMatchRejected publishes a match rejected event to JetStream with delivery guarantees
-func (g *NATSGateway) PublishMatchRejected(ctx context.Context, matchProp models.MatchProposal) error {
+func (g *NATSGateway) PublishMatchRejected(ctx context.Context, matchProp match.MatchProposal) error {
 	data, err := json.Marshal(matchProp)
 	if err != nil {
 		return fmt.Errorf("failed to marshal match proposal: %w", err)
@@ -65,7 +64,7 @@ func (g *NATSGateway) PublishMatchRejected(ctx context.Context, matchProp models
 
 	// Use JetStream publish with options for reliability
 	opts := natspkg.PublishOptions{
-		Subject: constants.SubjectMatchRejected,
+		Subject: natspkg.SubjectMatchRejected,
 		Data:    data,
 		MsgID:   fmt.Sprintf("match-rejected-%s-%d", matchProp.ID, time.Now().UnixNano()),
 		Timeout: 10 * time.Second,
@@ -89,7 +88,7 @@ func (g *NATSGateway) PublishMatchRejected(ctx context.Context, matchProp models
 }
 
 // PublishMatchAccepted publishes a match accepted event to JetStream with delivery guarantees
-func (g *NATSGateway) PublishMatchAccepted(ctx context.Context, matchProp models.MatchProposal) error {
+func (g *NATSGateway) PublishMatchAccepted(ctx context.Context, matchProp match.MatchProposal) error {
 	logger.InfoCtx(ctx, "Preparing to publish match accepted event to JetStream",
 		logger.String("match_id", matchProp.ID),
 		logger.String("driver_id", matchProp.DriverID),
@@ -105,7 +104,7 @@ func (g *NATSGateway) PublishMatchAccepted(ctx context.Context, matchProp models
 
 	// Use JetStream publish with options for reliability - higher retry for critical match events
 	opts := natspkg.PublishOptions{
-		Subject: constants.SubjectMatchAccepted,
+		Subject: natspkg.SubjectMatchAccepted,
 		Data:    data,
 		MsgID:   fmt.Sprintf("match-accepted-%s-%d", matchProp.ID, time.Now().UnixNano()),
 		Timeout: 15 * time.Second, // Longer timeout for critical match acceptance

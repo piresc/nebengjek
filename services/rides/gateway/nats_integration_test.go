@@ -8,8 +8,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/piresc/nebengjek/internal/pkg/constants"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	ridemodels "github.com/piresc/nebengjek/internal/pkg/models/ride"
+	locationmodels "github.com/piresc/nebengjek/internal/pkg/models/location"
+	natsconstants "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,11 +21,11 @@ func TestNATSGateway_PublishRidePickupEvent_Success(t *testing.T) {
 	gateway := NewNATSGateway(mockNATS)
 
 	ctx := context.Background()
-	rideEvent := &models.RidePickupEvent{
+	rideEvent := &ridemodels.RidePickupEvent{
 		RideID:      uuid.New().String(),
 		DriverID:    uuid.New().String(),
 		PassengerID: uuid.New().String(),
-		DriverLocation: models.Location{
+		DriverLocation: locationmodels.Location{
 			Latitude:  -6.2088,
 			Longitude: 106.8456,
 		},
@@ -40,10 +41,10 @@ func TestNATSGateway_PublishRidePickupEvent_Success(t *testing.T) {
 	// Verify message was published
 	messages := mockNATS.GetPublishedMessages()
 	assert.Len(t, messages, 1)
-	assert.Equal(t, constants.SubjectRidePickup, messages[0].Subject)
+	assert.Equal(t, natsconstants.SubjectRidePickup, messages[0].Subject)
 
 	// Verify message content
-	var publishedEvent models.RidePickupEvent
+	var publishedEvent ridemodels.RidePickupEvent
 	err = json.Unmarshal(messages[0].Data, &publishedEvent)
 	assert.NoError(t, err)
 	assert.Equal(t, rideEvent.RideID, publishedEvent.RideID)
@@ -58,11 +59,11 @@ func TestNATSGateway_PublishRidePickupEvent_PublishError(t *testing.T) {
 	gateway := NewNATSGateway(mockNATS)
 
 	ctx := context.Background()
-	rideEvent := &models.RidePickupEvent{
+	rideEvent := &ridemodels.RidePickupEvent{
 		RideID:      uuid.New().String(),
 		DriverID:    uuid.New().String(),
 		PassengerID: uuid.New().String(),
-		DriverLocation: models.Location{
+		DriverLocation: locationmodels.Location{
 			Latitude:  -6.2088,
 			Longitude: 106.8456,
 		},
@@ -83,7 +84,7 @@ func TestNATSGateway_PublishRideCompleteEvent_Success(t *testing.T) {
 	gateway := NewNATSGateway(mockNATS)
 
 	ctx := context.Background()
-	completeEvent := &models.RideCompleteEvent{
+	completeEvent := &ridemodels.RideCompleteEvent{
 		RideID:           "ride-123",
 		AdjustmentFactor: 0.9,
 	}
@@ -97,10 +98,10 @@ func TestNATSGateway_PublishRideCompleteEvent_Success(t *testing.T) {
 	// Verify message was published
 	messages := mockNATS.GetPublishedMessages()
 	assert.Len(t, messages, 1)
-	assert.Equal(t, constants.SubjectRideCompleted, messages[0].Subject)
+	assert.Equal(t, natsconstants.SubjectRideCompleted, messages[0].Subject)
 
 	// Verify message content
-	var publishedEvent models.RideCompleteEvent
+	var publishedEvent ridemodels.RideCompleteEvent
 	err = json.Unmarshal(messages[0].Data, &publishedEvent)
 	assert.NoError(t, err)
 	assert.Equal(t, completeEvent.RideID, publishedEvent.RideID)

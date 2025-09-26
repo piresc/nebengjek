@@ -3,7 +3,7 @@ package handler
 import (
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/middleware"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/location"
 	httpHandler "github.com/piresc/nebengjek/services/location/handler/http"
@@ -13,14 +13,14 @@ import (
 type HTTPHandler struct {
 	locationHTTP *httpHandler.LocationHandler
 	locationNATS *LocationHandler
-	cfg          *models.Config
+	cfg          *coremodels.Config
 }
 
 // NewHTTPHandler creates a new combined handler
 func NewHTTPHandler(
 	locationUC location.LocationUC,
 	natsClient *natspkg.Client,
-	cfg *models.Config,
+	cfg *coremodels.Config,
 ) *HTTPHandler {
 	return &HTTPHandler{
 		locationHTTP: httpHandler.NewLocationHandler(locationUC),

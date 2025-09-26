@@ -6,15 +6,16 @@ import (
 	"time"
 
 	"github.com/newrelic/go-agent/v3/newrelic"
-	"github.com/piresc/nebengjek/internal/pkg/converter"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
+	locationmodels "github.com/piresc/nebengjek/internal/pkg/models/location"
+	matchmodels "github.com/piresc/nebengjek/internal/pkg/models/match"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
 )
 
 // addDriverToPool adds a driver to the available pool without creating matches
-func (uc *MatchUC) addDriverToPool(ctx context.Context, driverID string, location *models.Location) error {
+func (uc *MatchUC) addDriverToPool(ctx context.Context, driverID string, loc *locationmodels.Location) error {
 	// Add driver to available pool
-	if err := uc.matchGW.AddAvailableDriver(ctx, driverID, location); err != nil {
+	if err := uc.matchGW.AddAvailableDriver(ctx, driverID, loc); err != nil {
 		logger.Error("Failed to add available driver",
 			logger.String("driver_id", driverID),
 			logger.ErrorField(err))
@@ -24,7 +25,7 @@ func (uc *MatchUC) addDriverToPool(ctx context.Context, driverID string, locatio
 }
 
 // createMatchesWithNearbyDrivers finds nearby drivers and creates match proposals
-func (uc *MatchUC) createMatchesWithNearbyDrivers(ctx context.Context, passengerID string, passengerLocation, targetLocation *models.Location) error {
+func (uc *MatchUC) createMatchesWithNearbyDrivers(ctx context.Context, passengerID string, passengerLocation, targetLocation *locationmodels.Location) error {
 	nearbyDrivers, err := uc.matchGW.FindNearbyDrivers(ctx, passengerLocation, uc.cfg.Match.SearchRadiusKm) // Configurable radius
 	if err != nil {
 		logger.Error("Failed to find nearby drivers",
@@ -51,35 +52,35 @@ func (uc *MatchUC) createMatchesWithNearbyDrivers(ctx context.Context, passenger
 }
 
 // buildMatch constructs a match object with the provided data
-func (uc *MatchUC) buildMatch(driverID, passengerID string, driverLocation, passengerLocation, targetLocation *models.Location) *models.Match {
+func (uc *MatchUC) buildMatch(driverID, passengerID string, driverLoc, passengerLoc, targetLoc *locationmodels.Location) *matchmodels.Match {
 	logger.Info("Building match with locations",
 		logger.String("driver_id", driverID),
 		logger.String("passenger_id", passengerID),
-		logger.Float64("driver_lat", driverLocation.Latitude),
-		logger.Float64("driver_lon", driverLocation.Longitude),
-		logger.Float64("passenger_lat", passengerLocation.Latitude),
-		logger.Float64("passenger_lon", passengerLocation.Longitude))
+		logger.Float64("driver_lat", driverLoc.Latitude),
+		logger.Float64("driver_lon", driverLoc.Longitude),
+		logger.Float64("passenger_lat", passengerLoc.Latitude),
+		logger.Float64("passenger_lon", passengerLoc.Longitude))
 
-	if targetLocation != nil {
+	if targetLoc != nil {
 		logger.Info("Target location provided",
-			logger.Float64("target_lat", targetLocation.Latitude),
-			logger.Float64("target_lon", targetLocation.Longitude))
+			logger.Float64("target_lat", targetLoc.Latitude),
+			logger.Float64("target_lon", targetLoc.Longitude))
 	} else {
 		logger.Warn("Target location is nil")
 	}
 
-	match := &models.Match{
-		DriverID:          converter.StrToUUID(driverID),
-		PassengerID:       converter.StrToUUID(passengerID),
-		DriverLocation:    *driverLocation,
-		PassengerLocation: *passengerLocation,
-		Status:            models.MatchStatusPending,
+	match := &matchmodels.Match{
+		DriverID:          core.StrToUUID(driverID),
+		PassengerID:       core.StrToUUID(passengerID),
+		DriverLocation:    *driverLoc,
+		PassengerLocation: *passengerLoc,
+		Status:            matchmodels.MatchStatusPending,
 		CreatedAt:         time.Now(),
 		UpdatedAt:         time.Now(),
 	}
 
-	if targetLocation != nil {
-		match.TargetLocation = *targetLocation
+	if targetLoc != nil {
+		match.TargetLocation = *targetLoc
 		logger.Info("Match created with target location",
 			logger.Float64("match_target_lat", match.TargetLocation.Latitude),
 			logger.Float64("match_target_lon", match.TargetLocation.Longitude))
@@ -88,8 +89,8 @@ func (uc *MatchUC) buildMatch(driverID, passengerID string, driverLocation, pass
 	return match
 }
 
-func (uc *MatchUC) handleActivePassengerWithTarget(ctx context.Context, event models.FinderEvent, location *models.Location, targetLocation *models.Location) error {
-	if err := uc.matchGW.AddAvailablePassenger(ctx, event.UserID, location); err != nil {
+func (uc *MatchUC) handleActivePassengerWithTarget(ctx context.Context, event core.FinderEvent, loc *locationmodels.Location, targetLoc *locationmodels.Location) error {
+	if err := uc.matchGW.AddAvailablePassenger(ctx, event.UserID, loc); err != nil {
 		logger.Error("Failed to add available passenger",
 			logger.String("passenger_id", event.UserID),
 			logger.ErrorField(err))
@@ -97,7 +98,7 @@ func (uc *MatchUC) handleActivePassengerWithTarget(ctx context.Context, event mo
 	}
 
 	// Find nearby drivers to match with
-	return uc.createMatchesWithNearbyDrivers(ctx, event.UserID, location, targetLocation)
+	return uc.createMatchesWithNearbyDrivers(ctx, event.UserID, loc, targetLoc)
 }
 
 func (uc *MatchUC) handleInactiveUser(ctx context.Context, userID string, role string) error {
@@ -119,9 +120,9 @@ func (uc *MatchUC) handleInactiveUser(ctx context.Context, userID string, role s
 }
 
 // HandleBeaconEvent processes beacon events from NATS for drivers
-func (uc *MatchUC) HandleBeaconEvent(ctx context.Context, event models.BeaconEvent) error {
+func (uc *MatchUC) HandleBeaconEvent(ctx context.Context, event core.BeaconEvent) error {
 
-	location := &models.Location{
+	location := &locationmodels.Location{
 		Latitude:  event.Location.Latitude,
 		Longitude: event.Location.Longitude,
 	}
@@ -147,14 +148,14 @@ func (uc *MatchUC) HandleBeaconEvent(ctx context.Context, event models.BeaconEve
 }
 
 // HandleFinderEvent processes finder events from NATS for passengers
-func (uc *MatchUC) HandleFinderEvent(ctx context.Context, event models.FinderEvent) error {
+func (uc *MatchUC) HandleFinderEvent(ctx context.Context, event core.FinderEvent) error {
 
-	location := &models.Location{
+	location := &locationmodels.Location{
 		Latitude:  event.Location.Latitude,
 		Longitude: event.Location.Longitude,
 	}
 
-	targetLocation := &models.Location{
+	targetLocation := &locationmodels.Location{
 		Latitude:  event.TargetLocation.Latitude,
 		Longitude: event.TargetLocation.Longitude,
 	}
@@ -188,7 +189,7 @@ func (uc *MatchUC) HandleFinderEvent(ctx context.Context, event models.FinderEve
 }
 
 // CreateMatch creates a new match and publishes a match proposal event
-func (uc *MatchUC) CreateMatch(ctx context.Context, match *models.Match) error {
+func (uc *MatchUC) CreateMatch(ctx context.Context, match *matchmodels.Match) error {
 	// Create match directly in database, which will check for existing pending matches
 	createdMatch, err := uc.matchRepo.CreateMatch(ctx, match)
 	if err != nil {
@@ -207,17 +208,17 @@ func (uc *MatchUC) CreateMatch(ctx context.Context, match *models.Match) error {
 }
 
 // buildMatchProposal creates a match proposal from a match object
-func (uc *MatchUC) buildMatchProposal(match *models.Match) models.MatchProposal {
+func (uc *MatchUC) buildMatchProposal(match *matchmodels.Match) matchmodels.MatchProposal {
 	logger.Info("Building match proposal",
 		logger.String("match_id", match.ID.String()),
 		logger.Float64("match_target_lat", match.TargetLocation.Latitude),
 		logger.Float64("match_target_lon", match.TargetLocation.Longitude),
-		logger.String("match_target_timestamp", match.TargetLocation.Timestamp.String()))
+		logger.String("match_target_location", fmt.Sprintf("%.6f,%.6f", match.TargetLocation.Latitude, match.TargetLocation.Longitude)))
 
-	proposal := models.MatchProposal{
+	proposal := matchmodels.MatchProposal{
 		ID:             match.ID.String(),
-		PassengerID:    converter.UUIDToStr(match.PassengerID),
-		DriverID:       converter.UUIDToStr(match.DriverID),
+		PassengerID:    core.UUIDToStr(match.PassengerID),
+		DriverID:       core.UUIDToStr(match.DriverID),
 		UserLocation:   match.PassengerLocation,
 		DriverLocation: match.DriverLocation,
 		TargetLocation: match.TargetLocation,
@@ -227,13 +228,13 @@ func (uc *MatchUC) buildMatchProposal(match *models.Match) models.MatchProposal 
 	logger.Info("Match proposal created",
 		logger.Float64("proposal_target_lat", proposal.TargetLocation.Latitude),
 		logger.Float64("proposal_target_lon", proposal.TargetLocation.Longitude),
-		logger.String("proposal_target_timestamp", proposal.TargetLocation.Timestamp.String()))
+		logger.String("proposal_target_location", fmt.Sprintf("%.6f,%.6f", proposal.TargetLocation.Latitude, proposal.TargetLocation.Longitude)))
 
 	return proposal
 }
 
 // updateMatchConfirmation updates match confirmation status based on user type
-func (uc *MatchUC) updateMatchConfirmation(ctx context.Context, match *models.Match, userID string, isDriver bool) (*models.Match, error) {
+func (uc *MatchUC) updateMatchConfirmation(ctx context.Context, match *matchmodels.Match, userID string, isDriver bool) (*matchmodels.Match, error) {
 	if isDriver {
 		match.DriverConfirmed = true
 	} else {
@@ -242,7 +243,7 @@ func (uc *MatchUC) updateMatchConfirmation(ctx context.Context, match *models.Ma
 
 	// Determine new status based on confirmations
 	if match.DriverConfirmed && match.PassengerConfirmed {
-		match.Status = models.MatchStatusAccepted
+		match.Status = matchmodels.MatchStatusAccepted
 		logger.Info("Match fully confirmed by both parties",
 			logger.String("match_id", match.ID.String()))
 
@@ -250,10 +251,10 @@ func (uc *MatchUC) updateMatchConfirmation(ctx context.Context, match *models.Ma
 		uc.matchGW.RemoveAvailableDriver(ctx, match.DriverID.String())
 		uc.matchGW.RemoveAvailablePassenger(ctx, match.PassengerID.String())
 	} else if match.DriverConfirmed {
-		match.Status = models.MatchStatusDriverConfirmed
+		match.Status = matchmodels.MatchStatusDriverConfirmed
 		// Match confirmed by driver, waiting for passenger
 	} else if match.PassengerConfirmed {
-		match.Status = models.MatchStatusPassengerConfirmed
+		match.Status = matchmodels.MatchStatusPassengerConfirmed
 		// Match confirmed by passenger, waiting for driver
 	}
 
@@ -262,7 +263,7 @@ func (uc *MatchUC) updateMatchConfirmation(ctx context.Context, match *models.Ma
 }
 
 // handleMatchAcceptance processes match acceptance logic
-func (uc *MatchUC) handleMatchAcceptance(ctx context.Context, match *models.Match, req *models.MatchConfirmRequest) (models.MatchProposal, error) {
+func (uc *MatchUC) handleMatchAcceptance(ctx context.Context, match *matchmodels.Match, req *matchmodels.MatchConfirmRequest) (matchmodels.MatchProposal, error) {
 	isDriver := req.UserID == match.DriverID.String()
 
 	updatedMatch, err := uc.updateMatchConfirmation(ctx, match, req.UserID, isDriver)
@@ -274,7 +275,7 @@ func (uc *MatchUC) handleMatchAcceptance(ctx context.Context, match *models.Matc
 	}
 
 	// If match is fully accepted, handle auto-rejection asynchronously
-	if updatedMatch.Status == models.MatchStatusAccepted {
+	if updatedMatch.Status == matchmodels.MatchStatusAccepted {
 		uc.startAsyncAutoRejection(updatedMatch)
 		uc.PublishMatchAccepted(ctx, updatedMatch)
 	}
@@ -285,12 +286,12 @@ func (uc *MatchUC) handleMatchAcceptance(ctx context.Context, match *models.Matc
 	return responseEvent, nil
 }
 
-func (uc *MatchUC) PublishMatchAccepted(ctx context.Context, match *models.Match) {
+func (uc *MatchUC) PublishMatchAccepted(ctx context.Context, match *matchmodels.Match) {
 	// Create match proposal for accepted match
-	PublishMatchAccepted := models.MatchProposal{
+	PublishMatchAccepted := matchmodels.MatchProposal{
 		ID:             match.ID.String(),
-		PassengerID:    converter.UUIDToStr(match.PassengerID),
-		DriverID:       converter.UUIDToStr(match.DriverID),
+		PassengerID:    core.UUIDToStr(match.PassengerID),
+		DriverID:       core.UUIDToStr(match.DriverID),
 		UserLocation:   match.PassengerLocation,
 		DriverLocation: match.DriverLocation,
 		TargetLocation: match.TargetLocation,
@@ -305,7 +306,7 @@ func (uc *MatchUC) PublishMatchAccepted(ctx context.Context, match *models.Match
 }
 
 // startAsyncAutoRejection initiates the asynchronous auto-rejection process
-func (uc *MatchUC) startAsyncAutoRejection(match *models.Match) {
+func (uc *MatchUC) startAsyncAutoRejection(match *matchmodels.Match) {
 	// Create context with timeout for background operation
 	bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 
@@ -322,7 +323,7 @@ func (uc *MatchUC) startAsyncAutoRejection(match *models.Match) {
 }
 
 // handleAutoRejectionForAcceptedMatch rejects all other pending matches for the same passenger
-func (uc *MatchUC) handleAutoRejectionForAcceptedMatch(ctx context.Context, acceptedMatch *models.Match) error {
+func (uc *MatchUC) handleAutoRejectionForAcceptedMatch(ctx context.Context, acceptedMatch *matchmodels.Match) error {
 	// Add timeout check
 	select {
 	case <-ctx.Done():
@@ -338,7 +339,7 @@ func (uc *MatchUC) handleAutoRejectionForAcceptedMatch(ctx context.Context, acce
 
 	// Process rejections in batches to reduce database load
 	rejectionBatch := make([]string, 0)
-	eventBatch := make([]models.MatchProposal, 0)
+	eventBatch := make([]matchmodels.MatchProposal, 0)
 
 	for _, otherMatch := range matches {
 		// Check context again during processing
@@ -354,9 +355,9 @@ func (uc *MatchUC) handleAutoRejectionForAcceptedMatch(ctx context.Context, acce
 		}
 
 		// Only process if the match is still pending
-		if otherMatch.Status == models.MatchStatusPending ||
-			otherMatch.Status == models.MatchStatusDriverConfirmed ||
-			otherMatch.Status == models.MatchStatusPassengerConfirmed {
+		if otherMatch.Status == matchmodels.MatchStatusPending ||
+			otherMatch.Status == matchmodels.MatchStatusDriverConfirmed ||
+			otherMatch.Status == matchmodels.MatchStatusPassengerConfirmed {
 
 			rejectionBatch = append(rejectionBatch, otherMatch.ID.String())
 			eventBatch = append(eventBatch, uc.createRejectionEvent(otherMatch))
@@ -376,13 +377,13 @@ func (uc *MatchUC) handleAutoRejectionForAcceptedMatch(ctx context.Context, acce
 }
 
 // processRejectionBatch handles the batch update of rejected matches and event publishing
-func (uc *MatchUC) processRejectionBatch(ctx context.Context, rejectionBatch []string, eventBatch []models.MatchProposal) error {
+func (uc *MatchUC) processRejectionBatch(ctx context.Context, rejectionBatch []string, eventBatch []matchmodels.MatchProposal) error {
 	if len(rejectionBatch) == 0 {
 		return nil
 	}
 
 	// Attempt batch update
-	if err := uc.matchRepo.BatchUpdateMatchStatus(ctx, rejectionBatch, models.MatchStatusRejected); err != nil {
+	if err := uc.matchRepo.BatchUpdateMatchStatus(ctx, rejectionBatch, matchmodels.MatchStatusRejected); err != nil {
 		logger.Warn("Batch update failed, falling back to individual updates",
 			logger.Int("batch_size", len(rejectionBatch)),
 			logger.ErrorField(err))
@@ -394,7 +395,7 @@ func (uc *MatchUC) processRejectionBatch(ctx context.Context, rejectionBatch []s
 }
 
 // processIndividualRejections handles individual updates when batch update fails
-func (uc *MatchUC) processIndividualRejections(ctx context.Context, matchIDs []string, events []models.MatchProposal) error {
+func (uc *MatchUC) processIndividualRejections(ctx context.Context, matchIDs []string, events []matchmodels.MatchProposal) error {
 	for i, matchID := range matchIDs {
 		select {
 		case <-ctx.Done():
@@ -402,7 +403,7 @@ func (uc *MatchUC) processIndividualRejections(ctx context.Context, matchIDs []s
 		default:
 		}
 
-		if err := uc.matchRepo.UpdateMatchStatus(ctx, matchID, models.MatchStatusRejected); err != nil {
+		if err := uc.matchRepo.UpdateMatchStatus(ctx, matchID, matchmodels.MatchStatusRejected); err != nil {
 			logger.Error("Failed to update rejected match status",
 				logger.String("match_id", matchID),
 				logger.ErrorField(err))
@@ -420,7 +421,7 @@ func (uc *MatchUC) processIndividualRejections(ctx context.Context, matchIDs []s
 }
 
 // publishRejectionEvents publishes all rejection events
-func (uc *MatchUC) publishRejectionEvents(ctx context.Context, events []models.MatchProposal) error {
+func (uc *MatchUC) publishRejectionEvents(ctx context.Context, events []matchmodels.MatchProposal) error {
 	for _, event := range events {
 		select {
 		case <-ctx.Done():
@@ -438,12 +439,12 @@ func (uc *MatchUC) publishRejectionEvents(ctx context.Context, events []models.M
 }
 
 // createRejectionEvent creates a match proposal event for rejection
-func (uc *MatchUC) createRejectionEvent(match *models.Match) models.MatchProposal {
-	return models.MatchProposal{
+func (uc *MatchUC) createRejectionEvent(match *matchmodels.Match) matchmodels.MatchProposal {
+	return matchmodels.MatchProposal{
 		ID:             match.ID.String(),
-		PassengerID:    converter.UUIDToStr(match.PassengerID),
-		DriverID:       converter.UUIDToStr(match.DriverID),
-		MatchStatus:    models.MatchStatusRejected,
+		PassengerID:    core.UUIDToStr(match.PassengerID),
+		DriverID:       core.UUIDToStr(match.DriverID),
+		MatchStatus:    matchmodels.MatchStatusRejected,
 		DriverLocation: match.DriverLocation,
 		UserLocation:   match.PassengerLocation,
 		TargetLocation: match.TargetLocation,
@@ -451,10 +452,10 @@ func (uc *MatchUC) createRejectionEvent(match *models.Match) models.MatchProposa
 }
 
 // handleMatchRejection processes match rejection logic
-func (uc *MatchUC) handleMatchRejection(ctx context.Context, match *models.Match) (models.MatchProposal, error) {
+func (uc *MatchUC) handleMatchRejection(ctx context.Context, match *matchmodels.Match) (matchmodels.MatchProposal, error) {
 	matchID := match.ID.String()
 
-	if err := uc.matchRepo.UpdateMatchStatus(ctx, matchID, models.MatchStatusRejected); err != nil {
+	if err := uc.matchRepo.UpdateMatchStatus(ctx, matchID, matchmodels.MatchStatusRejected); err != nil {
 		logger.Error("Failed to update match status to rejected",
 			logger.String("match_id", matchID),
 			logger.ErrorField(err))
@@ -466,7 +467,7 @@ func (uc *MatchUC) handleMatchRejection(ctx context.Context, match *models.Match
 		logger.Error("Failed to get updated match after rejection",
 			logger.String("match_id", matchID),
 			logger.ErrorField(err))
-		match.Status = models.MatchStatusRejected // Fallback to local update
+		match.Status = matchmodels.MatchStatusRejected // Fallback to local update
 		updatedMatch = match
 	}
 
@@ -482,7 +483,7 @@ func (uc *MatchUC) handleMatchRejection(ctx context.Context, match *models.Match
 }
 
 // ConfirmMatchStatus handles match confirmation from either driver or passenger
-func (uc *MatchUC) ConfirmMatchStatus(ctx context.Context, req *models.MatchConfirmRequest) (models.MatchProposal, error) {
+func (uc *MatchUC) ConfirmMatchStatus(ctx context.Context, req *matchmodels.MatchConfirmRequest) (matchmodels.MatchProposal, error) {
 	// Extract transaction from standard context
 	txn := newrelic.FromContext(ctx)
 	if txn != nil {
@@ -493,36 +494,36 @@ func (uc *MatchUC) ConfirmMatchStatus(ctx context.Context, req *models.MatchConf
 	// Get the match from database
 	match, err := uc.matchRepo.GetMatch(ctx, req.ID)
 	if err != nil {
-		return models.MatchProposal{}, fmt.Errorf("match not found in database: %w", err)
+		return matchmodels.MatchProposal{}, fmt.Errorf("match not found in database: %w", err)
 	}
 
 	switch req.Status {
-	case string(models.MatchStatusAccepted):
+	case string(matchmodels.MatchStatusAccepted):
 		return uc.handleMatchAcceptance(ctx, match, req)
-	case string(models.MatchStatusRejected):
+	case string(matchmodels.MatchStatusRejected):
 		return uc.handleMatchRejection(ctx, match)
 	default:
 		err := fmt.Errorf("unsupported match status: %s", req.Status)
-		return models.MatchProposal{}, err
+		return matchmodels.MatchProposal{}, err
 	}
 }
 
 // GetMatch retrieves a match by ID
-func (uc *MatchUC) GetMatch(ctx context.Context, matchID string) (*models.Match, error) {
+func (uc *MatchUC) GetMatch(ctx context.Context, matchID string) (*matchmodels.Match, error) {
 	return uc.matchRepo.GetMatch(ctx, matchID)
 }
 
 // GetPendingMatch retrieves a pending match by ID
-func (uc *MatchUC) GetPendingMatch(ctx context.Context, matchID string) (*models.Match, error) {
+func (uc *MatchUC) GetPendingMatch(ctx context.Context, matchID string) (*matchmodels.Match, error) {
 	match, err := uc.matchRepo.GetMatch(ctx, matchID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find match: %w", err)
 	}
 
 	// Only return if it's in pending state
-	if match.Status == models.MatchStatusPending ||
-		match.Status == models.MatchStatusDriverConfirmed ||
-		match.Status == models.MatchStatusPassengerConfirmed {
+	if match.Status == matchmodels.MatchStatusPending ||
+		match.Status == matchmodels.MatchStatusDriverConfirmed ||
+		match.Status == matchmodels.MatchStatusPassengerConfirmed {
 		return match, nil
 	}
 

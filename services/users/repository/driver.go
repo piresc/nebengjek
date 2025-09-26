@@ -10,17 +10,17 @@ import (
 	"github.com/google/uuid"
 	_ "github.com/newrelic/go-agent/v3/integrations/nrpq"
 	"github.com/newrelic/go-agent/v3/newrelic"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/user"
 )
 
 // getDriverInfo retrieves driver information for a user
-func (r *UserRepo) getDriverInfo(ctx context.Context, userID uuid.UUID) (*models.Driver, error) {
+func (r *UserRepo) getDriverInfo(ctx context.Context, userID uuid.UUID) (*user.Driver, error) {
 	txn := newrelic.FromContext(ctx)
 	dbCtx := newrelic.NewContext(ctx, txn)
 
 	query := `SELECT * FROM drivers WHERE user_id = $1`
 
-	var driver models.Driver
+	var driver user.Driver
 	err := r.db.GetContext(dbCtx, &driver, query, userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -31,7 +31,7 @@ func (r *UserRepo) getDriverInfo(ctx context.Context, userID uuid.UUID) (*models
 	return &driver, nil
 }
 
-func (r *UserRepo) UpdateToDriver(ctx context.Context, user *models.User) error {
+func (r *UserRepo) UpdateToDriver(ctx context.Context, user *user.User) error {
 	// Begin transaction
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -75,7 +75,7 @@ func (r *UserRepo) UpdateToDriver(ctx context.Context, user *models.User) error 
 }
 
 // GetUserByID retrieves a user by ID
-func (r *UserRepo) GetUserByID(ctx context.Context, id string) (*models.User, error) {
+func (r *UserRepo) GetUserByID(ctx context.Context, id string) (*user.User, error) {
 	txn := newrelic.FromContext(ctx)
 	dbCtx := newrelic.NewContext(ctx, txn)
 

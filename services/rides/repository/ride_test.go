@@ -9,7 +9,8 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
+	ridemodels "github.com/piresc/nebengjek/internal/pkg/models/ride"
 	"github.com/piresc/nebengjek/services/rides/repository"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,11 +24,11 @@ func setupMockDB(t *testing.T) (*sqlx.DB, sqlmock.Sqlmock) {
 
 func TestCreateRide_Success(t *testing.T) {
 	db, mock := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
 	rideID := uuid.New()
 	matchID := uuid.New()
-	r := &models.Ride{RideID: rideID, MatchID: matchID, DriverID: uuid.New(), PassengerID: uuid.New(), Status: models.RideStatusPending, TotalCost: 0}
+	r := &ridemodels.Ride{RideID: rideID, MatchID: matchID, DriverID: uuid.New(), PassengerID: uuid.New(), Status: ridemodels.RideStatusPending, TotalCost: 0}
 
 	// Expect insert
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO rides")).
@@ -42,7 +43,7 @@ func TestCreateRide_Success(t *testing.T) {
 
 func TestUpdateTotalCost_NoRows(t *testing.T) {
 	db, mock := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
 	rideID := "abc"
 
@@ -57,7 +58,7 @@ func TestUpdateTotalCost_NoRows(t *testing.T) {
 
 func TestGetRide_Error(t *testing.T) {
 	db, mock := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT ride_id, driver_id, passenger_id")).
 		WithArgs("id").
@@ -69,13 +70,13 @@ func TestGetRide_Error(t *testing.T) {
 
 func TestCompleteRide_Success(t *testing.T) {
 	db, mock := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
-	ride := &models.Ride{RideID: uuid.New()}
+	ride := &ridemodels.Ride{RideID: uuid.New()}
 
 	// Expect update marking ride as completed
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE rides")).
-		WithArgs(models.RideStatusCompleted, ride.RideID).
+		WithArgs(ridemodels.RideStatusCompleted, ride.RideID).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	err := repo.CompleteRide(context.Background(), ride)
@@ -84,7 +85,7 @@ func TestCompleteRide_Success(t *testing.T) {
 
 func TestGetBillingLedgerSum_Sum(t *testing.T) {
 	db, mock := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT COALESCE(SUM(cost), 0)")).
 		WithArgs("id").
@@ -97,9 +98,9 @@ func TestGetBillingLedgerSum_Sum(t *testing.T) {
 
 func TestCreatePayment_Success(t *testing.T) {
 	db, mock := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
-	pay := &models.Payment{PaymentID: uuid.New(), RideID: uuid.New(), AdjustedCost: 1000, AdminFee: 50, DriverPayout: 950, Status: models.PaymentStatusPending}
+	pay := &ridemodels.Payment{PaymentID: uuid.New(), RideID: uuid.New(), AdjustedCost: 1000, AdminFee: 50, DriverPayout: 950, Status: ridemodels.PaymentStatusPending}
 
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO payments")).
 		WithArgs(pay.PaymentID, pay.RideID, pay.AdjustedCost, pay.AdminFee, pay.DriverPayout, pay.Status, sqlmock.AnyArg()).
@@ -111,9 +112,9 @@ func TestCreatePayment_Success(t *testing.T) {
 
 func TestAddBillingEntry_Success(t *testing.T) {
 	db, mock := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
-	entry := &models.BillingLedger{EntryID: uuid.New(), RideID: uuid.New(), Distance: 2.5, Cost: 7500}
+	entry := &ridemodels.BillingLedger{EntryID: uuid.New(), RideID: uuid.New(), Distance: 2.5, Cost: 7500}
 
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO billing_ledger")).
 		WithArgs(entry.EntryID, entry.RideID, entry.Distance, entry.Cost, sqlmock.AnyArg()).
@@ -126,9 +127,9 @@ func TestAddBillingEntry_Success(t *testing.T) {
 
 func TestAddBillingEntry_Error(t *testing.T) {
 	db, mock := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
-	entry := &models.BillingLedger{RideID: uuid.New(), Distance: 2.5, Cost: 7500}
+	entry := &ridemodels.BillingLedger{RideID: uuid.New(), Distance: 2.5, Cost: 7500}
 
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO billing_ledger")).
 		WillReturnError(assert.AnError)
@@ -140,10 +141,10 @@ func TestAddBillingEntry_Error(t *testing.T) {
 
 func TestUpdateRideStatus_Success(t *testing.T) {
 	db, mock := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
 	rideID := uuid.New().String()
-	status := models.RideStatusOngoing
+	status := ridemodels.RideStatusOngoing
 
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE rides")).
 		WithArgs(status, rideID).
@@ -156,10 +157,10 @@ func TestUpdateRideStatus_Success(t *testing.T) {
 
 func TestUpdateRideStatus_NotFound(t *testing.T) {
 	db, mock := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
 	rideID := uuid.New().String()
-	status := models.RideStatusOngoing
+	status := ridemodels.RideStatusOngoing
 
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE rides")).
 		WithArgs(status, rideID).
@@ -172,7 +173,7 @@ func TestUpdateRideStatus_NotFound(t *testing.T) {
 
 func TestGetPaymentByRideID_Success(t *testing.T) {
 	db, mock := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
 	rideID := uuid.New().String()
 	paymentID := uuid.New()
@@ -180,7 +181,7 @@ func TestGetPaymentByRideID_Success(t *testing.T) {
 	createdAt := time.Now()
 
 	rows := sqlmock.NewRows([]string{"payment_id", "ride_id", "adjusted_cost", "admin_fee", "driver_payout", "status", "created_at"}).
-		AddRow(paymentID, rideUUID, 8000, 400, 7600, models.PaymentStatusPending, createdAt)
+		AddRow(paymentID, rideUUID, 8000, 400, 7600, ridemodels.PaymentStatusPending, createdAt)
 
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT payment_id, ride_id, adjusted_cost, admin_fee, driver_payout, status, created_at")).
 		WithArgs(rideUUID).
@@ -192,12 +193,12 @@ func TestGetPaymentByRideID_Success(t *testing.T) {
 	assert.Equal(t, paymentID, payment.PaymentID)
 	assert.Equal(t, rideUUID, payment.RideID)
 	assert.Equal(t, 8000, payment.AdjustedCost)
-	assert.Equal(t, models.PaymentStatusPending, payment.Status)
+	assert.Equal(t, ridemodels.PaymentStatusPending, payment.Status)
 }
 
 func TestGetPaymentByRideID_NotFound(t *testing.T) {
 	db, mock := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
 	rideID := uuid.New().String()
 	rideUUID := uuid.MustParse(rideID)
@@ -214,11 +215,11 @@ func TestGetPaymentByRideID_NotFound(t *testing.T) {
 
 func TestUpdatePaymentStatus_Success(t *testing.T) {
 	db, mock := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
 	paymentID := uuid.New().String()
 	paymentUUID := uuid.MustParse(paymentID)
-	status := models.PaymentStatusAccepted
+	status := ridemodels.PaymentStatusAccepted
 
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE payments")).
 		WithArgs(status, paymentUUID).
@@ -231,10 +232,10 @@ func TestUpdatePaymentStatus_Success(t *testing.T) {
 
 func TestUpdatePaymentStatus_InvalidID(t *testing.T) {
 	db, _ := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
 	invalidPaymentID := "invalid-uuid"
-	status := models.PaymentStatusAccepted
+	status := ridemodels.PaymentStatusAccepted
 
 	err := repo.UpdatePaymentStatus(context.Background(), invalidPaymentID, status)
 	assert.Error(t, err)
@@ -243,7 +244,7 @@ func TestUpdatePaymentStatus_InvalidID(t *testing.T) {
 
 func TestGetRide_Success(t *testing.T) {
 	db, mock := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
 	rideID := uuid.New().String()
 	rideUUID := uuid.MustParse(rideID)
@@ -254,7 +255,7 @@ func TestGetRide_Success(t *testing.T) {
 	updatedAt := time.Now()
 
 	rows := sqlmock.NewRows([]string{"ride_id", "match_id", "driver_id", "passenger_id", "status", "total_cost", "created_at", "updated_at"}).
-		AddRow(rideUUID, matchID, driverID, passengerID, models.RideStatusOngoing, 10000, createdAt, updatedAt)
+		AddRow(rideUUID, matchID, driverID, passengerID, ridemodels.RideStatusOngoing, 10000, createdAt, updatedAt)
 
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT ride_id, match_id, driver_id, passenger_id")).
 		WithArgs(rideUUID).
@@ -267,13 +268,13 @@ func TestGetRide_Success(t *testing.T) {
 	assert.Equal(t, matchID, ride.MatchID)
 	assert.Equal(t, driverID, ride.DriverID)
 	assert.Equal(t, passengerID, ride.PassengerID)
-	assert.Equal(t, models.RideStatusOngoing, ride.Status)
+	assert.Equal(t, ridemodels.RideStatusOngoing, ride.Status)
 	assert.Equal(t, 10000, ride.TotalCost)
 }
 
 func TestUpdateTotalCost_Success(t *testing.T) {
 	db, mock := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
 	rideID := uuid.New().String()
 	additionalCost := 500
@@ -289,12 +290,12 @@ func TestUpdateTotalCost_Success(t *testing.T) {
 
 func TestCompleteRide_NotFound(t *testing.T) {
 	db, mock := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
-	ride := &models.Ride{RideID: uuid.New()}
+	ride := &ridemodels.Ride{RideID: uuid.New()}
 
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE rides")).
-		WithArgs(models.RideStatusCompleted, ride.RideID).
+		WithArgs(ridemodels.RideStatusCompleted, ride.RideID).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
 	err := repo.CompleteRide(context.Background(), ride)
@@ -304,7 +305,7 @@ func TestCompleteRide_NotFound(t *testing.T) {
 
 func TestGetBillingLedgerSum_NoEntries(t *testing.T) {
 	db, mock := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
 	rideID := "test-ride-id"
 
@@ -319,9 +320,9 @@ func TestGetBillingLedgerSum_NoEntries(t *testing.T) {
 
 func TestCreatePayment_Error(t *testing.T) {
 	db, mock := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
-	payment := &models.Payment{RideID: uuid.New(), AdjustedCost: 1000, AdminFee: 50, DriverPayout: 950}
+	payment := &ridemodels.Payment{RideID: uuid.New(), AdjustedCost: 1000, AdminFee: 50, DriverPayout: 950}
 
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO payments")).
 		WillReturnError(assert.AnError)
@@ -333,9 +334,9 @@ func TestCreatePayment_Error(t *testing.T) {
 
 func TestCreateRide_Error(t *testing.T) {
 	db, mock := setupMockDB(t)
-	repo := repository.NewRideRepository(&models.Config{}, db)
+	repo := repository.NewRideRepository(&core.Config{}, db)
 
-	ride := &models.Ride{MatchID: uuid.New(), DriverID: uuid.New(), PassengerID: uuid.New(), Status: models.RideStatusPending}
+	ride := &ridemodels.Ride{MatchID: uuid.New(), DriverID: uuid.New(), PassengerID: uuid.New(), Status: ridemodels.RideStatusPending}
 
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO rides")).
 		WillReturnError(assert.AnError)

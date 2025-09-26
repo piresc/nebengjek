@@ -9,7 +9,8 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	models "github.com/piresc/nebengjek/internal/pkg/models"
+	locationmodels "github.com/piresc/nebengjek/internal/pkg/models/location"
+	matchmodels "github.com/piresc/nebengjek/internal/pkg/models/match"
 )
 
 // MockLocationRepo is a mock of LocationRepo interface.
@@ -36,7 +37,7 @@ func (m *MockLocationRepo) EXPECT() *MockLocationRepoMockRecorder {
 }
 
 // AddAvailableDriver mocks base method.
-func (m *MockLocationRepo) AddAvailableDriver(arg0 context.Context, arg1 string, arg2 *models.Location) error {
+func (m *MockLocationRepo) AddAvailableDriver(arg0 context.Context, arg1 string, arg2 *locationmodels.Location) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddAvailableDriver", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -50,7 +51,7 @@ func (mr *MockLocationRepoMockRecorder) AddAvailableDriver(arg0, arg1, arg2 inte
 }
 
 // AddAvailablePassenger mocks base method.
-func (m *MockLocationRepo) AddAvailablePassenger(arg0 context.Context, arg1 string, arg2 *models.Location) error {
+func (m *MockLocationRepo) AddAvailablePassenger(arg0 context.Context, arg1 string, arg2 *locationmodels.Location) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddAvailablePassenger", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -64,10 +65,10 @@ func (mr *MockLocationRepoMockRecorder) AddAvailablePassenger(arg0, arg1, arg2 i
 }
 
 // FindNearbyDrivers mocks base method.
-func (m *MockLocationRepo) FindNearbyDrivers(arg0 context.Context, arg1 *models.Location, arg2 float64) ([]*models.NearbyUser, error) {
+func (m *MockLocationRepo) FindNearbyDrivers(arg0 context.Context, arg1 *locationmodels.Location, arg2 float64) ([]*matchmodels.NearbyUser, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindNearbyDrivers", arg0, arg1, arg2)
-	ret0, _ := ret[0].([]*models.NearbyUser)
+	ret0, _ := ret[0].([]*matchmodels.NearbyUser)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -79,10 +80,10 @@ func (mr *MockLocationRepoMockRecorder) FindNearbyDrivers(arg0, arg1, arg2 inter
 }
 
 // GetDriverLocation mocks base method.
-func (m *MockLocationRepo) GetDriverLocation(arg0 context.Context, arg1 string) (models.Location, error) {
+func (m *MockLocationRepo) GetDriverLocation(arg0 context.Context, arg1 string) (locationmodels.Location, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetDriverLocation", arg0, arg1)
-	ret0, _ := ret[0].(models.Location)
+	ret0, _ := ret[0].(locationmodels.Location)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -94,10 +95,10 @@ func (mr *MockLocationRepoMockRecorder) GetDriverLocation(arg0, arg1 interface{}
 }
 
 // GetLastLocation mocks base method.
-func (m *MockLocationRepo) GetLastLocation(arg0 context.Context, arg1 string) (*models.Location, error) {
+func (m *MockLocationRepo) GetLastLocation(arg0 context.Context, arg1 string) (*locationmodels.Location, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetLastLocation", arg0, arg1)
-	ret0, _ := ret[0].(*models.Location)
+	ret0, _ := ret[0].(*locationmodels.Location)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -109,10 +110,10 @@ func (mr *MockLocationRepoMockRecorder) GetLastLocation(arg0, arg1 interface{}) 
 }
 
 // GetPassengerLocation mocks base method.
-func (m *MockLocationRepo) GetPassengerLocation(arg0 context.Context, arg1 string) (models.Location, error) {
+func (m *MockLocationRepo) GetPassengerLocation(arg0 context.Context, arg1 string) (locationmodels.Location, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPassengerLocation", arg0, arg1)
-	ret0, _ := ret[0].(models.Location)
+	ret0, _ := ret[0].(locationmodels.Location)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -152,7 +153,7 @@ func (mr *MockLocationRepoMockRecorder) RemoveAvailablePassenger(arg0, arg1 inte
 }
 
 // StoreLocation mocks base method.
-func (m *MockLocationRepo) StoreLocation(arg0 context.Context, arg1 string, arg2 models.Location) error {
+func (m *MockLocationRepo) StoreLocation(arg0 context.Context, arg1 string, arg2 locationmodels.Location) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "StoreLocation", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)

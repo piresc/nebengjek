@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 )
 
 // RedisClient represents a Redis Client
@@ -15,7 +15,7 @@ type RedisClient struct {
 }
 
 // NewRedisClient creates a new Redis Client
-func NewRedisClient(config models.RedisConfig) (*RedisClient, error) {
+func NewRedisClient(config core.RedisConfig) (*RedisClient, error) {
 	// Create Redis Client
 	Client := redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%d", config.Host, config.Port),

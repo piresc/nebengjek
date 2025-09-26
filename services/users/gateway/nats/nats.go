@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 )
 
@@ -25,7 +24,7 @@ func NewNATSGateway(client *natspkg.Client) *NATSGateway {
 }
 
 // PublishBeaconEvent publishes a beacon event to JetStream with delivery guarantees
-func (g *NATSGateway) PublishBeaconEvent(ctx context.Context, event *models.BeaconEvent) error {
+func (g *NATSGateway) PublishBeaconEvent(ctx context.Context, event *core.BeaconEvent) error {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("failed to marshal beacon event: %w", err)
@@ -33,7 +32,7 @@ func (g *NATSGateway) PublishBeaconEvent(ctx context.Context, event *models.Beac
 
 	// Use JetStream publish with options for reliability
 	opts := natspkg.PublishOptions{
-		Subject: constants.SubjectUserBeacon,
+		Subject: natspkg.SubjectUserBeacon,
 		Data:    data,
 		MsgID:   fmt.Sprintf("beacon-%s-%d", event.UserID, time.Now().UnixNano()),
 		Timeout: 10 * time.Second,
@@ -54,7 +53,7 @@ func (g *NATSGateway) PublishBeaconEvent(ctx context.Context, event *models.Beac
 }
 
 // PublishFinderEvent publishes a finder event to JetStream with delivery guarantees
-func (g *NATSGateway) PublishFinderEvent(ctx context.Context, event *models.FinderEvent) error {
+func (g *NATSGateway) PublishFinderEvent(ctx context.Context, event *core.FinderEvent) error {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("failed to marshal finder event: %w", err)
@@ -62,7 +61,7 @@ func (g *NATSGateway) PublishFinderEvent(ctx context.Context, event *models.Find
 
 	// Use JetStream publish with options for reliability
 	opts := natspkg.PublishOptions{
-		Subject: constants.SubjectUserFinder,
+		Subject: natspkg.SubjectUserFinder,
 		Data:    data,
 		MsgID:   fmt.Sprintf("finder-%s-%d", event.UserID, time.Now().UnixNano()),
 		Timeout: 10 * time.Second,

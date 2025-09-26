@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/newrelic/go-agent/v3/newrelic"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/notification"
 )
 
 // NotificationRepo implements the notification repository interface
@@ -22,7 +22,7 @@ func NewNotificationRepo(db *sqlx.DB) *NotificationRepo {
 }
 
 // StoreNotificationHistory stores a notification in the database
-func (r *NotificationRepo) StoreNotificationHistory(ctx context.Context, notification *models.NotificationHistory) error {
+func (r *NotificationRepo) StoreNotificationHistory(ctx context.Context, notification *notification.NotificationHistory) error {
 	txn := newrelic.FromContext(ctx)
 	dbCtx := newrelic.NewContext(ctx, txn)
 
@@ -52,7 +52,7 @@ func (r *NotificationRepo) StoreNotificationHistory(ctx context.Context, notific
 }
 
 // GetNotificationHistory retrieves notification history for a user
-func (r *NotificationRepo) GetNotificationHistory(ctx context.Context, userID string, limit, offset int) ([]*models.NotificationHistory, error) {
+func (r *NotificationRepo) GetNotificationHistory(ctx context.Context, userID string, limit, offset int) ([]*notification.NotificationHistory, error) {
 	txn := newrelic.FromContext(ctx)
 	dbCtx := newrelic.NewContext(ctx, txn)
 
@@ -70,9 +70,9 @@ func (r *NotificationRepo) GetNotificationHistory(ctx context.Context, userID st
 	}
 	defer rows.Close()
 
-	var notifications []*models.NotificationHistory
+	var notifications []*notification.NotificationHistory
 	for rows.Next() {
-		var notification models.NotificationHistory
+		var notification notification.NotificationHistory
 		err := rows.Scan(
 			&notification.ID,
 			&notification.UserID,
@@ -125,7 +125,7 @@ func (r *NotificationRepo) MarkNotificationDelivered(ctx context.Context, notifi
 }
 
 // GetUndeliveredNotifications retrieves undelivered notifications for a user
-func (r *NotificationRepo) GetUndeliveredNotifications(ctx context.Context, userID string) ([]*models.NotificationHistory, error) {
+func (r *NotificationRepo) GetUndeliveredNotifications(ctx context.Context, userID string) ([]*notification.NotificationHistory, error) {
 	txn := newrelic.FromContext(ctx)
 	dbCtx := newrelic.NewContext(ctx, txn)
 
@@ -142,9 +142,9 @@ func (r *NotificationRepo) GetUndeliveredNotifications(ctx context.Context, user
 	}
 	defer rows.Close()
 
-	var notifications []*models.NotificationHistory
+	var notifications []*notification.NotificationHistory
 	for rows.Next() {
-		var notification models.NotificationHistory
+		var notification notification.NotificationHistory
 		err := rows.Scan(
 			&notification.ID,
 			&notification.UserID,
@@ -169,14 +169,14 @@ func (r *NotificationRepo) GetUndeliveredNotifications(ctx context.Context, user
 }
 
 // CreateNotificationFromEvent creates a notification from a user notification event
-func (r *NotificationRepo) CreateNotificationFromEvent(userNotification *models.UserNotification) (*models.NotificationHistory, error) {
+func (r *NotificationRepo) CreateNotificationFromEvent(userNotification *notification.UserNotification) (*notification.NotificationHistory, error) {
 	// Convert data to JSON
 	dataBytes, err := json.Marshal(userNotification.Data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal notification data: %w", err)
 	}
 
-	notification := &models.NotificationHistory{
+	notification := &notification.NotificationHistory{
 		UserID:    userNotification.UserID,
 		Type:      userNotification.Type,
 		Data:      json.RawMessage(dataBytes),

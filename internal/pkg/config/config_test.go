@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -734,7 +734,7 @@ func TestConcurrentConfigLoading(t *testing.T) {
 
 	// Test concurrent config loading
 	done := make(chan bool, 10)
-	configs := make(chan *models.Config, 10)
+	configs := make(chan *core.Config, 10)
 
 	for i := 0; i < 10; i++ {
 		go func() {
@@ -751,7 +751,7 @@ func TestConcurrentConfigLoading(t *testing.T) {
 
 	// Verify all configs are identical
 	close(configs)
-	var firstConfig *models.Config
+	var firstConfig *core.Config
 	for config := range configs {
 		if firstConfig == nil {
 			firstConfig = config

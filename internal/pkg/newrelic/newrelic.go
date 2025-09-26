@@ -3,11 +3,11 @@ package newrelic
 import (
 	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 )
 
 // InitNewRelic initializes New Relic application based on configuration
-func InitNewRelic(configs *models.Config) *newrelic.Application {
+func InitNewRelic(configs *core.Config) *newrelic.Application {
 	if configs == nil || !configs.NewRelic.Enabled || configs.NewRelic.LicenseKey == "" {
 		logger.Info("New Relic is disabled or license key not provided")
 		return nil

@@ -12,8 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"log/slog"
 
-	"github.com/piresc/nebengjek/internal/pkg/constants"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/notification"
+	matchmodels "github.com/piresc/nebengjek/internal/pkg/models/match"
+	locationmodels "github.com/piresc/nebengjek/internal/pkg/models/location"
+	ridemodels "github.com/piresc/nebengjek/internal/pkg/models/ride"
+	wsconstants "github.com/piresc/nebengjek/internal/pkg/models/websocket"
 )
 
 // MockNotificationRepo is a mock implementation of the NotificationRepo interface
@@ -21,14 +24,14 @@ type MockNotificationRepo struct {
 	mock.Mock
 }
 
-func (m *MockNotificationRepo) StoreNotificationHistory(ctx context.Context, notification *models.NotificationHistory) error {
+func (m *MockNotificationRepo) StoreNotificationHistory(ctx context.Context, notification *notification.NotificationHistory) error {
 	args := m.Called(ctx, notification)
 	return args.Error(0)
 }
 
-func (m *MockNotificationRepo) GetNotificationHistory(ctx context.Context, userID string, limit, offset int) ([]*models.NotificationHistory, error) {
+func (m *MockNotificationRepo) GetNotificationHistory(ctx context.Context, userID string, limit, offset int) ([]*notification.NotificationHistory, error) {
 	args := m.Called(ctx, userID, limit, offset)
-	return args.Get(0).([]*models.NotificationHistory), args.Error(1)
+	return args.Get(0).([]*notification.NotificationHistory), args.Error(1)
 }
 
 func (m *MockNotificationRepo) MarkNotificationDelivered(ctx context.Context, notificationID string) error {
@@ -36,9 +39,9 @@ func (m *MockNotificationRepo) MarkNotificationDelivered(ctx context.Context, no
 	return args.Error(0)
 }
 
-func (m *MockNotificationRepo) GetUndeliveredNotifications(ctx context.Context, userID string) ([]*models.NotificationHistory, error) {
+func (m *MockNotificationRepo) GetUndeliveredNotifications(ctx context.Context, userID string) ([]*notification.NotificationHistory, error) {
 	args := m.Called(ctx, userID)
-	return args.Get(0).([]*models.NotificationHistory), args.Error(1)
+	return args.Get(0).([]*notification.NotificationHistory), args.Error(1)
 }
 
 func TestNewNotificationUC(t *testing.T) {
@@ -62,14 +65,14 @@ func TestNotificationUC_ProcessMatchProposal(t *testing.T) {
 	driverID := uuid.New()
 	passengerID := uuid.New()
 
-	matchProposal := models.MatchProposal{
+	matchProposal := matchmodels.MatchProposal{
 		ID:             "match-123",
 		DriverID:       driverID.String(),
 		PassengerID:    passengerID.String(),
-		UserLocation:   models.Location{Latitude: -6.2088, Longitude: 106.8456},
-		DriverLocation: models.Location{Latitude: -6.1751, Longitude: 106.8650},
-		TargetLocation: models.Location{Latitude: -6.2297, Longitude: 106.8295},
-		MatchStatus:    models.MatchStatusPending,
+		UserLocation:   locationmodels.Location{Latitude: -6.2088, Longitude: 106.8456},
+		DriverLocation: locationmodels.Location{Latitude: -6.1751, Longitude: 106.8650},
+		TargetLocation: locationmodels.Location{Latitude: -6.2297, Longitude: 106.8295},
+		MatchStatus:    matchmodels.MatchStatusPending,
 	}
 
 	eventData, err := json.Marshal(matchProposal)
@@ -90,14 +93,14 @@ func TestNotificationUC_ProcessMatchAccepted(t *testing.T) {
 	driverID := uuid.New()
 	passengerID := uuid.New()
 
-	matchProposal := models.MatchProposal{
+	matchProposal := matchmodels.MatchProposal{
 		ID:             "match-123",
 		DriverID:       driverID.String(),
 		PassengerID:    passengerID.String(),
-		UserLocation:   models.Location{Latitude: -6.2088, Longitude: 106.8456},
-		DriverLocation: models.Location{Latitude: -6.1751, Longitude: 106.8650},
-		TargetLocation: models.Location{Latitude: -6.2297, Longitude: 106.8295},
-		MatchStatus:    models.MatchStatusAccepted,
+		UserLocation:   locationmodels.Location{Latitude: -6.2088, Longitude: 106.8456},
+		DriverLocation: locationmodels.Location{Latitude: -6.1751, Longitude: 106.8650},
+		TargetLocation: locationmodels.Location{Latitude: -6.2297, Longitude: 106.8295},
+		MatchStatus:    matchmodels.MatchStatusAccepted,
 	}
 
 	eventData, err := json.Marshal(matchProposal)
@@ -118,14 +121,14 @@ func TestNotificationUC_ProcessMatchRejected(t *testing.T) {
 	driverID := uuid.New()
 	passengerID := uuid.New()
 
-	matchProposal := models.MatchProposal{
+	matchProposal := matchmodels.MatchProposal{
 		ID:             "match-123",
 		DriverID:       driverID.String(),
 		PassengerID:    passengerID.String(),
-		UserLocation:   models.Location{Latitude: -6.2088, Longitude: 106.8456},
-		DriverLocation: models.Location{Latitude: -6.1751, Longitude: 106.8650},
-		TargetLocation: models.Location{Latitude: -6.2297, Longitude: 106.8295},
-		MatchStatus:    models.MatchStatusRejected,
+		UserLocation:   locationmodels.Location{Latitude: -6.2088, Longitude: 106.8456},
+		DriverLocation: locationmodels.Location{Latitude: -6.1751, Longitude: 106.8650},
+		TargetLocation: locationmodels.Location{Latitude: -6.2297, Longitude: 106.8295},
+		MatchStatus:    matchmodels.MatchStatusRejected,
 	}
 
 	eventData, err := json.Marshal(matchProposal)
@@ -146,11 +149,11 @@ func TestNotificationUC_ProcessRidePickup(t *testing.T) {
 	driverID := uuid.New()
 	passengerID := uuid.New()
 
-	rideResp := models.RideResp{
+	rideResp := ridemodels.RideResp{
 		RideID:      uuid.New().String(),
 		DriverID:    driverID.String(),
 		PassengerID: passengerID.String(),
-		Status:      "pickup",
+		Status:      "PICKUP",
 	}
 
 	eventData, err := json.Marshal(rideResp)
@@ -171,11 +174,11 @@ func TestNotificationUC_ProcessRideStarted(t *testing.T) {
 	driverID := uuid.New()
 	passengerID := uuid.New()
 
-	rideData := models.Ride{
+	rideData := ridemodels.Ride{
 		RideID:      uuid.New(),
 		DriverID:    driverID,
 		PassengerID: passengerID,
-		Status:      "started",
+		Status:      "ONGOING",
 	}
 
 	eventData, err := json.Marshal(rideData)
@@ -195,10 +198,10 @@ func TestNotificationUC_ProcessRidePickupArrived(t *testing.T) {
 	ctx := context.Background()
 	passengerID := uuid.New()
 
-	rideData := models.Ride{
+	rideData := ridemodels.Ride{
 		RideID:      uuid.New(),
 		PassengerID: passengerID,
-		Status:      "arrived",
+		Status:      "PICKUP",
 	}
 
 	eventData, err := json.Marshal(rideData)
@@ -219,12 +222,12 @@ func TestNotificationUC_ProcessRideCompleted(t *testing.T) {
 	driverID := uuid.New()
 	passengerID := uuid.New()
 
-	rideComplete := models.RideComplete{
-		Ride: models.Ride{
+	rideComplete := ridemodels.RideComplete{
+		Ride: ridemodels.Ride{
 			RideID:      uuid.New(),
 			DriverID:    driverID,
 			PassengerID: passengerID,
-			Status:      "completed",
+			Status:      "COMPLETED",
 		},
 	}
 
@@ -246,11 +249,11 @@ func TestNotificationUC_ProcessRideCancelled(t *testing.T) {
 	driverID := uuid.New()
 	passengerID := uuid.New()
 
-	rideData := models.Ride{
+	rideData := ridemodels.Ride{
 		RideID:      uuid.New(),
 		DriverID:    driverID,
 		PassengerID: passengerID,
-		Status:      "cancelled",
+		Status:      "PENDING",
 	}
 
 	eventData, err := json.Marshal(rideData)
@@ -271,12 +274,12 @@ func TestNotificationUC_ProcessPaymentProcessed(t *testing.T) {
 	driverID := uuid.New()
 	passengerID := uuid.New()
 
-	rideComplete := models.RideComplete{
-		Ride: models.Ride{
+	rideComplete := ridemodels.RideComplete{
+		Ride: ridemodels.Ride{
 			RideID:      uuid.New(),
 			DriverID:    driverID,
 			PassengerID: passengerID,
-			Status:      "completed",
+			Status:      "COMPLETED",
 		},
 	}
 
@@ -299,11 +302,11 @@ func TestNotificationUC_GetNotificationHistory(t *testing.T) {
 	limit := 10
 	offset := 0
 
-	expectedHistory := []*models.NotificationHistory{
+	expectedHistory := []*notification.NotificationHistory{
 		{
 			ID:        uuid.New(),
 			UserID:    uuid.New(),
-			Type:      models.NotificationTypeMatchProposal,
+			Type:      notification.NotificationTypeMatchProposal,
 			Timestamp: time.Now(),
 			Delivered: true,
 		},
@@ -330,11 +333,11 @@ func TestNotificationUC_GetUndeliveredNotifications(t *testing.T) {
 	ctx := context.Background()
 	userID := uuid.New().String()
 
-	expectedNotifications := []*models.NotificationHistory{
+	expectedNotifications := []*notification.NotificationHistory{
 		{
 			ID:        uuid.New(),
 			UserID:    uuid.New(),
-			Type:      models.NotificationTypeMatchProposal,
+			Type:      notification.NotificationTypeMatchProposal,
 			Timestamp: time.Now(),
 			Delivered: false,
 		},
@@ -381,10 +384,10 @@ func TestNotificationUC_SendNotificationToGateway_NilNATS(t *testing.T) {
 	ctx := context.Background()
 	userID := uuid.New()
 
-	notification := &models.UserNotification{
+	notification := &notification.UserNotification{
 		UserID:    userID,
-		Type:      models.NotificationTypeMatchProposal,
-		Data:      models.MatchProposal{ID: "match-123"},
+		Type:      notification.NotificationTypeMatchProposal,
+		Data:      matchmodels.MatchProposal{ID: "match-123"},
 		Timestamp: time.Now(),
 	}
 
@@ -447,11 +450,11 @@ func TestNotificationUC_ProcessRidePickup_InvalidUUID(t *testing.T) {
 	uc := NewNotificationUC(mockRepo, nil, mockLogger)
 
 	ctx := context.Background()
-	rideResp := models.RideResp{
+	rideResp := ridemodels.RideResp{
 		RideID:      uuid.New().String(),
 		DriverID:    "invalid-uuid",
 		PassengerID: uuid.New().String(),
-		Status:      "pickup",
+		Status:      "PICKUP",
 	}
 
 	eventData, err := json.Marshal(rideResp)
@@ -474,12 +477,12 @@ func TestNotificationUC_mapNotificationToWSEvent(t *testing.T) {
 		notificationType string
 		expectedEvent    string
 	}{
-		{models.NotificationTypeMatchProposal, constants.EventMatchConfirm},
-		{models.NotificationTypeMatchAccepted, constants.EventMatchConfirm},
-		{models.NotificationTypeMatchRejected, constants.EventMatchRejected},
-		{models.NotificationTypeRideStarted, constants.EventRideStarted},
-		{models.NotificationTypeRideCompleted, constants.EventRideCompleted},
-		{models.NotificationTypePaymentProcessed, constants.EventPaymentProcessed},
+		{notification.NotificationTypeMatchProposal, wsconstants.EventMatchConfirm},
+		{notification.NotificationTypeMatchAccepted, wsconstants.EventMatchConfirm},
+		{notification.NotificationTypeMatchRejected, wsconstants.EventMatchRejected},
+		{notification.NotificationTypeRideStarted, wsconstants.EventRideStarted},
+		{notification.NotificationTypeRideCompleted, wsconstants.EventRideCompleted},
+		{notification.NotificationTypePaymentProcessed, wsconstants.EventPaymentProcessed},
 		{"unknown_type", "notification"},
 	}
 

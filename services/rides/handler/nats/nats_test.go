@@ -8,7 +8,10 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
+	ridemodels "github.com/piresc/nebengjek/internal/pkg/models/ride"
+	matchmodels "github.com/piresc/nebengjek/internal/pkg/models/match"
+	locationmodels "github.com/piresc/nebengjek/internal/pkg/models/location"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/rides/mocks"
 	"github.com/stretchr/testify/assert"
@@ -23,8 +26,8 @@ func TestNewRidesHandler(t *testing.T) {
 
 	mockRidesUC := mocks.NewMockRideUC(ctrl)
 	mockClient := &natspkg.Client{}
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MinDistanceKm: 1.0,
 		},
 	}
@@ -47,19 +50,19 @@ func TestRidesHandler_handleMatchAccepted_Success(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRidesUC := mocks.NewMockRideUC(ctrl)
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MinDistanceKm: 1.0,
 		},
 	}
 
 	handler := NewRidesHandler(mockRidesUC, nil, cfg)
 
-	matchProposal := models.MatchProposal{
+	matchProposal := matchmodels.MatchProposal{
 		ID:          uuid.New().String(),
 		DriverID:    uuid.New().String(),
 		PassengerID: uuid.New().String(),
-		MatchStatus: models.MatchStatusAccepted,
+		MatchStatus: matchmodels.MatchStatusAccepted,
 	}
 
 	mockRidesUC.EXPECT().CreateRide(gomock.Any(), matchProposal).Return(nil)
@@ -81,8 +84,8 @@ func TestRidesHandler_handleMatchAccepted_InvalidJSON(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRidesUC := mocks.NewMockRideUC(ctrl)
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MinDistanceKm: 1.0,
 		},
 	}
@@ -105,19 +108,19 @@ func TestRidesHandler_handleMatchAccepted_CreateRideError(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRidesUC := mocks.NewMockRideUC(ctrl)
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MinDistanceKm: 1.0,
 		},
 	}
 
 	handler := NewRidesHandler(mockRidesUC, nil, cfg)
 
-	matchProposal := models.MatchProposal{
+	matchProposal := matchmodels.MatchProposal{
 		ID:          uuid.New().String(),
 		DriverID:    uuid.New().String(),
 		PassengerID: uuid.New().String(),
-		MatchStatus: models.MatchStatusAccepted,
+		MatchStatus: matchmodels.MatchStatusAccepted,
 	}
 
 	expectedError := errors.New("create ride failed")
@@ -141,11 +144,11 @@ func TestRidesHandler_handleLocationAggregate_Success(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRidesUC := mocks.NewMockRideUC(ctrl)
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MinDistanceKm: 1.0,
 		},
-		Pricing: models.PricingConfig{
+		Pricing: core.PricingConfig{
 			RatePerKm: 3000.0, // Configure the same rate as was hardcoded
 		},
 	}
@@ -153,13 +156,13 @@ func TestRidesHandler_handleLocationAggregate_Success(t *testing.T) {
 	handler := NewRidesHandler(mockRidesUC, nil, cfg)
 
 	rideID := uuid.New()
-	locationAggregate := models.LocationAggregate{
+	locationAggregate := locationmodels.LocationAggregate{
 		RideID:   rideID.String(),
 		Distance: 2.5, // Above minimum distance
 	}
 
 	expectedCost := int(2.5 * cfg.Pricing.RatePerKm) // Use configured rate instead of hardcoded
-	expectedEntry := &models.BillingLedger{
+	expectedEntry := &ridemodels.BillingLedger{
 		RideID:   rideID,
 		Distance: 2.5,
 		Cost:     expectedCost,
@@ -184,8 +187,8 @@ func TestRidesHandler_handleLocationAggregate_BelowMinDistance(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRidesUC := mocks.NewMockRideUC(ctrl)
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MinDistanceKm: 2.0,
 		},
 	}
@@ -193,7 +196,7 @@ func TestRidesHandler_handleLocationAggregate_BelowMinDistance(t *testing.T) {
 	handler := NewRidesHandler(mockRidesUC, nil, cfg)
 
 	rideID := uuid.New()
-	locationAggregate := models.LocationAggregate{
+	locationAggregate := locationmodels.LocationAggregate{
 		RideID:   rideID.String(),
 		Distance: 1.5, // Below minimum distance
 	}
@@ -217,8 +220,8 @@ func TestRidesHandler_handleLocationAggregate_InvalidJSON(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRidesUC := mocks.NewMockRideUC(ctrl)
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MinDistanceKm: 1.0,
 		},
 	}
@@ -241,15 +244,15 @@ func TestRidesHandler_handleLocationAggregate_InvalidRideID(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRidesUC := mocks.NewMockRideUC(ctrl)
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MinDistanceKm: 1.0,
 		},
 	}
 
 	handler := NewRidesHandler(mockRidesUC, nil, cfg)
 
-	locationAggregate := models.LocationAggregate{
+	locationAggregate := locationmodels.LocationAggregate{
 		RideID:   "invalid-uuid",
 		Distance: 2.5,
 	}
@@ -272,11 +275,11 @@ func TestRidesHandler_handleLocationAggregate_ProcessBillingError(t *testing.T) 
 	defer ctrl.Finish()
 
 	mockRidesUC := mocks.NewMockRideUC(ctrl)
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MinDistanceKm: 1.0,
 		},
-		Pricing: models.PricingConfig{
+		Pricing: core.PricingConfig{
 			RatePerKm: 3000.0, // Configure the same rate as was hardcoded
 		},
 	}
@@ -284,13 +287,13 @@ func TestRidesHandler_handleLocationAggregate_ProcessBillingError(t *testing.T) 
 	handler := NewRidesHandler(mockRidesUC, nil, cfg)
 
 	rideID := uuid.New()
-	locationAggregate := models.LocationAggregate{
+	locationAggregate := locationmodels.LocationAggregate{
 		RideID:   rideID.String(),
 		Distance: 2.5,
 	}
 
 	expectedCost := int(2.5 * cfg.Pricing.RatePerKm) // Use configured rate instead of hardcoded
-	expectedEntry := &models.BillingLedger{
+	expectedEntry := &ridemodels.BillingLedger{
 		RideID:   rideID,
 		Distance: 2.5,
 		Cost:     expectedCost,

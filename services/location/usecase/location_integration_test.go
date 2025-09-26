@@ -8,7 +8,8 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	locationmodels "github.com/piresc/nebengjek/internal/pkg/models/location"
+	matchmodels "github.com/piresc/nebengjek/internal/pkg/models/match"
 	"github.com/piresc/nebengjek/services/location/mocks"
 	"github.com/stretchr/testify/assert"
 )
@@ -27,14 +28,13 @@ func TestLocationUC_CompleteLocationTracking_Success(t *testing.T) {
 	// Test data
 	rideID := uuid.New().String()
 	driverID := uuid.New().String()
-	initialLocation := models.Location{
+	initialLocation := locationmodels.Location{
 		Latitude:  -6.2088,
 		Longitude: 106.8456,
-		Timestamp: time.Now(),
-	}
+			}
 
 	// Step 1: Initial location update
-	locationUpdate := models.LocationUpdate{
+	locationUpdate := locationmodels.LocationUpdate{
 		RideID:    rideID,
 		DriverID:  driverID,
 		Location:  initialLocation,
@@ -56,13 +56,12 @@ func TestLocationUC_CompleteLocationTracking_Success(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Step 2: Subsequent location update with movement
-	newLocation := models.Location{
+	newLocation := locationmodels.Location{
 		Latitude:  -6.2188, // Moved ~1.1km south
 		Longitude: 106.8556, // Moved ~1.1km east
-		Timestamp: time.Now(),
-	}
+			}
 
-	newLocationUpdate := models.LocationUpdate{
+	newLocationUpdate := locationmodels.LocationUpdate{
 		RideID:    rideID,
 		DriverID:  driverID,
 		Location:  newLocation,
@@ -101,11 +100,10 @@ func TestLocationUC_AddRemoveAvailableDriver_Success(t *testing.T) {
 	uc := NewLocationUC(mockRepo, mockGW)
 
 	driverID := uuid.New().String()
-	location := &models.Location{
+	location := &locationmodels.Location{
 		Latitude:  -6.2088,
 		Longitude: 106.8456,
-		Timestamp: time.Now(),
-	}
+			}
 
 	// Step 1: Add available driver
 	mockRepo.EXPECT().
@@ -141,31 +139,28 @@ func TestLocationUC_FindNearbyDrivers_Success(t *testing.T) {
 	uc := NewLocationUC(mockRepo, mockGW)
 
 	// Search parameters
-	location := &models.Location{
+	location := &locationmodels.Location{
 		Latitude:  -6.2088,
 		Longitude: 106.8456,
-		Timestamp: time.Now(),
-	}
+			}
 	radius := 5.0 // 5km radius
 
 	// Mock nearby drivers
-	nearbyDrivers := []*models.NearbyUser{
+	nearbyDrivers := []*matchmodels.NearbyUser{
 		{
 			ID: uuid.New().String(),
-			Location: models.Location{
+			Location: locationmodels.Location{
 				Latitude:  -6.2188,
 				Longitude: 106.8556,
-				Timestamp: time.Now(),
-			},
+							},
 			Distance: 1.5,
 		},
 		{
 			ID: uuid.New().String(),
-			Location: models.Location{
+			Location: locationmodels.Location{
 				Latitude:  -6.2288,
 				Longitude: 106.8656,
-				Timestamp: time.Now(),
-			},
+							},
 			Distance: 3.2,
 		},
 	}
@@ -202,11 +197,10 @@ func TestLocationUC_GetDriverLocation_Success(t *testing.T) {
 	uc := NewLocationUC(mockRepo, mockGW)
 
 	driverID := uuid.New().String()
-	expectedLocation := models.Location{
+	expectedLocation := locationmodels.Location{
 		Latitude:  -6.2088,
 		Longitude: 106.8456,
-		Timestamp: time.Now(),
-	}
+			}
 
 	mockRepo.EXPECT().
 		GetDriverLocation(gomock.Any(), driverID).
@@ -232,11 +226,10 @@ func TestLocationUC_GetPassengerLocation_Success(t *testing.T) {
 	uc := NewLocationUC(mockRepo, mockGW)
 
 	passengerID := uuid.New().String()
-	expectedLocation := models.Location{
+	expectedLocation := locationmodels.Location{
 		Latitude:  -6.2188,
 		Longitude: 106.8556,
-		Timestamp: time.Now(),
-	}
+			}
 
 	mockRepo.EXPECT().
 		GetPassengerLocation(gomock.Any(), passengerID).

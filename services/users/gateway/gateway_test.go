@@ -5,7 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
+	"github.com/piresc/nebengjek/internal/pkg/models/location"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	gateway_nats "github.com/piresc/nebengjek/services/users/gateway/nats"
 	"github.com/stretchr/testify/assert"
@@ -32,10 +33,10 @@ func TestUserGW_PublishBeaconEvent_NilClient(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	event := &models.BeaconEvent{
+	event := &coremodels.BeaconEvent{
 		UserID:   "test-user-id",
 		IsActive: true,
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.2088,
 			Longitude: 106.8456,
 		},
@@ -55,14 +56,14 @@ func TestUserGW_PublishFinderEvent_NilClient(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	event := &models.FinderEvent{
+	event := &coremodels.FinderEvent{
 		UserID:   "test-user-id",
 		IsActive: true,
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.2088,
 			Longitude: 106.8456,
 		},
-		TargetLocation: models.Location{
+		TargetLocation: location.Location{
 			Latitude:  -6.2297,
 			Longitude: 106.8295,
 		},
@@ -112,24 +113,24 @@ func TestUserGW_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel the context before using it
 
-	beaconEvent := &models.BeaconEvent{
+	beaconEvent := &coremodels.BeaconEvent{
 		UserID:   "test-user-id",
 		IsActive: true,
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.2088,
 			Longitude: 106.8456,
 		},
 		Timestamp: time.Now(),
 	}
 
-	finderEvent := &models.FinderEvent{
+	finderEvent := &coremodels.FinderEvent{
 		UserID:   "test-user-id",
 		IsActive: true,
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.2088,
 			Longitude: 106.8456,
 		},
-		TargetLocation: models.Location{
+		TargetLocation: location.Location{
 			Latitude:  -6.2297,
 			Longitude: 106.8295,
 		},
@@ -152,24 +153,24 @@ func TestUserGW_WithRealNatsClient(t *testing.T) {
 	gateway := NewUserGW(mockNatsClient)
 
 	ctx := context.Background()
-	beaconEvent := &models.BeaconEvent{
+	beaconEvent := &coremodels.BeaconEvent{
 		UserID:   "test-user-id",
 		IsActive: true,
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.2088,
 			Longitude: 106.8456,
 		},
 		Timestamp: time.Now(),
 	}
 
-	finderEvent := &models.FinderEvent{
+	finderEvent := &coremodels.FinderEvent{
 		UserID:   "test-user-id",
 		IsActive: true,
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.2088,
 			Longitude: 106.8456,
 		},
-		TargetLocation: models.Location{
+		TargetLocation: location.Location{
 			Latitude:  -6.2297,
 			Longitude: 106.8295,
 		},

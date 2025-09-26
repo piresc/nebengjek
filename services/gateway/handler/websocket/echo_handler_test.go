@@ -6,7 +6,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
-	"github.com/piresc/nebengjek/internal/pkg/constants"
+	wsconstants "github.com/piresc/nebengjek/internal/pkg/models/websocket"
 	gatewaymocks "github.com/piresc/nebengjek/services/gateway/mocks"
 	repositorymocks "github.com/piresc/nebengjek/services/gateway/repository/mocks"
 	usersmocks "github.com/piresc/nebengjek/services/users/mocks"
@@ -94,13 +94,13 @@ func TestEchoWebSocketHandler_getSeverityString(t *testing.T) {
 	handler := NewEchoWebSocketHandler(mockGatewayUC, mockUserUC, mockSessionRepo, "test-server")
 
 	tests := []struct {
-		severity constants.ErrorSeverity
+		severity wsconstants.ErrorSeverity
 		expected string
 	}{
-		{constants.ErrorSeverityClient, "client"},
-		{constants.ErrorSeverityServer, "server"},
-		{constants.ErrorSeveritySecurity, "security"},
-		{constants.ErrorSeverity(999), "unknown"}, // Invalid severity
+		{wsconstants.ErrorSeverityClient, "client"},
+		{wsconstants.ErrorSeverityServer, "server"},
+		{wsconstants.ErrorSeveritySecurity, "security"},
+		{wsconstants.ErrorSeverity(999), "unknown"}, // Invalid severity
 	}
 
 	for _, tt := range tests {

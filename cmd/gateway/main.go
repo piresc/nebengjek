@@ -16,6 +16,7 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/health"
 	slogpkg "github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/middleware"
+	middlewaretracing "github.com/piresc/nebengjek/internal/pkg/middleware/tracing"
 	"github.com/piresc/nebengjek/internal/pkg/nats"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	nrpkg "github.com/piresc/nebengjek/internal/pkg/newrelic"
@@ -155,7 +156,7 @@ func main() {
 
 	// Initialize middleware with tracing
 	MW := middleware.NewMiddleware(configs, slogLogger, tracer)
-	tracingMiddleware := middleware.NewTracingMiddleware(&tracing.Config{
+	tracingMiddleware := middlewaretracing.NewTracingMiddleware(&tracing.Config{
 		Enabled:     configs.NewRelic.Enabled,
 		ServiceName: appName,
 	}, tracer)

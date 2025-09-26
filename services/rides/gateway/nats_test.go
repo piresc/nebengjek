@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/piresc/nebengjek/internal/pkg/constants"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	ridemodels "github.com/piresc/nebengjek/internal/pkg/models/ride"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
+	natsconstants "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -72,8 +72,8 @@ func NewTestableNATSGateway(client NATSClientInterface) *TestableNATSGateway {
 }
 
 // PublishRidePickup publishes a ride pickup event to NATS
-func (g *TestableNATSGateway) PublishRidePickup(ctx context.Context, ride *models.Ride) error {
-	rideResponse := models.RideResp{
+func (g *TestableNATSGateway) PublishRidePickup(ctx context.Context, ride *ridemodels.Ride) error {
+	rideResponse := ridemodels.RideResp{
 		RideID:      ride.RideID.String(),
 		DriverID:    ride.DriverID.String(),
 		PassengerID: ride.PassengerID.String(),
@@ -86,12 +86,12 @@ func (g *TestableNATSGateway) PublishRidePickup(ctx context.Context, ride *model
 	if err != nil {
 		return err
 	}
-	return g.client.Publish(constants.SubjectRidePickup, data)
+	return g.client.Publish(natsconstants.SubjectRidePickup, data)
 }
 
 // PublishRideStarted publishes a ride started event to NATS
-func (g *TestableNATSGateway) PublishRideStarted(ctx context.Context, ride *models.Ride) error {
-	rideResponse := models.RideResp{
+func (g *TestableNATSGateway) PublishRideStarted(ctx context.Context, ride *ridemodels.Ride) error {
+	rideResponse := ridemodels.RideResp{
 		RideID:      ride.RideID.String(),
 		DriverID:    ride.DriverID.String(),
 		PassengerID: ride.PassengerID.String(),
@@ -104,16 +104,16 @@ func (g *TestableNATSGateway) PublishRideStarted(ctx context.Context, ride *mode
 	if err != nil {
 		return err
 	}
-	return g.client.Publish(constants.SubjectRideStarted, data)
+	return g.client.Publish(natsconstants.SubjectRideStarted, data)
 }
 
 // PublishRideCompleted publishes a ride completed event to NATS
-func (g *TestableNATSGateway) PublishRideCompleted(ctx context.Context, rideComplete models.RideComplete) error {
+func (g *TestableNATSGateway) PublishRideCompleted(ctx context.Context, rideComplete ridemodels.RideComplete) error {
 	data, err := json.Marshal(rideComplete)
 	if err != nil {
 		return err
 	}
-	return g.client.Publish(constants.SubjectRideCompleted, data)
+	return g.client.Publish(natsconstants.SubjectRideCompleted, data)
 }
 
 // Ensure natspkg.Client implements our interface
@@ -131,11 +131,11 @@ func TestPublishRidePickup_Success(t *testing.T) {
 	createdAt := time.Now().Add(-10 * time.Minute)
 	updatedAt := time.Now()
 
-	ride := &models.Ride{
+	ride := &ridemodels.Ride{
 		RideID:      rideID,
 		DriverID:    driverID,
 		PassengerID: passengerID,
-		Status:      models.RideStatusDriverPickup,
+		Status:      ridemodels.RideStatusDriverPickup,
 		TotalCost:   1000,
 		CreatedAt:   createdAt,
 		UpdatedAt:   updatedAt,
@@ -149,11 +149,11 @@ func TestPublishRidePickup_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the message was published to the correct subject
-	publishedData, exists := mockClient.GetPublishedMessage(constants.SubjectRidePickup)
+	publishedData, exists := mockClient.GetPublishedMessage(natsconstants.SubjectRidePickup)
 	require.True(t, exists, "Message should be published to ride pickup subject")
 
 	// Verify the published data matches the original event
-	var receivedRide models.RideResp
+	var receivedRide ridemodels.RideResp
 	err = json.Unmarshal(publishedData, &receivedRide)
 	require.NoError(t, err)
 
@@ -181,11 +181,11 @@ func TestPublishRidePickup_Error(t *testing.T) {
 	createdAt := time.Now().Add(-10 * time.Minute)
 	updatedAt := time.Now()
 
-	ride := &models.Ride{
+	ride := &ridemodels.Ride{
 		RideID:      rideID,
 		DriverID:    driverID,
 		PassengerID: passengerID,
-		Status:      models.RideStatusDriverPickup,
+		Status:      ridemodels.RideStatusDriverPickup,
 		TotalCost:   1000,
 		CreatedAt:   createdAt,
 		UpdatedAt:   updatedAt,
@@ -212,11 +212,11 @@ func TestPublishRideStarted_Success(t *testing.T) {
 	createdAt := time.Now().Add(-10 * time.Minute)
 	updatedAt := time.Now()
 
-	ride := &models.Ride{
+	ride := &ridemodels.Ride{
 		RideID:      rideID,
 		DriverID:    driverID,
 		PassengerID: passengerID,
-		Status:      models.RideStatusOngoing,
+		Status:      ridemodels.RideStatusOngoing,
 		TotalCost:   1000,
 		CreatedAt:   createdAt,
 		UpdatedAt:   updatedAt,
@@ -230,11 +230,11 @@ func TestPublishRideStarted_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the message was published to the correct subject
-	publishedData, exists := mockClient.GetPublishedMessage(constants.SubjectRideStarted)
+	publishedData, exists := mockClient.GetPublishedMessage(natsconstants.SubjectRideStarted)
 	require.True(t, exists, "Message should be published to ride started subject")
 
 	// Verify the published data matches the original event
-	var receivedRide models.RideResp
+	var receivedRide ridemodels.RideResp
 	err = json.Unmarshal(publishedData, &receivedRide)
 	require.NoError(t, err)
 
@@ -262,11 +262,11 @@ func TestPublishRideStarted_Error(t *testing.T) {
 	createdAt := time.Now().Add(-10 * time.Minute)
 	updatedAt := time.Now()
 
-	ride := &models.Ride{
+	ride := &ridemodels.Ride{
 		RideID:      rideID,
 		DriverID:    driverID,
 		PassengerID: passengerID,
-		Status:      models.RideStatusOngoing,
+		Status:      ridemodels.RideStatusOngoing,
 		TotalCost:   1000,
 		CreatedAt:   createdAt,
 		UpdatedAt:   updatedAt,
@@ -293,28 +293,28 @@ func TestPublishRideCompleted_Success(t *testing.T) {
 	createdAt := time.Now().Add(-10 * time.Minute)
 	updatedAt := time.Now()
 
-	ride := models.Ride{
+	ride := ridemodels.Ride{
 		RideID:      rideID,
 		DriverID:    driverID,
 		PassengerID: passengerID,
-		Status:      models.RideStatusCompleted,
+		Status:      ridemodels.RideStatusCompleted,
 		TotalCost:   1000,
 		CreatedAt:   createdAt,
 		UpdatedAt:   updatedAt,
 	}
 
 	paymentID := uuid.New()
-	payment := models.Payment{
+	payment := ridemodels.Payment{
 		PaymentID:    paymentID,
 		RideID:       rideID,
 		AdjustedCost: 1200,
 		AdminFee:     200,
 		DriverPayout: 1000,
-		Status:       models.PaymentStatusProcessed,
+		Status:       ridemodels.PaymentStatusProcessed,
 		CreatedAt:    time.Now(),
 	}
 
-	rideComplete := models.RideComplete{
+	rideComplete := ridemodels.RideComplete{
 		Ride:    ride,
 		Payment: payment,
 	}
@@ -327,11 +327,11 @@ func TestPublishRideCompleted_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the message was published to the correct subject
-	publishedData, exists := mockClient.GetPublishedMessage(constants.SubjectRideCompleted)
+	publishedData, exists := mockClient.GetPublishedMessage(natsconstants.SubjectRideCompleted)
 	require.True(t, exists, "Message should be published to ride completed subject")
 
 	// Verify the published data matches the original event
-	var receivedRideComplete models.RideComplete
+	var receivedRideComplete ridemodels.RideComplete
 	err = json.Unmarshal(publishedData, &receivedRideComplete)
 	require.NoError(t, err)
 
@@ -367,28 +367,28 @@ func TestPublishRideCompleted_Error(t *testing.T) {
 	createdAt := time.Now().Add(-10 * time.Minute)
 	updatedAt := time.Now()
 
-	ride := models.Ride{
+	ride := ridemodels.Ride{
 		RideID:      rideID,
 		DriverID:    driverID,
 		PassengerID: passengerID,
-		Status:      models.RideStatusCompleted,
+		Status:      ridemodels.RideStatusCompleted,
 		TotalCost:   1000,
 		CreatedAt:   createdAt,
 		UpdatedAt:   updatedAt,
 	}
 
 	paymentID := uuid.New()
-	payment := models.Payment{
+	payment := ridemodels.Payment{
 		PaymentID:    paymentID,
 		RideID:       rideID,
 		AdjustedCost: 1200,
 		AdminFee:     200,
 		DriverPayout: 1000,
-		Status:       models.PaymentStatusProcessed,
+		Status:       ridemodels.PaymentStatusProcessed,
 		CreatedAt:    time.Now(),
 	}
 
-	rideComplete := models.RideComplete{
+	rideComplete := ridemodels.RideComplete{
 		Ride:    ride,
 		Payment: payment,
 	}
@@ -418,50 +418,50 @@ func TestMultiplePublishes(t *testing.T) {
 	updatedAt := time.Now()
 
 	// Create ride for pickup
-	ridePickup := &models.Ride{
+	ridePickup := &ridemodels.Ride{
 		RideID:      rideID,
 		DriverID:    driverID,
 		PassengerID: passengerID,
-		Status:      models.RideStatusDriverPickup,
+		Status:      ridemodels.RideStatusDriverPickup,
 		TotalCost:   1000,
 		CreatedAt:   createdAt,
 		UpdatedAt:   updatedAt,
 	}
 
 	// Create ride for started
-	rideStarted := &models.Ride{
+	rideStarted := &ridemodels.Ride{
 		RideID:      rideID,
 		DriverID:    driverID,
 		PassengerID: passengerID,
-		Status:      models.RideStatusOngoing,
+		Status:      ridemodels.RideStatusOngoing,
 		TotalCost:   1000,
 		CreatedAt:   createdAt,
 		UpdatedAt:   updatedAt,
 	}
 
 	// Create ride for completed
-	rideCompleted := models.Ride{
+	rideCompleted := ridemodels.Ride{
 		RideID:      rideID,
 		DriverID:    driverID,
 		PassengerID: passengerID,
-		Status:      models.RideStatusCompleted,
+		Status:      ridemodels.RideStatusCompleted,
 		TotalCost:   1000,
 		CreatedAt:   createdAt,
 		UpdatedAt:   updatedAt,
 	}
 
 	paymentID := uuid.New()
-	payment := models.Payment{
+	payment := ridemodels.Payment{
 		PaymentID:    paymentID,
 		RideID:       rideID,
 		AdjustedCost: 1200,
 		AdminFee:     200,
 		DriverPayout: 1000,
-		Status:       models.PaymentStatusProcessed,
+		Status:       ridemodels.PaymentStatusProcessed,
 		CreatedAt:    time.Now(),
 	}
 
-	rideComplete := models.RideComplete{
+	rideComplete := ridemodels.RideComplete{
 		Ride:    rideCompleted,
 		Payment: payment,
 	}
@@ -477,9 +477,9 @@ func TestMultiplePublishes(t *testing.T) {
 	require.NoError(t, err3)
 
 	// Verify all messages were published to their respective subjects
-	_, pickupExists := mockClient.GetPublishedMessage(constants.SubjectRidePickup)
-	_, startedExists := mockClient.GetPublishedMessage(constants.SubjectRideStarted)
-	_, completedExists := mockClient.GetPublishedMessage(constants.SubjectRideCompleted)
+	_, pickupExists := mockClient.GetPublishedMessage(natsconstants.SubjectRidePickup)
+	_, startedExists := mockClient.GetPublishedMessage(natsconstants.SubjectRideStarted)
+	_, completedExists := mockClient.GetPublishedMessage(natsconstants.SubjectRideCompleted)
 
 	assert.True(t, pickupExists, "Ride pickup message should be published")
 	assert.True(t, startedExists, "Ride started message should be published")

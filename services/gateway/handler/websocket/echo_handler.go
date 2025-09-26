@@ -10,9 +10,12 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
+	websocketmodels "github.com/piresc/nebengjek/internal/pkg/models/websocket"
+	"github.com/piresc/nebengjek/internal/pkg/models/location"
+	"github.com/piresc/nebengjek/internal/pkg/models/match"
+	"github.com/piresc/nebengjek/internal/pkg/models/ride"
 	"github.com/piresc/nebengjek/services/gateway"
 	"github.com/piresc/nebengjek/services/users"
 	"github.com/coder/websocket"
@@ -28,7 +31,7 @@ type WebSocketNotifier interface {
 type EchoWebSocketHandler struct {
 	gatewayUC       gateway.GatewayUC
 	userUC          users.UserUC
-	sessionRepo     models.WSConnectionRegistry
+	sessionRepo     websocketmodels.WSConnectionRegistry
 	serverID        string
 	clients         map[string]*websocket.Conn
 	lastActivity    map[string]time.Time
@@ -40,7 +43,7 @@ type EchoWebSocketHandler struct {
 }
 
 // NewEchoWebSocketHandler creates a new WebSocket handler with heartbeat support
-func NewEchoWebSocketHandler(gatewayUC gateway.GatewayUC, userUC users.UserUC, sessionRepo models.WSConnectionRegistry, serverID string) *EchoWebSocketHandler {
+func NewEchoWebSocketHandler(gatewayUC gateway.GatewayUC, userUC users.UserUC, sessionRepo websocketmodels.WSConnectionRegistry, serverID string) *EchoWebSocketHandler {
 	return &EchoWebSocketHandler{
 		gatewayUC:       gatewayUC,
 		userUC:          userUC,
@@ -112,7 +115,7 @@ func (h *EchoWebSocketHandler) HandleWebSocket(c echo.Context) error {
 	
 	// Message handling loop with proper context handling
 	for {
-		var msg models.WSMessage
+		var msg websocketmodels.WSMessage
 		if err := wsjson.Read(ctx, ws, &msg); err != nil {
 			// Check for normal closure
 			if websocket.CloseStatus(err) == websocket.StatusNormalClosure ||
@@ -150,7 +153,7 @@ func (h *EchoWebSocketHandler) addClient(userID string, role string, ws *websock
 	h.mu.Unlock()
 	
 	// Create session data for Redis storage
-	session := &models.WSSessionData{
+	session := &websocketmodels.WSSessionData{
 		UserID:       userID,
 		Role:         role,
 		ServerID:     h.serverID,
@@ -262,7 +265,7 @@ func (h *EchoWebSocketHandler) NotifyClient(userID string, event string, data in
 		return
 	}
 
-	response := models.WSMessage{
+	response := websocketmodels.WSMessage{
 		Event: event,
 		Data:  rawData,
 	}
@@ -305,7 +308,7 @@ func (h *EchoWebSocketHandler) NotifyClientWithError(userID string, event string
 		return fmt.Errorf("failed to marshal notification data: %w", err)
 	}
 
-	response := models.WSMessage{
+	response := websocketmodels.WSMessage{
 		Event: event,
 		Data:  rawData,
 	}
@@ -329,7 +332,7 @@ func (h *EchoWebSocketHandler) NotifyClientWithError(userID string, event string
 }
 
 // sendError sends an error message to the client
-func (h *EchoWebSocketHandler) sendError(ctx context.Context, ws *websocket.Conn, userID string, err error, code string, severity constants.ErrorSeverity) {
+func (h *EchoWebSocketHandler) sendError(ctx context.Context, ws *websocket.Conn, userID string, err error, code string, severity websocketmodels.ErrorSeverity) {
 	// Always log detailed error server-side
 	logger.Error("WebSocket operation failed",
 		logger.String("user_id", userID),
@@ -339,10 +342,10 @@ func (h *EchoWebSocketHandler) sendError(ctx context.Context, ws *websocket.Conn
 
 	var message string
 	switch severity {
-	case constants.ErrorSeverityClient:
+	case websocketmodels.ErrorSeverityClient:
 		// Show detailed error to client for validation/input issues
 		message = err.Error()
-	case constants.ErrorSeveritySecurity:
+	case websocketmodels.ErrorSeveritySecurity:
 		// Minimal info to client for security issues
 		logger.Warn("Security-related error occurred",
 			logger.String("user_id", userID),
@@ -362,8 +365,8 @@ func (h *EchoWebSocketHandler) sendError(ctx context.Context, ws *websocket.Conn
 	}
 
 	errorDataBytes, _ := json.Marshal(errorData)
-	errorResponse := models.WSMessage{
-		Event: constants.EventError,
+	errorResponse := websocketmodels.WSMessage{
+		Event: websocketmodels.EventError,
 		Data:  json.RawMessage(errorDataBytes),
 	}
 
@@ -375,13 +378,13 @@ func (h *EchoWebSocketHandler) sendError(ctx context.Context, ws *websocket.Conn
 }
 
 // getSeverityString returns string representation of error severity
-func (h *EchoWebSocketHandler) getSeverityString(severity constants.ErrorSeverity) string {
+func (h *EchoWebSocketHandler) getSeverityString(severity websocketmodels.ErrorSeverity) string {
 	switch severity {
-	case constants.ErrorSeverityClient:
+	case websocketmodels.ErrorSeverityClient:
 		return "client"
-	case constants.ErrorSeverityServer:
+	case websocketmodels.ErrorSeverityServer:
 		return "server"
-	case constants.ErrorSeveritySecurity:
+	case websocketmodels.ErrorSeveritySecurity:
 		return "security"
 	default:
 		return "unknown"
@@ -414,25 +417,25 @@ func (h *EchoWebSocketHandler) extractCleanErrorMessage(errorStr string) string 
 }
 
 // handleMessage processes incoming WebSocket messages with preserved business logic
-func (h *EchoWebSocketHandler) handleMessage(ctx context.Context, userID, role string, ws *websocket.Conn, msg *models.WSMessage) error {
+func (h *EchoWebSocketHandler) handleMessage(ctx context.Context, userID, role string, ws *websocket.Conn, msg *websocketmodels.WSMessage) error {
 	switch msg.Event {
-	case constants.EventBeaconUpdate:
+	case websocketmodels.EventBeaconUpdate:
 		return h.handleBeaconUpdate(ctx, userID, ws, msg.Data)
-	case constants.EventFinderUpdate:
+	case websocketmodels.EventFinderUpdate:
 		return h.handleFinderUpdate(ctx, userID, ws, msg.Data)
-	case constants.EventMatchConfirm:
+	case websocketmodels.EventMatchConfirm:
 		return h.handleMatchConfirmation(ctx, userID, ws, msg.Data)
-	case constants.EventLocationUpdate:
+	case websocketmodels.EventLocationUpdate:
 		return h.handleLocationUpdate(ctx, userID, ws, msg.Data)
-	case constants.EventRideStarted:
+	case websocketmodels.EventRideStarted:
 		return h.handleRideStart(ctx, userID, ws, msg.Data)
-	case constants.EventRideArrived:
+	case websocketmodels.EventRideArrived:
 		return h.handleRideArrived(ctx, userID, ws, msg.Data)
-	case constants.EventPaymentProcessed:
+	case websocketmodels.EventPaymentProcessed:
 		return h.handleProcessPayment(ctx, userID, ws, msg.Data)
 	default:
 		unknownEventErr := fmt.Errorf("unknown event type: %s", msg.Event)
-		h.sendError(ctx, ws, userID, unknownEventErr, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
+		h.sendError(ctx, ws, userID, unknownEventErr, websocketmodels.ErrorInvalidFormat, websocketmodels.ErrorSeverityClient)
 		return nil // Don't break connection for unknown events
 	}
 }
@@ -441,9 +444,9 @@ func (h *EchoWebSocketHandler) handleMessage(ctx context.Context, userID, role s
 
 // handleBeaconUpdate processes beacon status updates
 func (h *EchoWebSocketHandler) handleBeaconUpdate(ctx context.Context, userID string, ws *websocket.Conn, data json.RawMessage) error {
-	var req models.BeaconRequest
+	var req core.BeaconRequest
 	if err := json.Unmarshal(data, &req); err != nil {
-		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
+		h.sendError(ctx, ws, userID, err, websocketmodels.ErrorInvalidFormat, websocketmodels.ErrorSeverityClient)
 		return nil
 	}
 
@@ -457,12 +460,12 @@ func (h *EchoWebSocketHandler) handleBeaconUpdate(ctx context.Context, userID st
 		nil,
 	)
 	if err != nil {
-		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+		h.sendError(ctx, ws, userID, err, websocketmodels.ErrorInvalidFormat, websocketmodels.ErrorSeverityServer)
 		return nil
 	}
 
 	if resp.StatusCode >= 400 {
-		h.sendError(ctx, ws, userID, fmt.Errorf("users service returned error: %s", string(resp.Body)), constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+		h.sendError(ctx, ws, userID, fmt.Errorf("users service returned error: %s", string(resp.Body)), websocketmodels.ErrorInvalidFormat, websocketmodels.ErrorSeverityServer)
 		return nil
 	}
 
@@ -474,8 +477,8 @@ func (h *EchoWebSocketHandler) handleBeaconUpdate(ctx context.Context, userID st
 	}
 	
 	successDataBytes, _ := json.Marshal(successData)
-	response := models.WSMessage{
-		Event: constants.EventBeaconUpdate,
+	response := websocketmodels.WSMessage{
+		Event: websocketmodels.EventBeaconUpdate,
 		Data:  json.RawMessage(successDataBytes),
 	}
 
@@ -484,9 +487,9 @@ func (h *EchoWebSocketHandler) handleBeaconUpdate(ctx context.Context, userID st
 
 // handleFinderUpdate processes finder status updates
 func (h *EchoWebSocketHandler) handleFinderUpdate(ctx context.Context, userID string, ws *websocket.Conn, data json.RawMessage) error {
-	var req models.FinderRequest
+	var req core.FinderRequest
 	if err := json.Unmarshal(data, &req); err != nil {
-		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
+		h.sendError(ctx, ws, userID, err, websocketmodels.ErrorInvalidFormat, websocketmodels.ErrorSeverityClient)
 		return nil
 	}
 
@@ -500,12 +503,12 @@ func (h *EchoWebSocketHandler) handleFinderUpdate(ctx context.Context, userID st
 		nil,
 	)
 	if err != nil {
-		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+		h.sendError(ctx, ws, userID, err, websocketmodels.ErrorInvalidFormat, websocketmodels.ErrorSeverityServer)
 		return nil
 	}
 
 	if resp.StatusCode >= 400 {
-		h.sendError(ctx, ws, userID, fmt.Errorf("users service returned error: %s", string(resp.Body)), constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+		h.sendError(ctx, ws, userID, fmt.Errorf("users service returned error: %s", string(resp.Body)), websocketmodels.ErrorInvalidFormat, websocketmodels.ErrorSeverityServer)
 		return nil
 	}
 
@@ -517,8 +520,8 @@ func (h *EchoWebSocketHandler) handleFinderUpdate(ctx context.Context, userID st
 	}
 	
 	successDataBytes, _ := json.Marshal(successData)
-	response := models.WSMessage{
-		Event: constants.EventFinderUpdate,
+	response := websocketmodels.WSMessage{
+		Event: websocketmodels.EventFinderUpdate,
 		Data:  json.RawMessage(successDataBytes),
 	}
 
@@ -527,9 +530,9 @@ func (h *EchoWebSocketHandler) handleFinderUpdate(ctx context.Context, userID st
 
 // handleMatchConfirmation processes match confirmation with dual notification
 func (h *EchoWebSocketHandler) handleMatchConfirmation(ctx context.Context, userID string, ws *websocket.Conn, data json.RawMessage) error {
-	var req models.MatchConfirmRequest
+	var req match.MatchConfirmRequest
 	if err := json.Unmarshal(data, &req); err != nil {
-		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
+		h.sendError(ctx, ws, userID, err, websocketmodels.ErrorInvalidFormat, websocketmodels.ErrorSeverityClient)
 		return nil
 	}
 
@@ -538,13 +541,13 @@ func (h *EchoWebSocketHandler) handleMatchConfirmation(ctx context.Context, user
 
 	result, err := h.gatewayUC.ConfirmMatch(ctx, &req)
 	if err != nil {
-		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+		h.sendError(ctx, ws, userID, err, websocketmodels.ErrorInvalidFormat, websocketmodels.ErrorSeverityServer)
 		return nil
 	}
 
 	// Critical: Dual notification to both driver and passenger
-	h.NotifyClient(result.DriverID, constants.EventMatchConfirm, result)
-	h.NotifyClient(result.PassengerID, constants.EventMatchConfirm, result)
+	h.NotifyClient(result.DriverID, websocketmodels.EventMatchConfirm, result)
+	h.NotifyClient(result.PassengerID, websocketmodels.EventMatchConfirm, result)
 
 	// Send success response to the requesting client
 	successData := map[string]interface{}{
@@ -554,8 +557,8 @@ func (h *EchoWebSocketHandler) handleMatchConfirmation(ctx context.Context, user
 	}
 	
 	successDataBytes, _ := json.Marshal(successData)
-	response := models.WSMessage{
-		Event: constants.EventMatchConfirm,
+	response := websocketmodels.WSMessage{
+		Event: websocketmodels.EventMatchConfirm,
 		Data:  json.RawMessage(successDataBytes),
 	}
 
@@ -564,9 +567,9 @@ func (h *EchoWebSocketHandler) handleMatchConfirmation(ctx context.Context, user
 
 // handleLocationUpdate processes location updates with timestamp addition
 func (h *EchoWebSocketHandler) handleLocationUpdate(ctx context.Context, userID string, ws *websocket.Conn, data json.RawMessage) error {
-	var req models.LocationUpdate
+	var req location.LocationUpdate
 	if err := json.Unmarshal(data, &req); err != nil {
-		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
+		h.sendError(ctx, ws, userID, err, websocketmodels.ErrorInvalidFormat, websocketmodels.ErrorSeverityClient)
 		return nil
 	}
 	req.DriverID = userID // Ensure DriverID is set from client context
@@ -575,7 +578,7 @@ func (h *EchoWebSocketHandler) handleLocationUpdate(ctx context.Context, userID 
 	// This logic is handled inside the use case, but we ensure the call is made
 
 	if err := h.gatewayUC.UpdateUserLocation(ctx, &req); err != nil {
-		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+		h.sendError(ctx, ws, userID, err, websocketmodels.ErrorInvalidFormat, websocketmodels.ErrorSeverityServer)
 		return nil
 	}
 
@@ -587,8 +590,8 @@ func (h *EchoWebSocketHandler) handleLocationUpdate(ctx context.Context, userID 
 	}
 	
 	successDataBytes, _ := json.Marshal(successData)
-	response := models.WSMessage{
-		Event: constants.EventLocationUpdate,
+	response := websocketmodels.WSMessage{
+		Event: websocketmodels.EventLocationUpdate,
 		Data:  json.RawMessage(successDataBytes),
 	}
 
@@ -597,21 +600,21 @@ func (h *EchoWebSocketHandler) handleLocationUpdate(ctx context.Context, userID 
 
 // handleRideStart processes ride start with dual notification
 func (h *EchoWebSocketHandler) handleRideStart(ctx context.Context, userID string, ws *websocket.Conn, data json.RawMessage) error {
-	var req models.RideStartRequest
+	var req ride.RideStartRequest
 	if err := json.Unmarshal(data, &req); err != nil {
-		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
+		h.sendError(ctx, ws, userID, err, websocketmodels.ErrorInvalidFormat, websocketmodels.ErrorSeverityClient)
 		return nil
 	}
 
 	resp, err := h.gatewayUC.RideStart(ctx, &req)
 	if err != nil {
-		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+		h.sendError(ctx, ws, userID, err, websocketmodels.ErrorInvalidFormat, websocketmodels.ErrorSeverityServer)
 		return nil
 	}
 
 	// Critical: Dual notification to both driver and passenger
-	h.NotifyClient(resp.DriverID.String(), constants.EventRideStarted, resp)
-	h.NotifyClient(resp.PassengerID.String(), constants.EventRideStarted, resp)
+	h.NotifyClient(resp.DriverID.String(), websocketmodels.EventRideStarted, resp)
+	h.NotifyClient(resp.PassengerID.String(), websocketmodels.EventRideStarted, resp)
 
 	// Send success response to the requesting client
 	successData := map[string]interface{}{
@@ -621,8 +624,8 @@ func (h *EchoWebSocketHandler) handleRideStart(ctx context.Context, userID strin
 	}
 	
 	successDataBytes, _ := json.Marshal(successData)
-	response := models.WSMessage{
-		Event: constants.EventRideStarted,
+	response := websocketmodels.WSMessage{
+		Event: websocketmodels.EventRideStarted,
 		Data:  json.RawMessage(successDataBytes),
 	}
 
@@ -631,15 +634,15 @@ func (h *EchoWebSocketHandler) handleRideStart(ctx context.Context, userID strin
 
 // handleRideArrived processes ride arrival with event type transformation
 func (h *EchoWebSocketHandler) handleRideArrived(ctx context.Context, userID string, ws *websocket.Conn, data json.RawMessage) error {
-	var req models.RideArrivalReq
+	var req ride.RideArrivalReq
 	if err := json.Unmarshal(data, &req); err != nil {
-		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
+		h.sendError(ctx, ws, userID, err, websocketmodels.ErrorInvalidFormat, websocketmodels.ErrorSeverityClient)
 		return nil
 	}
 
 	paymentReq, err := h.gatewayUC.RideArrived(ctx, &req)
 	if err != nil {
-		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+		h.sendError(ctx, ws, userID, err, websocketmodels.ErrorInvalidFormat, websocketmodels.ErrorSeverityServer)
 		return nil
 	}
 
@@ -648,11 +651,11 @@ func (h *EchoWebSocketHandler) handleRideArrived(ctx context.Context, userID str
 		"ride_id":           req.RideID,
 		"adjustment_factor": req.AdjustmentFactor,
 	}
-	h.NotifyClient(paymentReq.PassengerID, constants.EventRideArrived, rideArrivedData)
-	h.NotifyClient(paymentReq.DriverID, constants.EventRideArrived, rideArrivedData)
+	h.NotifyClient(paymentReq.PassengerID, websocketmodels.EventRideArrived, rideArrivedData)
+	h.NotifyClient(paymentReq.DriverID, websocketmodels.EventRideArrived, rideArrivedData)
 
 	// Then: Send payment request to passenger only (payment is passenger's responsibility)
-	h.NotifyClient(paymentReq.PassengerID, constants.EventPaymentRequest, paymentReq)
+	h.NotifyClient(paymentReq.PassengerID, websocketmodels.EventPaymentRequest, paymentReq)
 
 	// Send success response to the requesting client
 	successData := map[string]interface{}{
@@ -662,8 +665,8 @@ func (h *EchoWebSocketHandler) handleRideArrived(ctx context.Context, userID str
 	}
 	
 	successDataBytes, _ := json.Marshal(successData)
-	response := models.WSMessage{
-		Event: constants.EventRideArrived,
+	response := websocketmodels.WSMessage{
+		Event: websocketmodels.EventRideArrived,
 		Data:  json.RawMessage(successDataBytes),
 	}
 
@@ -672,22 +675,22 @@ func (h *EchoWebSocketHandler) handleRideArrived(ctx context.Context, userID str
 
 // handleProcessPayment processes payment with status validation
 func (h *EchoWebSocketHandler) handleProcessPayment(ctx context.Context, userID string, ws *websocket.Conn, data json.RawMessage) error {
-	var req models.PaymentProccessRequest
+	var req ride.PaymentProccessRequest
 	if err := json.Unmarshal(data, &req); err != nil {
-		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
+		h.sendError(ctx, ws, userID, err, websocketmodels.ErrorInvalidFormat, websocketmodels.ErrorSeverityClient)
 		return nil
 	}
 
 	// Critical: Payment status validation
-	if req.Status != models.PaymentStatusAccepted && req.Status != models.PaymentStatusRejected {
+	if req.Status != ride.PaymentStatusAccepted && req.Status != ride.PaymentStatusRejected {
 		validationErr := fmt.Errorf("invalid payment status: %s", req.Status)
-		h.sendError(ctx, ws, userID, validationErr, constants.ErrorInvalidFormat, constants.ErrorSeverityClient)
+		h.sendError(ctx, ws, userID, validationErr, websocketmodels.ErrorInvalidFormat, websocketmodels.ErrorSeverityClient)
 		return nil
 	}
 
 	_, err := h.gatewayUC.ProcessPayment(ctx, &req)
 	if err != nil {
-		h.sendError(ctx, ws, userID, err, constants.ErrorInvalidFormat, constants.ErrorSeverityServer)
+		h.sendError(ctx, ws, userID, err, websocketmodels.ErrorInvalidFormat, websocketmodels.ErrorSeverityServer)
 		return nil
 	}
 
@@ -699,8 +702,8 @@ func (h *EchoWebSocketHandler) handleProcessPayment(ctx context.Context, userID 
 	}
 	
 	successDataBytes, _ := json.Marshal(successData)
-	response := models.WSMessage{
-		Event: constants.EventPaymentProcessed,
+	response := websocketmodels.WSMessage{
+		Event: websocketmodels.EventPaymentProcessed,
 		Data:  json.RawMessage(successDataBytes),
 	}
 
@@ -720,7 +723,7 @@ func (h *EchoWebSocketHandler) startHeartbeat(userID string, ws *websocket.Conn)
 	h.mu.Unlock()
 
 	go func() {
-		ticker := time.NewTicker(constants.HeartbeatInterval)
+		ticker := time.NewTicker(websocketmodels.HeartbeatInterval)
 		defer ticker.Stop()
 		sequence := int64(0)
 
@@ -742,7 +745,7 @@ func (h *EchoWebSocketHandler) startHeartbeat(userID string, ws *websocket.Conn)
 					missedCount := h.missedPings[userID]
 					h.mu.Unlock()
 
-					if missedCount >= constants.MaxMissedPings {
+					if missedCount >= websocketmodels.MaxMissedPings {
 						logger.Warn("Connection appears dead, closing",
 							logger.String("user_id", userID),
 							logger.Int("missed_pings", missedCount))
@@ -801,8 +804,8 @@ func (h *EchoWebSocketHandler) checkConnectionHealth(userID string) bool {
 	// Connection is unhealthy if:
 	// 1. Too many missed pings, OR
 	// 2. No ping response within timeout period
-	isUnhealthy := missedCount >= constants.MaxMissedPings ||
-				   timeSinceLastPing > constants.HeartbeatTimeout
+	isUnhealthy := missedCount >= websocketmodels.MaxMissedPings ||
+				   timeSinceLastPing > websocketmodels.HeartbeatTimeout
 
 	return !isUnhealthy
 }
@@ -810,11 +813,11 @@ func (h *EchoWebSocketHandler) checkConnectionHealth(userID string) bool {
 // Health monitoring endpoints for heartbeat status
 
 // GetConnectionHealth returns detailed health status for a specific user
-func (h *EchoWebSocketHandler) GetConnectionHealth(userID string) *models.WSConnectionHealth {
+func (h *EchoWebSocketHandler) GetConnectionHealth(userID string) *websocketmodels.WSConnectionHealth {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
-	health := &models.WSConnectionHealth{
+	health := &websocketmodels.WSConnectionHealth{
 		UserID:    userID,
 		IsHealthy: false,
 	}
@@ -831,13 +834,13 @@ func (h *EchoWebSocketHandler) GetConnectionHealth(userID string) *models.WSConn
 }
 
 // GetAllConnectionsHealth returns health status for all connected users
-func (h *EchoWebSocketHandler) GetAllConnectionsHealth() map[string]*models.WSConnectionHealth {
+func (h *EchoWebSocketHandler) GetAllConnectionsHealth() map[string]*websocketmodels.WSConnectionHealth {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
-	result := make(map[string]*models.WSConnectionHealth)
+	result := make(map[string]*websocketmodels.WSConnectionHealth)
 	for userID := range h.clients {
-		result[userID] = &models.WSConnectionHealth{
+		result[userID] = &websocketmodels.WSConnectionHealth{
 			UserID:         userID,
 			LastActivity:   h.lastActivity[userID],
 			LastPing:       h.lastPing[userID],
@@ -886,8 +889,8 @@ func (h *EchoWebSocketHandler) GetHeartbeatStats() map[string]interface{} {
 		"healthy_connections": healthyConnections,
 		"unhealthy_connections": totalConnections - healthyConnections,
 		"total_missed_pings":  totalMissedPings,
-		"heartbeat_interval":  constants.HeartbeatInterval.String(),
-		"heartbeat_timeout":   constants.HeartbeatTimeout.String(),
-		"max_missed_pings":    constants.MaxMissedPings,
+		"heartbeat_interval":  websocketmodels.HeartbeatInterval.String(),
+		"heartbeat_timeout":   websocketmodels.HeartbeatTimeout.String(),
+		"max_missed_pings":    websocketmodels.MaxMissedPings,
 	}
 }

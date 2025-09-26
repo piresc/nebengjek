@@ -91,8 +91,6 @@ func (h *NotificationHandler) InitNATSConsumers() error {
 			handler = h.handleRideCompletedJS
 		case "RIDE.cancelled":
 			handler = h.handleRideCancelledJS
-		// case "PAYMENT.processed": // TODO: Add when PAYMENT_STREAM is implemented
-		//	handler = h.handlePaymentProcessedJS
 		default:
 			h.logger.Warn("No handler defined for subject", slog.String("subject", subject))
 			continue
@@ -191,16 +189,6 @@ func (h *NotificationHandler) handleRideCancelledJS(msg jetstream.Msg) error {
 	err := h.notificationUC.ProcessRideCancelled(ctx, msg.Data())
 	if err != nil {
 		h.logger.Error("Failed to process ride cancelled notification", slog.Any("error", err))
-		return err
-	}
-	return nil // Message is auto-acknowledged by ConsumeMessages on success
-}
-
-func (h *NotificationHandler) handlePaymentProcessedJS(msg jetstream.Msg) error {
-	ctx := context.Background()
-	err := h.notificationUC.ProcessPaymentProcessed(ctx, msg.Data())
-	if err != nil {
-		h.logger.Error("Failed to process payment processed notification", slog.Any("error", err))
 		return err
 	}
 	return nil // Message is auto-acknowledged by ConsumeMessages on success

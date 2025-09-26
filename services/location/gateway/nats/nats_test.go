@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/nats-io/nats.go"
-	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
+	"github.com/piresc/nebengjek/internal/pkg/models/location"
 	locationgateway "github.com/piresc/nebengjek/services/location/gateway"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -62,14 +62,14 @@ func TestLocationGW_PublishLocationAggregate(t *testing.T) {
 	tests := []struct {
 		name          string
 		ctx           context.Context
-		locationData  *models.LocationAggregate
+		locationData  *location.LocationAggregate
 		mockSetup     func(*MockNATSConn)
 		expectedError bool
 	}{
 		{
 			name: "Success",
 			ctx:  context.Background(),
-			locationData: &models.LocationAggregate{
+			locationData: &location.LocationAggregate{
 				RideID:    "ride-123",
 				Distance:  10.5,
 				Latitude:  -6.175392,
@@ -85,7 +85,7 @@ func TestLocationGW_PublishLocationAggregate(t *testing.T) {
 		{
 			name: "NATS publish error",
 			ctx:  context.Background(),
-			locationData: &models.LocationAggregate{
+			locationData: &location.LocationAggregate{
 				RideID:    "ride-123",
 				Distance:  10.5,
 				Latitude:  -6.175392,
@@ -117,7 +117,7 @@ func TestLocationGW_PublishLocationAggregate(t *testing.T) {
 				cancel()
 				return ctx
 			}(),
-			locationData: &models.LocationAggregate{
+			locationData: &location.LocationAggregate{
 				RideID:    "ride-123",
 				Distance:  10.5,
 				Latitude:  -6.175392,
@@ -145,7 +145,7 @@ func TestLocationGW_PublishLocationAggregate(t *testing.T) {
 				err = gw.PublishLocationAggregate(tt.ctx, *tt.locationData)
 			} else {
 				// For nil data test, pass a zero value
-				err = gw.PublishLocationAggregate(tt.ctx, models.LocationAggregate{})
+				err = gw.PublishLocationAggregate(tt.ctx, location.LocationAggregate{})
 			}
 
 			if tt.expectedError {
@@ -171,7 +171,7 @@ func TestLocationGW_JSONMarshaling(t *testing.T) {
 	mockConn := &MockNATSConn{}
 	gw := locationgateway.NewLocationGW(mockConn)
 
-	locationData := &models.LocationAggregate{
+	locationData := &location.LocationAggregate{
 		RideID:    "ride-123",
 		Distance:  10.5,
 		Latitude:  -6.175392,
@@ -189,7 +189,7 @@ func TestLocationGW_JSONMarshaling(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify that the published data is valid JSON
-	var unmarshaled models.LocationAggregate
+	var unmarshaled location.LocationAggregate
 	err = json.Unmarshal(publishedData, &unmarshaled)
 	assert.NoError(t, err)
 	assert.Equal(t, locationData.RideID, unmarshaled.RideID)
@@ -205,7 +205,7 @@ func BenchmarkLocationGW_PublishLocationAggregate(b *testing.B) {
 	mockConn.On("PublishWithOptions", mock.AnythingOfType("nats.PublishOptions")).Return(nil)
 
 	gw := locationgateway.NewLocationGW(mockConn)
-	locationData := &models.LocationAggregate{
+	locationData := &location.LocationAggregate{
 		RideID:    "ride-123",
 		Distance:  10.5,
 		Latitude:  -6.175392,

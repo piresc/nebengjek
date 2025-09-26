@@ -8,23 +8,26 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/piresc/nebengjek/internal/pkg/constants"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/match"
+	"github.com/piresc/nebengjek/internal/pkg/models/ride"
+	"github.com/piresc/nebengjek/internal/pkg/models/notification"
+	"github.com/piresc/nebengjek/internal/pkg/models/websocket"
+	"github.com/piresc/nebengjek/internal/pkg/nats"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
-	"github.com/piresc/nebengjek/services/notification"
+	notificationpkg "github.com/piresc/nebengjek/services/notification"
 	"github.com/piresc/nebengjek/services/notification/repository"
 )
 
 // NotificationUC implements the notification usecase interface
 type NotificationUC struct {
-	notificationRepo notification.NotificationRepo
+	notificationRepo notificationpkg.NotificationRepo
 	natsClient       *natspkg.Client
 	logger           *slog.Logger
 }
 
 // NewNotificationUC creates a new notification usecase
 func NewNotificationUC(
-	notificationRepo notification.NotificationRepo,
+	notificationRepo notificationpkg.NotificationRepo,
 	natsClient *natspkg.Client,
 	logger *slog.Logger,
 ) *NotificationUC {
@@ -37,23 +40,23 @@ func NewNotificationUC(
 
 // ProcessMatchProposal processes match proposal events
 func (uc *NotificationUC) ProcessMatchProposal(ctx context.Context, eventData []byte) error {
-	var matchProposal models.MatchProposal
+	var matchProposal match.MatchProposal
 	if err := json.Unmarshal(eventData, &matchProposal); err != nil {
 		return fmt.Errorf("failed to unmarshal match proposal data: %w", err)
 	}
 
 	// Create notification for driver
-	driverNotification := &models.UserNotification{
+	driverNotification := &notification.UserNotification{
 		UserID:    uuid.MustParse(matchProposal.DriverID),
-		Type:      models.NotificationTypeMatchProposal,
+		Type:      notification.NotificationTypeMatchProposal,
 		Data:      matchProposal,
 		Timestamp: time.Now(),
 	}
 
 	// Create notification for passenger
-	passengerNotification := &models.UserNotification{
+	passengerNotification := &notification.UserNotification{
 		UserID:    uuid.MustParse(matchProposal.PassengerID),
-		Type:      models.NotificationTypeMatchProposal,
+		Type:      notification.NotificationTypeMatchProposal,
 		Data:      matchProposal,
 		Timestamp: time.Now(),
 	}
@@ -72,22 +75,22 @@ func (uc *NotificationUC) ProcessMatchProposal(ctx context.Context, eventData []
 
 // ProcessMatchAccepted processes match accepted events
 func (uc *NotificationUC) ProcessMatchAccepted(ctx context.Context, eventData []byte) error {
-	var matchProposal models.MatchProposal
+	var matchProposal match.MatchProposal
 	if err := json.Unmarshal(eventData, &matchProposal); err != nil {
 		return fmt.Errorf("failed to unmarshal match accepted data: %w", err)
 	}
 
 	// Create notifications for both driver and passenger
-	driverNotification := &models.UserNotification{
+	driverNotification := &notification.UserNotification{
 		UserID:    uuid.MustParse(matchProposal.DriverID),
-		Type:      models.NotificationTypeMatchAccepted,
+		Type:      notification.NotificationTypeMatchAccepted,
 		Data:      matchProposal,
 		Timestamp: time.Now(),
 	}
 
-	passengerNotification := &models.UserNotification{
+	passengerNotification := &notification.UserNotification{
 		UserID:    uuid.MustParse(matchProposal.PassengerID),
-		Type:      models.NotificationTypeMatchAccepted,
+		Type:      notification.NotificationTypeMatchAccepted,
 		Data:      matchProposal,
 		Timestamp: time.Now(),
 	}
@@ -101,22 +104,22 @@ func (uc *NotificationUC) ProcessMatchAccepted(ctx context.Context, eventData []
 
 // ProcessMatchRejected processes match rejected events
 func (uc *NotificationUC) ProcessMatchRejected(ctx context.Context, eventData []byte) error {
-	var matchProposal models.MatchProposal
+	var matchProposal match.MatchProposal
 	if err := json.Unmarshal(eventData, &matchProposal); err != nil {
 		return fmt.Errorf("failed to unmarshal match rejected data: %w", err)
 	}
 
 	// Create notifications for both driver and passenger
-	driverNotification := &models.UserNotification{
+	driverNotification := &notification.UserNotification{
 		UserID:    uuid.MustParse(matchProposal.DriverID),
-		Type:      models.NotificationTypeMatchRejected,
+		Type:      notification.NotificationTypeMatchRejected,
 		Data:      matchProposal,
 		Timestamp: time.Now(),
 	}
 
-	passengerNotification := &models.UserNotification{
+	passengerNotification := &notification.UserNotification{
 		UserID:    uuid.MustParse(matchProposal.PassengerID),
-		Type:      models.NotificationTypeMatchRejected,
+		Type:      notification.NotificationTypeMatchRejected,
 		Data:      matchProposal,
 		Timestamp: time.Now(),
 	}
@@ -130,7 +133,7 @@ func (uc *NotificationUC) ProcessMatchRejected(ctx context.Context, eventData []
 
 // ProcessRidePickup processes ride pickup events (ride.pickup subject)
 func (uc *NotificationUC) ProcessRidePickup(ctx context.Context, eventData []byte) error {
-	var rideResp models.RideResp
+	var rideResp ride.RideResp
 	if err := json.Unmarshal(eventData, &rideResp); err != nil {
 		return fmt.Errorf("failed to unmarshal ride pickup data: %w", err)
 	}
@@ -147,16 +150,16 @@ func (uc *NotificationUC) ProcessRidePickup(ctx context.Context, eventData []byt
 	}
 
 	// Create notifications for both driver and passenger with ride_started type
-	driverNotification := &models.UserNotification{
+	driverNotification := &notification.UserNotification{
 		UserID:    driverID,
-		Type:      models.NotificationTypeRideStarted,
+		Type:      notification.NotificationTypeRideStarted,
 		Data:      rideResp,
 		Timestamp: time.Now(),
 	}
 
-	passengerNotification := &models.UserNotification{
+	passengerNotification := &notification.UserNotification{
 		UserID:    passengerID,
-		Type:      models.NotificationTypeRideStarted,
+		Type:      notification.NotificationTypeRideStarted,
 		Data:      rideResp,
 		Timestamp: time.Now(),
 	}
@@ -170,22 +173,22 @@ func (uc *NotificationUC) ProcessRidePickup(ctx context.Context, eventData []byt
 
 // ProcessRideStarted processes ride started events
 func (uc *NotificationUC) ProcessRideStarted(ctx context.Context, eventData []byte) error {
-	var rideData models.Ride
+	var rideData ride.Ride
 	if err := json.Unmarshal(eventData, &rideData); err != nil {
 		return fmt.Errorf("failed to unmarshal ride started data: %w", err)
 	}
 
 	// Create notifications for both driver and passenger
-	driverNotification := &models.UserNotification{
+	driverNotification := &notification.UserNotification{
 		UserID:    rideData.DriverID,
-		Type:      models.NotificationTypeRideStarted,
+		Type:      notification.NotificationTypeRideStarted,
 		Data:      rideData,
 		Timestamp: time.Now(),
 	}
 
-	passengerNotification := &models.UserNotification{
+	passengerNotification := &notification.UserNotification{
 		UserID:    rideData.PassengerID,
-		Type:      models.NotificationTypeRideStarted,
+		Type:      notification.NotificationTypeRideStarted,
 		Data:      rideData,
 		Timestamp: time.Now(),
 	}
@@ -199,15 +202,15 @@ func (uc *NotificationUC) ProcessRideStarted(ctx context.Context, eventData []by
 
 // ProcessRidePickupArrived processes ride pickup arrived events
 func (uc *NotificationUC) ProcessRidePickupArrived(ctx context.Context, eventData []byte) error {
-	var rideData models.Ride
+	var rideData ride.Ride
 	if err := json.Unmarshal(eventData, &rideData); err != nil {
 		return fmt.Errorf("failed to unmarshal ride pickup arrived data: %w", err)
 	}
 
 	// Notify passenger that driver has arrived
-	notification := &models.UserNotification{
+	notification := &notification.UserNotification{
 		UserID:    rideData.PassengerID,
-		Type:      models.NotificationTypeRidePickupArrived,
+		Type:      notification.NotificationTypeRidePickupArrived,
 		Data:      rideData,
 		Timestamp: time.Now(),
 	}
@@ -217,22 +220,22 @@ func (uc *NotificationUC) ProcessRidePickupArrived(ctx context.Context, eventDat
 
 // ProcessRideCompleted processes ride completed events (sends payment_processed notifications)
 func (uc *NotificationUC) ProcessRideCompleted(ctx context.Context, eventData []byte) error {
-	var rideCompleteData models.RideComplete
+	var rideCompleteData ride.RideComplete
 	if err := json.Unmarshal(eventData, &rideCompleteData); err != nil {
 		return fmt.Errorf("failed to unmarshal ride completed data: %w", err)
 	}
 
 	// Create payment_processed notifications for both driver and passenger
-	driverNotification := &models.UserNotification{
+	driverNotification := &notification.UserNotification{
 		UserID:    rideCompleteData.Ride.DriverID,
-		Type:      models.NotificationTypePaymentProcessed,
+		Type:      notification.NotificationTypePaymentProcessed,
 		Data:      rideCompleteData,
 		Timestamp: time.Now(),
 	}
 
-	passengerNotification := &models.UserNotification{
+	passengerNotification := &notification.UserNotification{
 		UserID:    rideCompleteData.Ride.PassengerID,
-		Type:      models.NotificationTypePaymentProcessed,
+		Type:      notification.NotificationTypePaymentProcessed,
 		Data:      rideCompleteData,
 		Timestamp: time.Now(),
 	}
@@ -246,22 +249,22 @@ func (uc *NotificationUC) ProcessRideCompleted(ctx context.Context, eventData []
 
 // ProcessRideCancelled processes ride cancelled events
 func (uc *NotificationUC) ProcessRideCancelled(ctx context.Context, eventData []byte) error {
-	var rideData models.Ride
+	var rideData ride.Ride
 	if err := json.Unmarshal(eventData, &rideData); err != nil {
 		return fmt.Errorf("failed to unmarshal ride cancelled data: %w", err)
 	}
 
 	// Create notifications for both driver and passenger
-	driverNotification := &models.UserNotification{
+	driverNotification := &notification.UserNotification{
 		UserID:    rideData.DriverID,
-		Type:      models.NotificationTypeRideCancelled,
+		Type:      notification.NotificationTypeRideCancelled,
 		Data:      rideData,
 		Timestamp: time.Now(),
 	}
 
-	passengerNotification := &models.UserNotification{
+	passengerNotification := &notification.UserNotification{
 		UserID:    rideData.PassengerID,
-		Type:      models.NotificationTypeRideCancelled,
+		Type:      notification.NotificationTypeRideCancelled,
 		Data:      rideData,
 		Timestamp: time.Now(),
 	}
@@ -275,22 +278,22 @@ func (uc *NotificationUC) ProcessRideCancelled(ctx context.Context, eventData []
 
 // ProcessPaymentProcessed processes payment processed events
 func (uc *NotificationUC) ProcessPaymentProcessed(ctx context.Context, eventData []byte) error {
-	var rideCompleteData models.RideComplete
+	var rideCompleteData ride.RideComplete
 	if err := json.Unmarshal(eventData, &rideCompleteData); err != nil {
 		return fmt.Errorf("failed to unmarshal payment processed data: %w", err)
 	}
 
 	// Create notifications for both driver and passenger using ride information
-	driverNotification := &models.UserNotification{
+	driverNotification := &notification.UserNotification{
 		UserID:    rideCompleteData.Ride.DriverID,
-		Type:      models.NotificationTypePaymentProcessed,
+		Type:      notification.NotificationTypePaymentProcessed,
 		Data:      rideCompleteData,
 		Timestamp: time.Now(),
 	}
 
-	passengerNotification := &models.UserNotification{
+	passengerNotification := &notification.UserNotification{
 		UserID:    rideCompleteData.Ride.PassengerID,
-		Type:      models.NotificationTypePaymentProcessed,
+		Type:      notification.NotificationTypePaymentProcessed,
 		Data:      rideCompleteData,
 		Timestamp: time.Now(),
 	}
@@ -303,12 +306,12 @@ func (uc *NotificationUC) ProcessPaymentProcessed(ctx context.Context, eventData
 }
 
 // GetNotificationHistory retrieves notification history for a user
-func (uc *NotificationUC) GetNotificationHistory(ctx context.Context, userID string, limit, offset int) ([]*models.NotificationHistory, error) {
+func (uc *NotificationUC) GetNotificationHistory(ctx context.Context, userID string, limit, offset int) ([]*notification.NotificationHistory, error) {
 	return uc.notificationRepo.GetNotificationHistory(ctx, userID, limit, offset)
 }
 
 // GetUndeliveredNotifications retrieves undelivered notifications for a user
-func (uc *NotificationUC) GetUndeliveredNotifications(ctx context.Context, userID string) ([]*models.NotificationHistory, error) {
+func (uc *NotificationUC) GetUndeliveredNotifications(ctx context.Context, userID string) ([]*notification.NotificationHistory, error) {
 	return uc.notificationRepo.GetUndeliveredNotifications(ctx, userID)
 }
 
@@ -318,7 +321,7 @@ func (uc *NotificationUC) MarkNotificationDelivered(ctx context.Context, notific
 }
 
 // SendNotificationToGateway sends a notification to all gateways via multi-gateway broadcasting
-func (uc *NotificationUC) SendNotificationToGateway(ctx context.Context, notification *models.UserNotification) error {
+func (uc *NotificationUC) SendNotificationToGateway(ctx context.Context, notification *notification.UserNotification) error {
 	// Map notification type to WebSocket event
 	wsEvent := uc.mapNotificationToWSEvent(notification.Type)
 	
@@ -329,8 +332,8 @@ func (uc *NotificationUC) SendNotificationToGateway(ctx context.Context, notific
 	}
 	
 	// Create user-targeted broadcast message
-	broadcastMsg := &models.WSUserBroadcast{
-		WSBroadcastMessage: models.WSBroadcastMessage{
+	broadcastMsg := &websocket.WSUserBroadcast{
+		WSBroadcastMessage: websocket.WSBroadcastMessage{
 			MessageID: uuid.New().String(),
 			Event:     wsEvent,
 			Data:      json.RawMessage(notificationData),
@@ -349,7 +352,7 @@ func (uc *NotificationUC) SendNotificationToGateway(ctx context.Context, notific
 	
 	// Publish to multi-gateway subject (all gateways will receive this)
 	opts := natspkg.PublishOptions{
-		Subject: constants.SubjectWSBroadcastUser,
+		Subject: nats.SubjectWSBroadcastUser,
 		Data:    data,
 		MsgID:   broadcastMsg.MessageID,
 		Timeout: 10 * time.Second,
@@ -374,12 +377,12 @@ func (uc *NotificationUC) SendNotificationToGateway(ctx context.Context, notific
 // mapNotificationToWSEvent maps notification types to WebSocket events
 func (uc *NotificationUC) mapNotificationToWSEvent(notificationType string) string {
 	eventMap := map[string]string{
-		models.NotificationTypeMatchProposal:  constants.EventMatchConfirm,
-		models.NotificationTypeMatchAccepted:  constants.EventMatchConfirm,
-		models.NotificationTypeMatchRejected:  constants.EventMatchRejected,
-		models.NotificationTypeRideStarted:    constants.EventRideStarted,
-		models.NotificationTypeRideCompleted:  constants.EventRideCompleted,
-		models.NotificationTypePaymentProcessed: constants.EventPaymentProcessed,
+		notification.NotificationTypeMatchProposal:  websocket.EventMatchConfirm,
+		notification.NotificationTypeMatchAccepted:  websocket.EventMatchConfirm,
+		notification.NotificationTypeMatchRejected:  websocket.EventMatchRejected,
+		notification.NotificationTypeRideStarted:    websocket.EventRideStarted,
+		notification.NotificationTypeRideCompleted:  websocket.EventRideCompleted,
+		notification.NotificationTypePaymentProcessed: websocket.EventPaymentProcessed,
 		// Add more mappings as needed
 	}
 	
@@ -398,8 +401,8 @@ func (uc *NotificationUC) BroadcastToRole(ctx context.Context, roles []string, e
 		return fmt.Errorf("failed to marshal broadcast data: %w", err)
 	}
 	
-	broadcastMsg := &models.WSRoleBroadcast{
-		WSBroadcastMessage: models.WSBroadcastMessage{
+	broadcastMsg := &websocket.WSRoleBroadcast{
+		WSBroadcastMessage: websocket.WSBroadcastMessage{
 			MessageID: uuid.New().String(),
 			Event:     event,
 			Data:      json.RawMessage(dataBytes),
@@ -416,7 +419,7 @@ func (uc *NotificationUC) BroadcastToRole(ctx context.Context, roles []string, e
 	}
 	
 	opts := natspkg.PublishOptions{
-		Subject: constants.SubjectWSBroadcastRole,
+		Subject: nats.SubjectWSBroadcastRole,
 		Data:    msgData,
 		MsgID:   broadcastMsg.MessageID,
 		Timeout: 10 * time.Second,
@@ -432,7 +435,7 @@ func (uc *NotificationUC) BroadcastToAll(ctx context.Context, event string, data
 		return fmt.Errorf("failed to marshal broadcast data: %w", err)
 	}
 	
-	broadcastMsg := &models.WSBroadcastMessage{
+	broadcastMsg := &websocket.WSBroadcastMessage{
 		MessageID: uuid.New().String(),
 		Event:     event,
 		Data:      json.RawMessage(dataBytes),
@@ -447,7 +450,7 @@ func (uc *NotificationUC) BroadcastToAll(ctx context.Context, event string, data
 	}
 	
 	opts := natspkg.PublishOptions{
-		Subject: constants.SubjectWSBroadcastAll,
+		Subject: nats.SubjectWSBroadcastAll,
 		Data:    msgData,
 		MsgID:   broadcastMsg.MessageID,
 		Timeout: 10 * time.Second,
@@ -457,10 +460,10 @@ func (uc *NotificationUC) BroadcastToAll(ctx context.Context, event string, data
 }
 
 // processAndStoreNotification is a helper method to process and store notifications
-func (uc *NotificationUC) processAndStoreNotification(ctx context.Context, notification *models.UserNotification) error {
+func (uc *NotificationUC) processAndStoreNotification(ctx context.Context, userNotification *notification.UserNotification) error {
 	// Convert to notification history  
 	if repo, ok := uc.notificationRepo.(*repository.NotificationRepo); ok {
-		notificationHistory, err := repo.CreateNotificationFromEvent(notification)
+		notificationHistory, err := repo.CreateNotificationFromEvent(userNotification)
 		if err != nil {
 			uc.logger.Error("Failed to create notification from event", slog.Any("error", err))
 			return err
@@ -473,20 +476,20 @@ func (uc *NotificationUC) processAndStoreNotification(ctx context.Context, notif
 		}
 	} else {
 		// For interface compatibility, create notification history manually
-		dataBytes, err := json.Marshal(notification.Data)
+		dataBytes, err := json.Marshal(userNotification.Data)
 		if err != nil {
 			uc.logger.Error("Failed to marshal notification data", slog.Any("error", err))
 			return err
 		}
 
-		notificationHistory := &models.NotificationHistory{
-			UserID:    notification.UserID,
-			Type:      notification.Type,
+		notificationHistory := &notification.NotificationHistory{
+			UserID:    userNotification.UserID,
+			Type:      userNotification.Type,
 			Data:      json.RawMessage(dataBytes),
-			Timestamp: notification.Timestamp,
+			Timestamp: userNotification.Timestamp,
 			Delivered: false,
-			CreatedAt: notification.Timestamp,
-			UpdatedAt: notification.Timestamp,
+			CreatedAt: userNotification.Timestamp,
+			UpdatedAt: userNotification.Timestamp,
 		}
 		
 		// Store in database
@@ -497,14 +500,14 @@ func (uc *NotificationUC) processAndStoreNotification(ctx context.Context, notif
 	}
 
 	// Send to gateway
-	if err := uc.SendNotificationToGateway(ctx, notification); err != nil {
+	if err := uc.SendNotificationToGateway(ctx, userNotification); err != nil {
 		uc.logger.Error("Failed to send notification to gateway", slog.Any("error", err))
 		// Don't return error here - notification is stored, delivery can be retried
 	}
 
 	uc.logger.Info("Notification processed successfully",
-		slog.String("type", notification.Type),
-		slog.String("user_id", notification.UserID.String()),
+		slog.String("type", userNotification.Type),
+		slog.String("user_id", userNotification.UserID.String()),
 	)
 
 	return nil

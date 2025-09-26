@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/piresc/nebengjek/internal/pkg/constants"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/ride"
+	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 )
 
 // NATSPublisher interface for publishing messages
@@ -27,21 +27,21 @@ func NewNATSGateway(publisher NATSPublisher) *NATSGateway {
 }
 
 // PublishRidePickupEvent publishes a ride pickup event to NATS
-func (g *NATSGateway) PublishRidePickupEvent(ctx context.Context, event *models.RidePickupEvent) error {
+func (g *NATSGateway) PublishRidePickupEvent(ctx context.Context, event *ride.RidePickupEvent) error {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("failed to marshal ride pickup event: %w", err)
 	}
 
-	return g.publisher.Publish(constants.SubjectRidePickup, data)
+	return g.publisher.Publish(natspkg.SubjectRidePickup, data)
 }
 
 // PublishRideCompleteEvent publishes a ride complete event to NATS
-func (g *NATSGateway) PublishRideCompleteEvent(ctx context.Context, event *models.RideCompleteEvent) error {
+func (g *NATSGateway) PublishRideCompleteEvent(ctx context.Context, event *ride.RideCompleteEvent) error {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("failed to marshal ride complete event: %w", err)
 	}
 
-	return g.publisher.Publish(constants.SubjectRideCompleted, data)
+	return g.publisher.Publish(natspkg.SubjectRideCompleted, data)
 }

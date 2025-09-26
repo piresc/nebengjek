@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go/jetstream"
-	"github.com/piresc/nebengjek/internal/pkg/constants"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/notification"
+	"github.com/piresc/nebengjek/internal/pkg/models/websocket"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	gatewaywebsocket "github.com/piresc/nebengjek/services/gateway/handler/websocket"
 	"github.com/piresc/nebengjek/services/gateway/repository"
@@ -114,7 +114,7 @@ func (h *GatewayNotificationHandler) handleNotificationDeliveryJS(msg jetstream.
 
 // handleNotificationDelivery processes notification delivery events
 func (h *GatewayNotificationHandler) handleNotificationDelivery(ctx context.Context, msgData []byte) error {
-	var deliveryEvent models.NotificationDeliveryEvent
+	var deliveryEvent notification.NotificationDeliveryEvent
 	if err := json.Unmarshal(msgData, &deliveryEvent); err != nil {
 		h.logger.Error("Failed to unmarshal notification delivery event", 
 			slog.Any("error", err),
@@ -167,21 +167,21 @@ func (h *GatewayNotificationHandler) handleNotificationDelivery(ctx context.Cont
 // mapNotificationTypeToWSEvent maps notification types to WebSocket event names
 func (h *GatewayNotificationHandler) mapNotificationTypeToWSEvent(notificationType string) string {
 	switch notificationType {
-	case models.NotificationTypeMatchProposal:
+	case notification.NotificationTypeMatchProposal:
 		return "match_proposal"
-	case models.NotificationTypeMatchAccepted:
+	case notification.NotificationTypeMatchAccepted:
 		return "match_accepted"
-	case models.NotificationTypeMatchRejected:
+	case notification.NotificationTypeMatchRejected:
 		return "match_rejected"
-	case models.NotificationTypeRideStarted:
+	case notification.NotificationTypeRideStarted:
 		return "ride_started"
-	case models.NotificationTypeRidePickupArrived:
+	case notification.NotificationTypeRidePickupArrived:
 		return "ride_pickup_arrived"
-	case models.NotificationTypeRideCompleted:
+	case notification.NotificationTypeRideCompleted:
 		return "ride_completed"
-	case models.NotificationTypeRideCancelled:
+	case notification.NotificationTypeRideCancelled:
 		return "ride_cancelled"
-	case models.NotificationTypePaymentProcessed:
+	case notification.NotificationTypePaymentProcessed:
 		return "payment_processed"
 	default:
 		h.logger.Warn("Unknown notification type", slog.String("type", notificationType))
@@ -200,22 +200,22 @@ func (h *GatewayNotificationHandler) InitMultiGatewayConsumers() error {
 		handler      func(jetstream.Msg) error
 	}{
 		{
-			subject:      constants.SubjectWSBroadcastUser,
+			subject:      natspkg.SubjectWSBroadcastUser,
 			consumerName: fmt.Sprintf("ws_user_broadcast_%s", sanitizedServerID),
 			handler:      h.handleUserBroadcast,
 		},
 		{
-			subject:      constants.SubjectWSBroadcastRole,
+			subject:      natspkg.SubjectWSBroadcastRole,
 			consumerName: fmt.Sprintf("ws_role_broadcast_%s", sanitizedServerID),
 			handler:      h.handleRoleBroadcast,
 		},
 		{
-			subject:      constants.SubjectWSBroadcastAll,
+			subject:      natspkg.SubjectWSBroadcastAll,
 			consumerName: fmt.Sprintf("ws_all_broadcast_%s", sanitizedServerID),
 			handler:      h.handleAllBroadcast,
 		},
 		{
-			subject:      constants.SubjectWSRouteUser,
+			subject:      natspkg.SubjectWSRouteUser,
 			consumerName: fmt.Sprintf("ws_user_route_%s", sanitizedServerID),
 			handler:      h.handleUserRoute,
 		},
@@ -223,7 +223,7 @@ func (h *GatewayNotificationHandler) InitMultiGatewayConsumers() error {
 
 	for _, consumer := range consumers {
 		config := natspkg.ConsumerConfig{
-			StreamName:    constants.StreamWebSocket,
+			StreamName:    natspkg.StreamWebSocket,
 			ConsumerName:  consumer.consumerName,
 			FilterSubject: consumer.subject,
 			AckPolicy:     jetstream.AckExplicitPolicy,
@@ -238,7 +238,7 @@ func (h *GatewayNotificationHandler) InitMultiGatewayConsumers() error {
 		}
 
 		if err := h.natsClient.ConsumeMessages(
-			constants.StreamWebSocket,
+			natspkg.StreamWebSocket,
 			consumer.consumerName,
 			consumer.handler,
 		); err != nil {
@@ -255,7 +255,7 @@ func (h *GatewayNotificationHandler) InitMultiGatewayConsumers() error {
 
 // handleUserBroadcast processes user-targeted broadcasts
 func (h *GatewayNotificationHandler) handleUserBroadcast(msg jetstream.Msg) error {
-	var broadcast models.WSUserBroadcast
+	var broadcast websocket.WSUserBroadcast
 	if err := json.Unmarshal(msg.Data(), &broadcast); err != nil {
 		h.logger.Error("Failed to unmarshal user broadcast", slog.String("error", err.Error()))
 		return err
@@ -318,7 +318,7 @@ func (h *GatewayNotificationHandler) handleUserBroadcast(msg jetstream.Msg) erro
 
 // handleRoleBroadcast processes role-targeted broadcasts
 func (h *GatewayNotificationHandler) handleRoleBroadcast(msg jetstream.Msg) error {
-	var broadcast models.WSRoleBroadcast
+	var broadcast websocket.WSRoleBroadcast
 	if err := json.Unmarshal(msg.Data(), &broadcast); err != nil {
 		h.logger.Error("Failed to unmarshal role broadcast", slog.String("error", err.Error()))
 		return err
@@ -375,7 +375,7 @@ func (h *GatewayNotificationHandler) handleRoleBroadcast(msg jetstream.Msg) erro
 
 // handleAllBroadcast processes broadcasts to all users
 func (h *GatewayNotificationHandler) handleAllBroadcast(msg jetstream.Msg) error {
-	var broadcast models.WSBroadcastMessage
+	var broadcast websocket.WSBroadcastMessage
 	if err := json.Unmarshal(msg.Data(), &broadcast); err != nil {
 		h.logger.Error("Failed to unmarshal all broadcast", slog.String("error", err.Error()))
 		return err
@@ -417,7 +417,7 @@ func (h *GatewayNotificationHandler) handleAllBroadcast(msg jetstream.Msg) error
 
 // handleUserRoute processes cross-server user routing
 func (h *GatewayNotificationHandler) handleUserRoute(msg jetstream.Msg) error {
-	var route models.WSRouteMessage
+	var route websocket.WSRouteMessage
 	if err := json.Unmarshal(msg.Data(), &route); err != nil {
 		h.logger.Error("Failed to unmarshal route message", slog.String("error", err.Error()))
 		return err

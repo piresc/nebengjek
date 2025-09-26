@@ -9,7 +9,9 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
+	locationmodels "github.com/piresc/nebengjek/internal/pkg/models/location"
+	ridemodels "github.com/piresc/nebengjek/internal/pkg/models/ride"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/match/mocks"
 	"github.com/stretchr/testify/assert"
@@ -44,16 +46,14 @@ func TestMatchHandler_handleBeaconEvent(t *testing.T) {
 		{
 			name: "successful beacon event processing",
 			eventData: func() []byte {
-				event := models.BeaconEvent{
+				event := coremodels.BeaconEvent{
 					UserID:   uuid.New().String(),
 					IsActive: true,
-					Location: models.Location{
+					Location: locationmodels.Location{
 						Latitude:  -6.175392,
 						Longitude: 106.827153,
-						Timestamp: time.Now(),
-					},
-					Timestamp: time.Now(),
-				}
+											},
+									}
 				data, _ := json.Marshal(event)
 				return data
 			}(),
@@ -71,16 +71,14 @@ func TestMatchHandler_handleBeaconEvent(t *testing.T) {
 		{
 			name: "usecase returns error",
 			eventData: func() []byte {
-				event := models.BeaconEvent{
+				event := coremodels.BeaconEvent{
 					UserID:   uuid.New().String(),
 					IsActive: false,
-					Location: models.Location{
+					Location: locationmodels.Location{
 						Latitude:  -6.175392,
 						Longitude: 106.827153,
-						Timestamp: time.Now(),
-					},
-					Timestamp: time.Now(),
-				}
+											},
+									}
 				data, _ := json.Marshal(event)
 				return data
 			}(),
@@ -127,21 +125,18 @@ func TestMatchHandler_handleFinderEvent(t *testing.T) {
 		{
 			name: "successful finder event processing",
 			eventData: func() []byte {
-				event := models.FinderEvent{
+				event := coremodels.FinderEvent{
 					UserID:   uuid.New().String(),
 					IsActive: true,
-					Location: models.Location{
+					Location: locationmodels.Location{
 						Latitude:  -6.175392,
 						Longitude: 106.827153,
-						Timestamp: time.Now(),
-					},
-					TargetLocation: models.Location{
+											},
+					TargetLocation: locationmodels.Location{
 						Latitude:  -6.185392,
 						Longitude: 106.837153,
-						Timestamp: time.Now(),
-					},
-					Timestamp: time.Now(),
-				}
+											},
+									}
 				data, _ := json.Marshal(event)
 				return data
 			}(),
@@ -159,21 +154,18 @@ func TestMatchHandler_handleFinderEvent(t *testing.T) {
 		{
 			name: "usecase returns error",
 			eventData: func() []byte {
-				event := models.FinderEvent{
+				event := coremodels.FinderEvent{
 					UserID:   uuid.New().String(),
 					IsActive: false,
-					Location: models.Location{
+					Location: locationmodels.Location{
 						Latitude:  -6.175392,
 						Longitude: 106.827153,
-						Timestamp: time.Now(),
-					},
-					TargetLocation: models.Location{
+											},
+					TargetLocation: locationmodels.Location{
 						Latitude:  -6.185392,
 						Longitude: 106.837153,
-						Timestamp: time.Now(),
-					},
-					Timestamp: time.Now(),
-				}
+											},
+									}
 				data, _ := json.Marshal(event)
 				return data
 			}(),
@@ -220,7 +212,7 @@ func TestMatchHandler_handleRidePickup(t *testing.T) {
 		{
 			name: "successful ride pickup processing",
 			eventData: func() []byte {
-				rideResp := models.RideResp{
+				rideResp := ridemodels.RideResp{
 					RideID:      uuid.New().String(),
 					DriverID:    uuid.New().String(),
 					PassengerID: uuid.New().String(),
@@ -248,7 +240,7 @@ func TestMatchHandler_handleRidePickup(t *testing.T) {
 		{
 			name: "driver removal fails but continues",
 			eventData: func() []byte {
-				rideResp := models.RideResp{
+				rideResp := ridemodels.RideResp{
 					RideID:      uuid.New().String(),
 					DriverID:    uuid.New().String(),
 					PassengerID: uuid.New().String(),
@@ -270,7 +262,7 @@ func TestMatchHandler_handleRidePickup(t *testing.T) {
 		{
 			name: "passenger removal fails but continues",
 			eventData: func() []byte {
-				rideResp := models.RideResp{
+				rideResp := ridemodels.RideResp{
 					RideID:      uuid.New().String(),
 					DriverID:    uuid.New().String(),
 					PassengerID: uuid.New().String(),
@@ -329,23 +321,23 @@ func TestMatchHandler_handleRideCompleted(t *testing.T) {
 			eventData: func() []byte {
 				driverID := uuid.New()
 				passengerID := uuid.New()
-				rideComplete := models.RideComplete{
-					Ride: models.Ride{
+				rideComplete := ridemodels.RideComplete{
+					Ride: ridemodels.Ride{
 						RideID:      uuid.New(),
 						DriverID:    driverID,
 						PassengerID: passengerID,
-						Status:      models.RideStatusCompleted,
+						Status:      ridemodels.RideStatusCompleted,
 						TotalCost:   50000,
 						CreatedAt:   time.Now(),
 						UpdatedAt:   time.Now(),
 					},
-					Payment: models.Payment{
+					Payment: ridemodels.Payment{
 						PaymentID:    uuid.New(),
 						RideID:       uuid.New(),
 						AdjustedCost: 50000,
 						AdminFee:     2500,
 						DriverPayout: 47500,
-						Status:       models.PaymentStatusAccepted,
+						Status:       ridemodels.PaymentStatusAccepted,
 						CreatedAt:    time.Now(),
 					},
 				}
@@ -368,23 +360,23 @@ func TestMatchHandler_handleRideCompleted(t *testing.T) {
 			eventData: func() []byte {
 				driverID := uuid.New()
 				passengerID := uuid.New()
-				rideComplete := models.RideComplete{
-					Ride: models.Ride{
+				rideComplete := ridemodels.RideComplete{
+					Ride: ridemodels.Ride{
 						RideID:      uuid.New(),
 						DriverID:    driverID,
 						PassengerID: passengerID,
-						Status:      models.RideStatusCompleted,
+						Status:      ridemodels.RideStatusCompleted,
 						TotalCost:   50000,
 						CreatedAt:   time.Now(),
 						UpdatedAt:   time.Now(),
 					},
-					Payment: models.Payment{
+					Payment: ridemodels.Payment{
 						PaymentID:    uuid.New(),
 						RideID:       uuid.New(),
 						AdjustedCost: 50000,
 						AdminFee:     2500,
 						DriverPayout: 47500,
-						Status:       models.PaymentStatusAccepted,
+						Status:       ridemodels.PaymentStatusAccepted,
 						CreatedAt:    time.Now(),
 					},
 				}
@@ -401,23 +393,23 @@ func TestMatchHandler_handleRideCompleted(t *testing.T) {
 			eventData: func() []byte {
 				driverID := uuid.New()
 				passengerID := uuid.New()
-				rideComplete := models.RideComplete{
-					Ride: models.Ride{
+				rideComplete := ridemodels.RideComplete{
+					Ride: ridemodels.Ride{
 						RideID:      uuid.New(),
 						DriverID:    driverID,
 						PassengerID: passengerID,
-						Status:      models.RideStatusCompleted,
+						Status:      ridemodels.RideStatusCompleted,
 						TotalCost:   50000,
 						CreatedAt:   time.Now(),
 						UpdatedAt:   time.Now(),
 					},
-					Payment: models.Payment{
+					Payment: ridemodels.Payment{
 						PaymentID:    uuid.New(),
 						RideID:       uuid.New(),
 						AdjustedCost: 50000,
 						AdminFee:     2500,
 						DriverPayout: 47500,
-						Status:       models.PaymentStatusAccepted,
+						Status:       ridemodels.PaymentStatusAccepted,
 						CreatedAt:    time.Now(),
 					},
 				}

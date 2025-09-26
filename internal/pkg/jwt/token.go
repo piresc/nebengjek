@@ -5,7 +5,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 )
 
 // Claims represents standard JWT claims plus custom fields
@@ -17,7 +17,7 @@ type Claims struct {
 }
 
 // GenerateToken generates a JWT token for the given user details
-func GenerateToken(userID uuid.UUID, msisdn, role string, cfg *models.Config) (string, int64, error) {
+func GenerateToken(userID uuid.UUID, msisdn, role string, cfg *core.Config) (string, int64, error) {
 	// Set token expiration time
 	expirationTime := time.Now().Add(time.Duration(cfg.JWT.Expiration) * time.Minute)
 	expiresAt := expirationTime.Unix()

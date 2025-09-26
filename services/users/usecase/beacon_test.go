@@ -7,7 +7,8 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
+	usermodels "github.com/piresc/nebengjek/internal/pkg/models/user"
 	"github.com/piresc/nebengjek/services/users/mocks"
 	"github.com/stretchr/testify/assert"
 )
@@ -20,8 +21,8 @@ func TestUpdateBeaconStatus_Success(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -30,14 +31,14 @@ func TestUpdateBeaconStatus_Success(t *testing.T) {
 
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
-	request := &models.BeaconRequest{
+	request := &coremodels.BeaconRequest{
 		MSISDN:    "+628123456789",
 		IsActive:  true,
 		Latitude:  -6.2088,
 		Longitude: 106.8456,
 	}
 
-	expectedUser := &models.User{
+	expectedUser := &usermodels.User{
 		ID:       uuid.New(),
 		MSISDN:   "+628123456789",
 		FullName: "Test User",
@@ -63,8 +64,8 @@ func TestUpdateBeaconStatus_GatewayError(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -73,14 +74,14 @@ func TestUpdateBeaconStatus_GatewayError(t *testing.T) {
 
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
-	request := &models.BeaconRequest{
+	request := &coremodels.BeaconRequest{
 		MSISDN:    "+628123456789",
 		IsActive:  true,
 		Latitude:  -6.2088,
 		Longitude: 106.8456,
 	}
 
-	expectedUser := &models.User{
+	expectedUser := &usermodels.User{
 		ID:       uuid.New(),
 		MSISDN:   "+628123456789",
 		FullName: "Test User",
@@ -108,8 +109,8 @@ func TestUpdateBeaconStatus_UserNotFound(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -118,7 +119,7 @@ func TestUpdateBeaconStatus_UserNotFound(t *testing.T) {
 
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
-	request := &models.BeaconRequest{
+	request := &coremodels.BeaconRequest{
 		MSISDN:    "+628123456789",
 		IsActive:  true,
 		Latitude:  -6.2088,
@@ -144,8 +145,8 @@ func TestUpdateBeaconStatus_DeactivateBeacon(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -154,7 +155,7 @@ func TestUpdateBeaconStatus_DeactivateBeacon(t *testing.T) {
 
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
-	expectedUser := &models.User{
+	expectedUser := &usermodels.User{
 		ID:       uuid.New(),
 		MSISDN:   "+628123456789",
 		Role:     "driver",
@@ -162,7 +163,7 @@ func TestUpdateBeaconStatus_DeactivateBeacon(t *testing.T) {
 		FullName: "Test Driver",
 	}
 
-	request := &models.BeaconRequest{
+	request := &coremodels.BeaconRequest{
 		MSISDN:    "+628123456789",
 		IsActive:  false, // Deactivating beacon
 		Latitude:  -6.2088,

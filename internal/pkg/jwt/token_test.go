@@ -6,14 +6,14 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func getTestConfig() *models.Config {
-	return &models.Config{
-		JWT: models.JWTConfig{
+func getTestConfig() *core.Config {
+	return &core.Config{
+		JWT: core.JWTConfig{
 			Secret:     "test-secret-key-for-jwt-signing",
 			Expiration: 60, // 60 minutes
 			Issuer:     "nebengjek-test",
@@ -27,7 +27,7 @@ func TestGenerateToken(t *testing.T) {
 		userID      uuid.UUID
 		msisdn      string
 		role        string
-		config      *models.Config
+		config      *core.Config
 		expectError bool
 	}{
 		{
@@ -299,13 +299,13 @@ func TestClaims_Struct(t *testing.T) {
 func TestGenerateToken_DifferentConfigurations(t *testing.T) {
 	tests := []struct {
 		name       string
-		config     *models.Config
+		config     *core.Config
 		expiration int
 	}{
 		{
 			name: "Short expiration",
-			config: &models.Config{
-				JWT: models.JWTConfig{
+			config: &core.Config{
+				JWT: core.JWTConfig{
 					Secret:     "short-secret",
 					Expiration: 5, // 5 minutes
 					Issuer:     "short-issuer",
@@ -315,8 +315,8 @@ func TestGenerateToken_DifferentConfigurations(t *testing.T) {
 		},
 		{
 			name: "Long expiration",
-			config: &models.Config{
-				JWT: models.JWTConfig{
+			config: &core.Config{
+				JWT: core.JWTConfig{
 					Secret:     "long-secret-key-for-testing",
 					Expiration: 1440, // 24 hours
 					Issuer:     "long-issuer",

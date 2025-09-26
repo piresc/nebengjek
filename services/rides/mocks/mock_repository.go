@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	models "github.com/piresc/nebengjek/internal/pkg/models"
+	ridemodels "github.com/piresc/nebengjek/internal/pkg/models/ride"
 )
 
 // MockRideRepo is a mock of RideRepo interface.
@@ -36,7 +36,7 @@ func (m *MockRideRepo) EXPECT() *MockRideRepoMockRecorder {
 }
 
 // AddBillingEntry mocks base method.
-func (m *MockRideRepo) AddBillingEntry(arg0 context.Context, arg1 *models.BillingLedger) error {
+func (m *MockRideRepo) AddBillingEntry(arg0 context.Context, arg1 *ridemodels.BillingLedger) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddBillingEntry", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -50,7 +50,7 @@ func (mr *MockRideRepoMockRecorder) AddBillingEntry(arg0, arg1 interface{}) *gom
 }
 
 // CompleteRide mocks base method.
-func (m *MockRideRepo) CompleteRide(arg0 context.Context, arg1 *models.Ride) error {
+func (m *MockRideRepo) CompleteRide(arg0 context.Context, arg1 *ridemodels.Ride) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CompleteRide", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -64,7 +64,7 @@ func (mr *MockRideRepoMockRecorder) CompleteRide(arg0, arg1 interface{}) *gomock
 }
 
 // CreatePayment mocks base method.
-func (m *MockRideRepo) CreatePayment(arg0 context.Context, arg1 *models.Payment) error {
+func (m *MockRideRepo) CreatePayment(arg0 context.Context, arg1 *ridemodels.Payment) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreatePayment", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -78,10 +78,10 @@ func (mr *MockRideRepoMockRecorder) CreatePayment(arg0, arg1 interface{}) *gomoc
 }
 
 // CreateRide mocks base method.
-func (m *MockRideRepo) CreateRide(arg0 *models.Ride) (*models.Ride, error) {
+func (m *MockRideRepo) CreateRide(arg0 *ridemodels.Ride) (*ridemodels.Ride, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateRide", arg0)
-	ret0, _ := ret[0].(*models.Ride)
+	ret0, _ := ret[0].(*ridemodels.Ride)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -108,10 +108,10 @@ func (mr *MockRideRepoMockRecorder) GetBillingLedgerSum(arg0, arg1 interface{}) 
 }
 
 // GetPaymentByRideID mocks base method.
-func (m *MockRideRepo) GetPaymentByRideID(arg0 context.Context, arg1 string) (*models.Payment, error) {
+func (m *MockRideRepo) GetPaymentByRideID(arg0 context.Context, arg1 string) (*ridemodels.Payment, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPaymentByRideID", arg0, arg1)
-	ret0, _ := ret[0].(*models.Payment)
+	ret0, _ := ret[0].(*ridemodels.Payment)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -123,10 +123,10 @@ func (mr *MockRideRepoMockRecorder) GetPaymentByRideID(arg0, arg1 interface{}) *
 }
 
 // GetRide mocks base method.
-func (m *MockRideRepo) GetRide(arg0 context.Context, arg1 string) (*models.Ride, error) {
+func (m *MockRideRepo) GetRide(arg0 context.Context, arg1 string) (*ridemodels.Ride, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetRide", arg0, arg1)
-	ret0, _ := ret[0].(*models.Ride)
+	ret0, _ := ret[0].(*ridemodels.Ride)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -138,7 +138,7 @@ func (mr *MockRideRepoMockRecorder) GetRide(arg0, arg1 interface{}) *gomock.Call
 }
 
 // UpdatePaymentStatus mocks base method.
-func (m *MockRideRepo) UpdatePaymentStatus(arg0 context.Context, arg1 string, arg2 models.PaymentStatus) error {
+func (m *MockRideRepo) UpdatePaymentStatus(arg0 context.Context, arg1 string, arg2 ridemodels.PaymentStatus) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdatePaymentStatus", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -152,7 +152,7 @@ func (mr *MockRideRepoMockRecorder) UpdatePaymentStatus(arg0, arg1, arg2 interfa
 }
 
 // UpdateRideStatus mocks base method.
-func (m *MockRideRepo) UpdateRideStatus(arg0 context.Context, arg1 string, arg2 models.RideStatus) error {
+func (m *MockRideRepo) UpdateRideStatus(arg0 context.Context, arg1 string, arg2 ridemodels.RideStatus) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateRideStatus", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)

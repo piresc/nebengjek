@@ -9,14 +9,14 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 	"github.com/piresc/nebengjek/services/gateway"
 )
 
 // HTTPGateway implements the GatewayGW interface for HTTP communication with microservices
 type HTTPGateway struct {
 	client    *http.Client
-	config    *models.Config
+	config    *core.Config
 	endpoints *ServiceEndpoints
 }
 
@@ -29,7 +29,7 @@ type ServiceEndpoints struct {
 }
 
 // NewHTTPGateway creates a new HTTP gateway instance
-func NewHTTPGateway(config *models.Config) gateway.GatewayGW {
+func NewHTTPGateway(config *core.Config) gateway.GatewayGW {
 	endpoints := &ServiceEndpoints{
 		UsersService:    "http://localhost:9990",
 		MatchService:    "http://localhost:9993",
@@ -47,28 +47,28 @@ func NewHTTPGateway(config *models.Config) gateway.GatewayGW {
 }
 
 // CallUsersService makes an HTTP call to the Users Service
-func (g *HTTPGateway) CallUsersService(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*models.ProxyResponse, error) {
+func (g *HTTPGateway) CallUsersService(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*core.ProxyResponse, error) {
 	return g.makeHTTPCall(ctx, g.endpoints.UsersService, method, path, body, headers, queryParams, g.config.APIKey.UserService)
 }
 
 // CallMatchService makes an HTTP call to the Match Service
-func (g *HTTPGateway) CallMatchService(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*models.ProxyResponse, error) {
+func (g *HTTPGateway) CallMatchService(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*core.ProxyResponse, error) {
 	return g.makeHTTPCall(ctx, g.endpoints.MatchService, method, path, body, headers, queryParams, g.config.APIKey.MatchService)
 }
 
 // CallRidesService makes an HTTP call to the Rides Service
-func (g *HTTPGateway) CallRidesService(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*models.ProxyResponse, error) {
+func (g *HTTPGateway) CallRidesService(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*core.ProxyResponse, error) {
 	return g.makeHTTPCall(ctx, g.endpoints.RidesService, method, path, body, headers, queryParams, g.config.APIKey.RidesService)
 }
 
 // CallLocationService makes an HTTP call to the Location Service
-func (g *HTTPGateway) CallLocationService(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*models.ProxyResponse, error) {
+func (g *HTTPGateway) CallLocationService(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*core.ProxyResponse, error) {
 	return g.makeHTTPCall(ctx, g.endpoints.LocationService, method, path, body, headers, queryParams, g.config.APIKey.LocationService)
 }
 
 
 // makeHTTPCall is a helper method to make HTTP calls to microservices
-func (g *HTTPGateway) makeHTTPCall(ctx context.Context, baseURL, method, path string, body interface{}, headers map[string]string, queryParams map[string]string, apiKey string) (*models.ProxyResponse, error) {
+func (g *HTTPGateway) makeHTTPCall(ctx context.Context, baseURL, method, path string, body interface{}, headers map[string]string, queryParams map[string]string, apiKey string) (*core.ProxyResponse, error) {
 	// Build full URL
 	fullURL := baseURL + "/internal" + path
 	if len(queryParams) > 0 {
@@ -117,7 +117,7 @@ func (g *HTTPGateway) makeHTTPCall(ctx context.Context, baseURL, method, path st
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	return &models.ProxyResponse{
+	return &core.ProxyResponse{
 		StatusCode: resp.StatusCode,
 		Body:       respBody,
 		Headers:    resp.Header,

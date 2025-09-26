@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	models "github.com/piresc/nebengjek/internal/pkg/models"
+	locationmodels "github.com/piresc/nebengjek/internal/pkg/models/location"
 )
 
 // MockLocationGW is a mock of LocationGW interface.
@@ -36,7 +36,7 @@ func (m *MockLocationGW) EXPECT() *MockLocationGWMockRecorder {
 }
 
 // PublishLocationAggregate mocks base method.
-func (m *MockLocationGW) PublishLocationAggregate(ctx context.Context, aggregate models.LocationAggregate) error {
+func (m *MockLocationGW) PublishLocationAggregate(ctx context.Context, aggregate locationmodels.LocationAggregate) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PublishLocationAggregate", ctx, aggregate)
 	ret0, _ := ret[0].(error)

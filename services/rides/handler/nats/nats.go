@@ -10,7 +10,10 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
+	"github.com/piresc/nebengjek/internal/pkg/models/match"
+	"github.com/piresc/nebengjek/internal/pkg/models/ride"
+	"github.com/piresc/nebengjek/internal/pkg/models/location"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/rides"
 )
@@ -19,14 +22,14 @@ type RidesHandler struct {
 	ridesUC    rides.RideUC
 	natsClient *natspkg.Client
 	subs       []*nats.Subscription
-	cfg        *models.Config
+	cfg        *core.Config
 }
 
 // NewRidesHandler creates a new rides NATS handler
 func NewRidesHandler(
 	ridesUC rides.RideUC,
 	client *natspkg.Client,
-	cfg *models.Config,
+	cfg *core.Config,
 ) *RidesHandler {
 	return &RidesHandler{
 		ridesUC:    ridesUC,
@@ -110,7 +113,7 @@ func (h *RidesHandler) handleLocationAggregateJS(msg jetstream.Msg) error {
 
 // handleMatchAccepted processes match acceptance events to create rides
 func (h *RidesHandler) handleMatchAccepted(ctx context.Context, msg []byte) error {
-	var matchProposal models.MatchProposal
+	var matchProposal match.MatchProposal
 	if err := json.Unmarshal(msg, &matchProposal); err != nil {
 		logger.ErrorCtx(ctx, "Failed to unmarshal match proposal",
 			logger.String("raw_message", string(msg)),
@@ -135,7 +138,7 @@ func (h *RidesHandler) handleMatchAccepted(ctx context.Context, msg []byte) erro
 
 // handleLocationAggregate processes location aggregates for billing
 func (h *RidesHandler) handleLocationAggregate(ctx context.Context, msg []byte) error {
-	var update models.LocationAggregate
+	var update location.LocationAggregate
 	if err := json.Unmarshal(msg, &update); err != nil {
 		logger.ErrorCtx(ctx, "Failed to unmarshal location aggregate", logger.ErrorField(err))
 		return err
@@ -159,7 +162,7 @@ func (h *RidesHandler) handleLocationAggregate(ctx context.Context, msg []byte) 
 		cost := int(math.Round(update.Distance * h.cfg.Pricing.RatePerKm))
 
 		// Create billing entry
-		entry := &models.BillingLedger{
+		entry := &ride.BillingLedger{
 			RideID:   rideUUID,
 			Distance: update.Distance,
 			Cost:     cost,

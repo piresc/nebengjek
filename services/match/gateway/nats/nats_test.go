@@ -6,7 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	locationmodels "github.com/piresc/nebengjek/internal/pkg/models/location"
+	matchmodels "github.com/piresc/nebengjek/internal/pkg/models/match"
 )
 
 func TestNewNATSGateway(t *testing.T) {
@@ -20,14 +21,14 @@ func TestNATSGateway_PublishMatchFound_NilClient(t *testing.T) {
 	gateway := NewNATSGateway(nil)
 	
 	ctx := context.Background()
-	matchProp := models.MatchProposal{
+	matchProp := matchmodels.MatchProposal{
 		ID:             "match-123",
 		DriverID:       "driver-456",
 		PassengerID:    "passenger-789",
-		UserLocation:   models.Location{Latitude: -6.2088, Longitude: 106.8456},
-		DriverLocation: models.Location{Latitude: -6.1751, Longitude: 106.8650},
-		TargetLocation: models.Location{Latitude: -6.2297, Longitude: 106.8295},
-		MatchStatus:    models.MatchStatusPending,
+		UserLocation:   locationmodels.Location{Latitude: -6.2088, Longitude: 106.8456},
+		DriverLocation: locationmodels.Location{Latitude: -6.1751, Longitude: 106.8650},
+		TargetLocation: locationmodels.Location{Latitude: -6.2297, Longitude: 106.8295},
+		MatchStatus:    matchmodels.MatchStatusPending,
 	}
 
 	// Should panic with nil client
@@ -40,14 +41,14 @@ func TestNATSGateway_PublishMatchRejected_NilClient(t *testing.T) {
 	gateway := NewNATSGateway(nil)
 	
 	ctx := context.Background()
-	matchProp := models.MatchProposal{
+	matchProp := matchmodels.MatchProposal{
 		ID:             "match-123",
 		DriverID:       "driver-456",
 		PassengerID:    "passenger-789",
-		UserLocation:   models.Location{Latitude: -6.2088, Longitude: 106.8456},
-		DriverLocation: models.Location{Latitude: -6.1751, Longitude: 106.8650},
-		TargetLocation: models.Location{Latitude: -6.2297, Longitude: 106.8295},
-		MatchStatus:    models.MatchStatusPending,
+		UserLocation:   locationmodels.Location{Latitude: -6.2088, Longitude: 106.8456},
+		DriverLocation: locationmodels.Location{Latitude: -6.1751, Longitude: 106.8650},
+		TargetLocation: locationmodels.Location{Latitude: -6.2297, Longitude: 106.8295},
+		MatchStatus:    matchmodels.MatchStatusPending,
 	}
 
 	// Should panic with nil client
@@ -60,14 +61,14 @@ func TestNATSGateway_PublishMatchAccepted_NilClient(t *testing.T) {
 	gateway := NewNATSGateway(nil)
 	
 	ctx := context.Background()
-	matchProp := models.MatchProposal{
+	matchProp := matchmodels.MatchProposal{
 		ID:             "match-123",
 		DriverID:       "driver-456",
 		PassengerID:    "passenger-789",
-		UserLocation:   models.Location{Latitude: -6.2088, Longitude: 106.8456},
-		DriverLocation: models.Location{Latitude: -6.1751, Longitude: 106.8650},
-		TargetLocation: models.Location{Latitude: -6.2297, Longitude: 106.8295},
-		MatchStatus:    models.MatchStatusPending,
+		UserLocation:   locationmodels.Location{Latitude: -6.2088, Longitude: 106.8456},
+		DriverLocation: locationmodels.Location{Latitude: -6.1751, Longitude: 106.8650},
+		TargetLocation: locationmodels.Location{Latitude: -6.2297, Longitude: 106.8295},
+		MatchStatus:    matchmodels.MatchStatusPending,
 	}
 
 	// Should panic with nil client
@@ -84,7 +85,7 @@ func TestNATSGateway_InvalidMatchProposal(t *testing.T) {
 	ctx := context.Background()
 	
 	// Test with empty match proposal
-	matchProp := models.MatchProposal{
+	matchProp := matchmodels.MatchProposal{
 		ID: "",
 	}
 

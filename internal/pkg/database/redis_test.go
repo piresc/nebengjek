@@ -7,13 +7,13 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/go-redis/redismock/v8"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func getTestRedisConfig() models.RedisConfig {
-	return models.RedisConfig{
+func getTestRedisConfig() core.RedisConfig {
+	return core.RedisConfig{
 		Host:     "localhost",
 		Port:     6379,
 		Password: "",
@@ -37,7 +37,7 @@ func TestNewRedisClient(t *testing.T) {
 
 func TestNewRedisClient_ConnectionError(t *testing.T) {
 	// Test with invalid configuration
-	config := models.RedisConfig{
+	config := core.RedisConfig{
 		Host:     "invalid-host",
 		Port:     9999,
 		Password: "",

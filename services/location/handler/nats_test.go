@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/location"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/location/mocks"
 	"github.com/stretchr/testify/assert"
@@ -46,13 +46,12 @@ func TestLocationHandler_handleLocationUpdate(t *testing.T) {
 		{
 			name: "successful location update processing",
 			eventData: func() []byte {
-				update := models.LocationUpdate{
+				update := location.LocationUpdate{
 					RideID:   uuid.New().String(),
 					DriverID: uuid.New().String(),
-					Location: models.Location{
+					Location: location.Location{
 						Latitude:  -6.175392,
 						Longitude: 106.827153,
-						Timestamp: time.Now(),
 					},
 					CreatedAt: time.Now(),
 				}
@@ -73,13 +72,12 @@ func TestLocationHandler_handleLocationUpdate(t *testing.T) {
 		{
 			name: "usecase returns error",
 			eventData: func() []byte {
-				update := models.LocationUpdate{
+				update := location.LocationUpdate{
 					RideID:   uuid.New().String(),
 					DriverID: uuid.New().String(),
-					Location: models.Location{
+					Location: location.Location{
 						Latitude:  -6.175392,
 						Longitude: 106.827153,
-						Timestamp: time.Now(),
 					},
 					CreatedAt: time.Now(),
 				}

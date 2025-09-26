@@ -7,7 +7,8 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
+	usermodels "github.com/piresc/nebengjek/internal/pkg/models/user"
 	"github.com/piresc/nebengjek/services/users/mocks"
 	"github.com/stretchr/testify/assert"
 )
@@ -20,8 +21,8 @@ func TestRegisterUser_Success(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -30,7 +31,7 @@ func TestRegisterUser_Success(t *testing.T) {
 
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
-	user := &models.User{
+	user := &usermodels.User{
 		ID:       uuid.New(),
 		MSISDN:   "+628123456789",
 		FullName: "Test User",
@@ -55,8 +56,8 @@ func TestRegisterUser_ValidationError(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -66,7 +67,7 @@ func TestRegisterUser_ValidationError(t *testing.T) {
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
 	// User without required fields
-	invalidUser := &models.User{
+	invalidUser := &usermodels.User{
 		ID: uuid.New(),
 		// Missing MSISDN
 		FullName: "Test User",
@@ -90,8 +91,8 @@ func TestRegisterUser_NilUser(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -116,8 +117,8 @@ func TestRegisterUser_InvalidMSISDN(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -127,7 +128,7 @@ func TestRegisterUser_InvalidMSISDN(t *testing.T) {
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
 	// User with invalid MSISDN
-	invalidUser := &models.User{
+	invalidUser := &usermodels.User{
 		ID:       uuid.New(),
 		MSISDN:   "invalid-msisdn", // Invalid format
 		FullName: "Test User",
@@ -151,8 +152,8 @@ func TestRegisterUser_RepositoryError(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -161,7 +162,7 @@ func TestRegisterUser_RepositoryError(t *testing.T) {
 
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
-	user := &models.User{
+	user := &usermodels.User{
 		ID:       uuid.New(),
 		MSISDN:   "+628123456789",
 		FullName: "Test User",
@@ -188,8 +189,8 @@ func TestGetUserByID_Success(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -199,7 +200,7 @@ func TestGetUserByID_Success(t *testing.T) {
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
 	userId := uuid.New().String()
-	expected := &models.User{
+	expected := &usermodels.User{
 		ID:       uuid.MustParse(userId),
 		MSISDN:   "+628123456789",
 		FullName: "Test User",
@@ -225,8 +226,8 @@ func TestGetUserByID_NotFound(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -257,8 +258,8 @@ func TestRegisterDriver_Success(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -268,7 +269,7 @@ func TestRegisterDriver_Success(t *testing.T) {
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
 	userId := uuid.New()
-	existingUser := &models.User{
+	existingUser := &usermodels.User{
 		ID:       userId,
 		MSISDN:   "+628123456789",
 		FullName: "Test User",
@@ -276,11 +277,11 @@ func TestRegisterDriver_Success(t *testing.T) {
 		IsActive: true,
 	}
 
-	driverUser := &models.User{
+	driverUser := &usermodels.User{
 		MSISDN:   "+628123456789",
 		FullName: "Test User",
 		Role:     "driver",
-		DriverInfo: &models.Driver{
+		DriverInfo: &usermodels.Driver{
 			VehicleType:  "car",
 			VehiclePlate: "B 1234 ABC",
 		},
@@ -290,7 +291,7 @@ func TestRegisterDriver_Success(t *testing.T) {
 	mockRepo.EXPECT().GetUserByMSISDN(gomock.Any(), "628123456789").Return(existingUser, nil)
 
 	mockRepo.EXPECT().UpdateToDriver(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, u *models.User) error {
+		DoAndReturn(func(ctx context.Context, u *usermodels.User) error {
 			assert.Equal(t, userId, u.ID)
 			assert.Equal(t, "driver", u.Role)
 			assert.Equal(t, "car", u.DriverInfo.VehicleType)
@@ -314,8 +315,8 @@ func TestRegisterDriver_UserNotFound(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -324,11 +325,11 @@ func TestRegisterDriver_UserNotFound(t *testing.T) {
 
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
-	driverUser := &models.User{
+	driverUser := &usermodels.User{
 		MSISDN:   "+628123456789",
 		FullName: "Test User",
 		Role:     "driver",
-		DriverInfo: &models.Driver{
+		DriverInfo: &usermodels.Driver{
 			VehicleType:  "car",
 			VehiclePlate: "B 1234 ABC",
 		},
@@ -353,8 +354,8 @@ func TestRegisterDriver_AlreadyDriver(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -364,7 +365,7 @@ func TestRegisterDriver_AlreadyDriver(t *testing.T) {
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
 	userId := uuid.New()
-	existingUser := &models.User{
+	existingUser := &usermodels.User{
 		ID:       userId,
 		MSISDN:   "+628123456789",
 		FullName: "Test User",
@@ -372,11 +373,11 @@ func TestRegisterDriver_AlreadyDriver(t *testing.T) {
 		IsActive: true,
 	}
 
-	driverUser := &models.User{
+	driverUser := &usermodels.User{
 		MSISDN:   "+628123456789",
 		FullName: "Test User",
 		Role:     "driver",
-		DriverInfo: &models.Driver{
+		DriverInfo: &usermodels.Driver{
 			VehicleType:  "car",
 			VehiclePlate: "B 1234 ABC",
 		},
@@ -401,8 +402,8 @@ func TestRegisterDriver_InvalidMSISDN(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -411,11 +412,11 @@ func TestRegisterDriver_InvalidMSISDN(t *testing.T) {
 
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
-	driverUser := &models.User{
+	driverUser := &usermodels.User{
 		MSISDN:   "invalid-msisdn", // Invalid format
 		FullName: "Test User",
 		Role:     "driver",
-		DriverInfo: &models.Driver{
+		DriverInfo: &usermodels.Driver{
 			VehicleType:  "car",
 			VehiclePlate: "B 1234 ABC",
 		},
@@ -437,8 +438,8 @@ func TestRegisterDriver_MissingDriverInfo(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -447,7 +448,7 @@ func TestRegisterDriver_MissingDriverInfo(t *testing.T) {
 
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
-	driverUser := &models.User{
+	driverUser := &usermodels.User{
 		MSISDN:     "+628123456789",
 		FullName:   "Test User",
 		Role:       "driver",
@@ -455,7 +456,7 @@ func TestRegisterDriver_MissingDriverInfo(t *testing.T) {
 	}
 
 	// Mock GetUserByMSISDN to set up the test situation
-	mockRepo.EXPECT().GetUserByMSISDN(gomock.Any(), "628123456789").Return(&models.User{
+	mockRepo.EXPECT().GetUserByMSISDN(gomock.Any(), "628123456789").Return(&usermodels.User{
 		ID:       uuid.New(),
 		MSISDN:   "+628123456789",
 		FullName: "Test User",
@@ -478,8 +479,8 @@ func TestRegisterDriver_MissingVehicleInfo(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -489,18 +490,18 @@ func TestRegisterDriver_MissingVehicleInfo(t *testing.T) {
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
 	// Test case 1: Missing vehicle type
-	driverUser := &models.User{
+	driverUser := &usermodels.User{
 		MSISDN:   "+628123456789",
 		FullName: "Test User",
 		Role:     "driver",
-		DriverInfo: &models.Driver{
+		DriverInfo: &usermodels.Driver{
 			// Missing VehicleType
 			VehiclePlate: "B 1234 ABC",
 		},
 	}
 
 	// Mock GetUserByMSISDN to set up the test situation
-	mockRepo.EXPECT().GetUserByMSISDN(gomock.Any(), "628123456789").Return(&models.User{
+	mockRepo.EXPECT().GetUserByMSISDN(gomock.Any(), "628123456789").Return(&usermodels.User{
 		ID:       uuid.New(),
 		MSISDN:   "+628123456789",
 		FullName: "Test User",
@@ -519,17 +520,17 @@ func TestRegisterDriver_MissingVehicleInfo(t *testing.T) {
 	defer ctrl.Finish()
 	mockRepo = mocks.NewMockUserRepo(ctrl)
 
-	driverUser2 := &models.User{
+	driverUser2 := &usermodels.User{
 		MSISDN:   "+628123456789",
 		FullName: "Test User",
 		Role:     "driver",
-		DriverInfo: &models.Driver{
+		DriverInfo: &usermodels.Driver{
 			VehicleType: "car",
 			// Missing VehiclePlate
 		},
 	}
 
-	mockRepo.EXPECT().GetUserByMSISDN(gomock.Any(), "628123456789").Return(&models.User{
+	mockRepo.EXPECT().GetUserByMSISDN(gomock.Any(), "628123456789").Return(&usermodels.User{
 		ID:       uuid.New(),
 		MSISDN:   "+628123456789",
 		FullName: "Test User",
@@ -554,8 +555,8 @@ func TestRegisterDriver_UpdateToDriverError(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -565,7 +566,7 @@ func TestRegisterDriver_UpdateToDriverError(t *testing.T) {
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
 	userId := uuid.New()
-	existingUser := &models.User{
+	existingUser := &usermodels.User{
 		ID:       userId,
 		MSISDN:   "+628123456789",
 		FullName: "Test User",
@@ -573,11 +574,11 @@ func TestRegisterDriver_UpdateToDriverError(t *testing.T) {
 		IsActive: true,
 	}
 
-	driverUser := &models.User{
+	driverUser := &usermodels.User{
 		MSISDN:   "+628123456789",
 		FullName: "Test User",
 		Role:     "driver",
-		DriverInfo: &models.Driver{
+		DriverInfo: &usermodels.Driver{
 			VehicleType:  "car",
 			VehiclePlate: "B 1234 ABC",
 		},

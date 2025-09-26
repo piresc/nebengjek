@@ -9,7 +9,8 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	models "github.com/piresc/nebengjek/internal/pkg/models"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
+	matchmodels "github.com/piresc/nebengjek/internal/pkg/models/match"
 )
 
 // MockMatchUC is a mock of MatchUC interface.
@@ -36,10 +37,10 @@ func (m *MockMatchUC) EXPECT() *MockMatchUCMockRecorder {
 }
 
 // ConfirmMatchStatus mocks base method.
-func (m *MockMatchUC) ConfirmMatchStatus(arg0 context.Context, arg1 *models.MatchConfirmRequest) (models.MatchProposal, error) {
+func (m *MockMatchUC) ConfirmMatchStatus(arg0 context.Context, arg1 *matchmodels.MatchConfirmRequest) (matchmodels.MatchProposal, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ConfirmMatchStatus", arg0, arg1)
-	ret0, _ := ret[0].(models.MatchProposal)
+	ret0, _ := ret[0].(matchmodels.MatchProposal)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -51,10 +52,10 @@ func (mr *MockMatchUCMockRecorder) ConfirmMatchStatus(arg0, arg1 interface{}) *g
 }
 
 // GetMatch mocks base method.
-func (m *MockMatchUC) GetMatch(arg0 context.Context, arg1 string) (*models.Match, error) {
+func (m *MockMatchUC) GetMatch(arg0 context.Context, arg1 string) (*matchmodels.Match, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMatch", arg0, arg1)
-	ret0, _ := ret[0].(*models.Match)
+	ret0, _ := ret[0].(*matchmodels.Match)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -66,10 +67,10 @@ func (mr *MockMatchUCMockRecorder) GetMatch(arg0, arg1 interface{}) *gomock.Call
 }
 
 // GetPendingMatch mocks base method.
-func (m *MockMatchUC) GetPendingMatch(arg0 context.Context, arg1 string) (*models.Match, error) {
+func (m *MockMatchUC) GetPendingMatch(arg0 context.Context, arg1 string) (*matchmodels.Match, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPendingMatch", arg0, arg1)
-	ret0, _ := ret[0].(*models.Match)
+	ret0, _ := ret[0].(*matchmodels.Match)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -81,7 +82,7 @@ func (mr *MockMatchUCMockRecorder) GetPendingMatch(arg0, arg1 interface{}) *gomo
 }
 
 // HandleBeaconEvent mocks base method.
-func (m *MockMatchUC) HandleBeaconEvent(arg0 context.Context, arg1 models.BeaconEvent) error {
+func (m *MockMatchUC) HandleBeaconEvent(arg0 context.Context, arg1 coremodels.BeaconEvent) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleBeaconEvent", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -95,7 +96,7 @@ func (mr *MockMatchUCMockRecorder) HandleBeaconEvent(arg0, arg1 interface{}) *go
 }
 
 // HandleFinderEvent mocks base method.
-func (m *MockMatchUC) HandleFinderEvent(arg0 context.Context, arg1 models.FinderEvent) error {
+func (m *MockMatchUC) HandleFinderEvent(arg0 context.Context, arg1 coremodels.FinderEvent) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HandleFinderEvent", arg0, arg1)
 	ret0, _ := ret[0].(error)

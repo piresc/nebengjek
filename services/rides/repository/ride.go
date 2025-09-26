@@ -8,16 +8,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
+	ridemodels "github.com/piresc/nebengjek/internal/pkg/models/ride"
 )
 
 type RideRepo struct {
-	cfg *models.Config
+	cfg *coremodels.Config
 	db  *sqlx.DB
 }
 
 func NewRideRepository(
-	cfg *models.Config,
+	cfg *coremodels.Config,
 	db *sqlx.DB,
 ) *RideRepo {
 	return &RideRepo{
@@ -27,7 +28,7 @@ func NewRideRepository(
 }
 
 // CreateRide creates a new ride in the database
-func (r *RideRepo) CreateRide(ride *models.Ride) (*models.Ride, error) {
+func (r *RideRepo) CreateRide(ride *ridemodels.Ride) (*ridemodels.Ride, error) {
 	ctx := context.Background()
 
 	// Generate a new UUID if not provided
@@ -72,7 +73,7 @@ func (r *RideRepo) CreateRide(ride *models.Ride) (*models.Ride, error) {
 }
 
 // AddBillingEntry adds a new entry to the billing ledger
-func (r *RideRepo) AddBillingEntry(ctx context.Context, entry *models.BillingLedger) error {
+func (r *RideRepo) AddBillingEntry(ctx context.Context, entry *ridemodels.BillingLedger) error {
 	query := `
 		INSERT INTO billing_ledger (
 			entry_id, ride_id, distance, cost, created_at
@@ -129,11 +130,11 @@ func (r *RideRepo) UpdateTotalCost(ctx context.Context, rideID string, additiona
 }
 
 // GetRide gets a ride by ID
-func (r *RideRepo) GetRide(ctx context.Context, rideID string) (*models.Ride, error) {
+func (r *RideRepo) GetRide(ctx context.Context, rideID string) (*ridemodels.Ride, error) {
 	logger.Info("Getting ride from database",
 		logger.String("ride_id", rideID))
 
-	var ride models.Ride
+	var ride ridemodels.Ride
 	rideIDUUID, err := uuid.Parse(rideID)
 	if err != nil {
 		logger.Error("Invalid ride ID format",
@@ -167,7 +168,7 @@ func (r *RideRepo) GetRide(ctx context.Context, rideID string) (*models.Ride, er
 }
 
 // CompleteRide marks a ride as completed
-func (r *RideRepo) CompleteRide(ctx context.Context, ride *models.Ride) error {
+func (r *RideRepo) CompleteRide(ctx context.Context, ride *ridemodels.Ride) error {
 	query := `
 		UPDATE rides 
 		SET status = $1,
@@ -175,7 +176,7 @@ func (r *RideRepo) CompleteRide(ctx context.Context, ride *models.Ride) error {
 		WHERE ride_id = $2
 	`
 
-	result, err := r.db.ExecContext(ctx, query, models.RideStatusCompleted, ride.RideID)
+	result, err := r.db.ExecContext(ctx, query, ridemodels.RideStatusCompleted, ride.RideID)
 	if err != nil {
 		return fmt.Errorf("failed to complete ride: %w", err)
 	}
@@ -210,7 +211,7 @@ func (r *RideRepo) GetBillingLedgerSum(ctx context.Context, rideID string) (int,
 }
 
 // CreatePayment creates a payment record for a ride
-func (r *RideRepo) CreatePayment(ctx context.Context, payment *models.Payment) error {
+func (r *RideRepo) CreatePayment(ctx context.Context, payment *ridemodels.Payment) error {
 	query := `
 		INSERT INTO payments (
 			payment_id, ride_id, adjusted_cost, admin_fee, driver_payout, status, created_at
@@ -243,7 +244,7 @@ func (r *RideRepo) CreatePayment(ctx context.Context, payment *models.Payment) e
 }
 
 // UpdateRideStatus updates the status of a ride
-func (r *RideRepo) UpdateRideStatus(ctx context.Context, rideID string, status models.RideStatus) error {
+func (r *RideRepo) UpdateRideStatus(ctx context.Context, rideID string, status ridemodels.RideStatus) error {
 	logger.Info("Updating ride status",
 		logger.String("ride_id", rideID),
 		logger.String("new_status", string(status)))
@@ -288,8 +289,8 @@ func (r *RideRepo) UpdateRideStatus(ctx context.Context, rideID string, status m
 }
 
 // GetPaymentByRideID retrieves payment information for a specific ride
-func (r *RideRepo) GetPaymentByRideID(ctx context.Context, rideID string) (*models.Payment, error) {
-	var payment models.Payment
+func (r *RideRepo) GetPaymentByRideID(ctx context.Context, rideID string) (*ridemodels.Payment, error) {
+	var payment ridemodels.Payment
 	rideIDUUID, err := uuid.Parse(rideID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid ride ID format: %w", err)
@@ -310,7 +311,7 @@ func (r *RideRepo) GetPaymentByRideID(ctx context.Context, rideID string) (*mode
 }
 
 // UpdatePaymentStatus updates the status of a payment
-func (r *RideRepo) UpdatePaymentStatus(ctx context.Context, paymentID string, status models.PaymentStatus) error {
+func (r *RideRepo) UpdatePaymentStatus(ctx context.Context, paymentID string, status ridemodels.PaymentStatus) error {
 	query := `
 		UPDATE payments
 		SET status = $1

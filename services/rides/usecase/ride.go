@@ -8,21 +8,23 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
+	"github.com/piresc/nebengjek/internal/pkg/models/ride"
+	"github.com/piresc/nebengjek/internal/pkg/models/match"
 	"github.com/piresc/nebengjek/internal/utils"
 	"github.com/piresc/nebengjek/services/rides"
 )
 
 // RideUC implements the rides.RideUseCase interface
 type rideUC struct {
-	cfg       *models.Config
+	cfg       *core.Config
 	ridesRepo rides.RideRepo
 	ridesGW   rides.RideGW
 }
 
 // NewRideUC creates a new ride use case
 func NewRideUC(
-	cfg *models.Config,
+	cfg *core.Config,
 	rideRepo rides.RideRepo,
 	rideGW rides.RideGW,
 ) (rides.RideUC, error) {
@@ -34,7 +36,7 @@ func NewRideUC(
 }
 
 // CreateRide creates a new ride from a confirmed match
-func (uc *rideUC) CreateRide(ctx context.Context, mp models.MatchProposal) error {
+func (uc *rideUC) CreateRide(ctx context.Context, mp match.MatchProposal) error {
 	// Parse UUIDs safely
 	matchID, err := uuid.Parse(mp.ID)
 	if err != nil {
@@ -52,12 +54,12 @@ func (uc *rideUC) CreateRide(ctx context.Context, mp models.MatchProposal) error
 	}
 
 	// Create a new ride from the match proposal
-	ride := &models.Ride{
+	ride := &ride.Ride{
 		MatchID:     matchID,
 		DriverID:    driverID,
 		PassengerID: passengerID,
-		Status:      models.RideStatusDriverPickup, // Set initial status to driver pickup
-		TotalCost:   0,                             // This will be calculated later
+		Status:      ride.RideStatusDriverPickup, // Set initial status to driver pickup
+		TotalCost:   0,                           // This will be calculated later
 	}
 
 	// Delegate to repository
@@ -98,15 +100,15 @@ func (uc *rideUC) CreateRide(ctx context.Context, mp models.MatchProposal) error
 }
 
 // ProcessBillingUpdate handles billing updates from location aggregates
-func (uc *rideUC) ProcessBillingUpdate(ctx context.Context, rideID string, entry *models.BillingLedger) error {
+func (uc *rideUC) ProcessBillingUpdate(ctx context.Context, rideID string, entry *ride.BillingLedger) error {
 
 	// Get current ride to verify it exists and is active
-	ride, err := uc.ridesRepo.GetRide(ctx, rideID)
+	rideObj, err := uc.ridesRepo.GetRide(ctx, rideID)
 	if err != nil {
 		return fmt.Errorf("failed to get ride: %w", err)
 	}
 
-	if ride.Status != models.RideStatusOngoing {
+	if rideObj.Status != ride.RideStatusOngoing {
 		return fmt.Errorf("cannot update billing for non-active ride")
 	}
 
@@ -138,23 +140,23 @@ func (uc *rideUC) ProcessBillingUpdate(ctx context.Context, rideID string, entry
 }
 
 // StartRide updates a ride from driver_pickup to ongoing status
-func (uc *rideUC) StartRide(ctx context.Context, req models.RideStartRequest) (*models.Ride, error) {
+func (uc *rideUC) StartRide(ctx context.Context, req ride.RideStartRequest) (*ride.Ride, error) {
 	// Get current ride to verify it exists and is in pickup state
-	ride, err := uc.ridesRepo.GetRide(ctx, req.RideID)
+	rideObj, err := uc.ridesRepo.GetRide(ctx, req.RideID)
 	if err != nil {
 		logger.Error("Failed to get ride for start request",
 			logger.String("ride_id", req.RideID),
 			logger.ErrorField(err))
-		return &models.Ride{}, fmt.Errorf("failed to get ride: %w", err)
+		return &ride.Ride{}, fmt.Errorf("failed to get ride: %w", err)
 	}
 
-	if ride.Status != models.RideStatusDriverPickup {
+	if rideObj.Status != ride.RideStatusDriverPickup {
 		logger.Error("Cannot start ride - invalid status",
 			logger.String("ride_id", req.RideID),
-			logger.String("current_status", string(ride.Status)),
-			logger.String("required_status", string(models.RideStatusDriverPickup)))
-		err := fmt.Errorf("cannot start trip for ride not in driver_pickup state, current status: %s", ride.Status)
-		return &models.Ride{}, err
+			logger.String("current_status", string(rideObj.Status)),
+			logger.String("required_status", string(ride.RideStatusDriverPickup)))
+		err := fmt.Errorf("cannot start trip for ride not in driver_pickup state, current status: %s", rideObj.Status)
+		return &ride.Ride{}, err
 	}
 
 	// Calculate distance using Haversine formula
@@ -179,29 +181,29 @@ func (uc *rideUC) StartRide(ctx context.Context, req models.RideStartRequest) (*
 			logger.Float64("distance_meters", distanceMeters),
 			logger.Float64("max_allowed_meters", maxPickupDistance))
 		err := fmt.Errorf("driver is too far from passenger (%.2f meters)", distanceMeters)
-		return &models.Ride{}, err
+		return &ride.Ride{}, err
 	}
 
 	// Update ride status to ongoing
-	ride.Status = models.RideStatusOngoing
-	if err := uc.ridesRepo.UpdateRideStatus(ctx, ride.RideID.String(), models.RideStatusOngoing); err != nil {
-		return &models.Ride{}, fmt.Errorf("failed to update ride status to ongoing: %w", err)
+	rideObj.Status = ride.RideStatusOngoing
+	if err := uc.ridesRepo.UpdateRideStatus(ctx, rideObj.RideID.String(), ride.RideStatusOngoing); err != nil {
+		return &ride.Ride{}, fmt.Errorf("failed to update ride status to ongoing: %w", err)
 	}
 
 	logger.Info("Ride started - Driver picked up passenger",
 		logger.String("ride_id", req.RideID))
-	return ride, nil
+	return rideObj, nil
 }
 
 // RideArrived handles when a ride arrives at the destination but before payment processing
-func (uc *rideUC) RideArrived(ctx context.Context, req models.RideArrivalReq) (*models.PaymentRequest, error) {
+func (uc *rideUC) RideArrived(ctx context.Context, req ride.RideArrivalReq) (*ride.PaymentRequest, error) {
 	// Get current ride to verify it exists and is active
-	ride, err := uc.ridesRepo.GetRide(ctx, req.RideID)
+	rideObj, err := uc.ridesRepo.GetRide(ctx, req.RideID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ride: %w", err)
 	}
 
-	if ride.Status != models.RideStatusOngoing {
+	if rideObj.Status != ride.RideStatusOngoing {
 		err := fmt.Errorf("cannot process arrival for ride that is not ongoing")
 		return nil, err
 	}
@@ -225,13 +227,13 @@ func (uc *rideUC) RideArrived(ctx context.Context, req models.RideArrivalReq) (*
 	driverPayout := adjustedCost - adminFee
 
 	// Create payment record
-	payment := &models.Payment{
+	payment := &ride.Payment{
 		PaymentID:    uuid.New(),
-		RideID:       ride.RideID,
+		RideID:       rideObj.RideID,
 		AdjustedCost: adjustedCost,
 		AdminFee:     adminFee,
 		DriverPayout: driverPayout,
-		Status:       models.PaymentStatusPending,
+		Status:       ride.PaymentStatusPending,
 		CreatedAt:    time.Now(),
 	}
 
@@ -242,13 +244,13 @@ func (uc *rideUC) RideArrived(ctx context.Context, req models.RideArrivalReq) (*
 
 	// Generate QR code URL for payment processing
 	qrCodeURL := fmt.Sprintf("%s?ride_id=%s&amount=%d&passenger_id=%s",
-		uc.cfg.Payment.QRCodeBaseURL, req.RideID, adjustedCost, ride.PassengerID.String())
+		uc.cfg.Payment.QRCodeBaseURL, req.RideID, adjustedCost, rideObj.PassengerID.String())
 
 	// Create payment request
-	paymentRequest := &models.PaymentRequest{
+	paymentRequest := &ride.PaymentRequest{
 		RideID:      req.RideID,
-		PassengerID: ride.PassengerID.String(),
-		DriverID:    ride.DriverID.String(),
+		PassengerID: rideObj.PassengerID.String(),
+		DriverID:    rideObj.DriverID.String(),
 		TotalCost:   adjustedCost,
 		QRCodeURL:   qrCodeURL,
 	}
@@ -262,14 +264,14 @@ func (uc *rideUC) RideArrived(ctx context.Context, req models.RideArrivalReq) (*
 }
 
 // ProcessPayment processes the payment for a completed ride
-func (uc *rideUC) ProcessPayment(ctx context.Context, req models.PaymentProccessRequest) (*models.Payment, error) {
+func (uc *rideUC) ProcessPayment(ctx context.Context, req ride.PaymentProccessRequest) (*ride.Payment, error) {
 	// Get current ride to verify it exists and is active
-	ride, err := uc.ridesRepo.GetRide(ctx, req.RideID)
+	rideObj, err := uc.ridesRepo.GetRide(ctx, req.RideID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ride: %w", err)
 	}
 
-	if ride.Status != models.RideStatusOngoing {
+	if rideObj.Status != ride.RideStatusOngoing {
 		err := fmt.Errorf("cannot process payment for ride that is not ongoing")
 		return nil, err
 	}
@@ -280,7 +282,7 @@ func (uc *rideUC) ProcessPayment(ctx context.Context, req models.PaymentProccess
 	}
 
 	// Validate current payment status
-	if payment.Status != models.PaymentStatusPending {
+	if payment.Status != ride.PaymentStatusPending {
 		err := fmt.Errorf("cannot process payment with status: %s", payment.Status)
 		return nil, err
 	}
@@ -299,20 +301,20 @@ func (uc *rideUC) ProcessPayment(ctx context.Context, req models.PaymentProccess
 	}
 
 	// Populate driver and passenger IDs for WebSocket notifications
-	payment.DriverID = ride.DriverID
-	payment.PassengerID = ride.PassengerID
+	payment.DriverID = rideObj.DriverID
+	payment.PassengerID = rideObj.PassengerID
 
 	// Payment status needs to be accepted for ride to be completed
-	if req.Status == models.PaymentStatusAccepted {
+	if req.Status == ride.PaymentStatusAccepted {
 		// Mark ride as completed
-		ride.Status = models.RideStatusCompleted
-		if err := uc.ridesRepo.CompleteRide(ctx, ride); err != nil {
+		rideObj.Status = ride.RideStatusCompleted
+		if err := uc.ridesRepo.CompleteRide(ctx, rideObj); err != nil {
 			return nil, fmt.Errorf("failed to mark ride as completed: %w", err)
 		}
 
 		// Create ride complete data for the event
-		var rideComplete = models.RideComplete{
-			Ride:    *ride,
+		var rideComplete = ride.RideComplete{
+			Ride:    *rideObj,
 			Payment: *payment,
 		}
 

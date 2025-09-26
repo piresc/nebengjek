@@ -11,7 +11,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	usermodels "github.com/piresc/nebengjek/internal/pkg/models/user"
 	"github.com/piresc/nebengjek/services/users/mocks"
 	"github.com/stretchr/testify/assert"
 )
@@ -42,7 +42,7 @@ func TestCreateUser_Success(t *testing.T) {
 	// and then register it via RegisterUser
 	mockUserUC.EXPECT().
 		RegisterUser(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ interface{}, user *models.User) error {
+		DoAndReturn(func(_ interface{}, user *usermodels.User) error {
 			// Verify the user details are correct
 			assert.Equal(t, "John Doe", user.FullName)
 			assert.Equal(t, "+6281234567890", user.MSISDN)
@@ -166,7 +166,7 @@ func TestGetUser_Success(t *testing.T) {
 	c.SetParamValues(userIDStr)
 
 	// Setup mock user object to return
-	mockUser := &models.User{
+	mockUser := &usermodels.User{
 		ID:       userID,
 		MSISDN:   "+6281234567890",
 		FullName: "John Doe",
@@ -299,7 +299,7 @@ func TestRegisterDriver_Success(t *testing.T) {
 	// Mock usecase to accept the registration
 	mockUserUC.EXPECT().
 		RegisterDriver(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ interface{}, user *models.User) error {
+		DoAndReturn(func(_ interface{}, user *usermodels.User) error {
 			// Verify the driver details are correct
 			assert.Equal(t, "John Driver", user.FullName)
 			assert.Equal(t, "+6281234567890", user.MSISDN)

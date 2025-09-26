@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 )
 
 // SetEventCacheWithTTL generates cache key and atomically sets it with TTL using SetNX
@@ -31,7 +31,7 @@ func (r *UserRepo) generateEventCacheKey(eventType, userID string, req interface
 	var content string
 	
 	switch r := req.(type) {
-	case *models.FinderRequest:
+	case *core.FinderRequest:
 		content = fmt.Sprintf("%s:%t:%.6f:%.6f:%.6f:%.6f", 
 			userID,
 			r.IsActive,
@@ -40,7 +40,7 @@ func (r *UserRepo) generateEventCacheKey(eventType, userID string, req interface
 			r.TargetLocation.Latitude,
 			r.TargetLocation.Longitude,
 		)
-	case *models.BeaconRequest:
+	case *core.BeaconRequest:
 		content = fmt.Sprintf("%s:%t:%.6f:%.6f", 
 			userID,
 			r.IsActive,

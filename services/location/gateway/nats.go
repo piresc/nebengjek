@@ -7,12 +7,11 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
-	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	locationmodels "github.com/piresc/nebengjek/internal/pkg/models/location"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
-	"github.com/piresc/nebengjek/services/location"
-)
+	locationsvc "github.com/piresc/nebengjek/services/location"
+	)
 
 // NATSPublisher defines the interface for NATS publishing operations
 type NATSPublisher interface {
@@ -28,7 +27,7 @@ type locationGW struct {
 }
 
 // NewLocationGW creates a new location gateway
-func NewLocationGW(client NATSPublisher) location.LocationGW {
+func NewLocationGW(client NATSPublisher) locationsvc.LocationGW {
 	return &locationGW{
 		natsClient: client,
 	}
@@ -36,7 +35,7 @@ func NewLocationGW(client NATSPublisher) location.LocationGW {
 
 
 // PublishLocationAggregate publishes a location aggregate event to JetStream with delivery guarantees
-func (g *locationGW) PublishLocationAggregate(ctx context.Context, aggregate models.LocationAggregate) error {
+func (g *locationGW) PublishLocationAggregate(ctx context.Context, aggregate locationmodels.LocationAggregate) error {
 	data, err := json.Marshal(aggregate)
 	if err != nil {
 		return fmt.Errorf("failed to marshal location aggregate: %w", err)
@@ -44,7 +43,7 @@ func (g *locationGW) PublishLocationAggregate(ctx context.Context, aggregate mod
 
 	// Use JetStream publish with options for reliability
 	opts := natspkg.PublishOptions{
-		Subject: constants.SubjectLocationAggregate,
+		Subject: natspkg.SubjectLocationAggregate,
 		Data:    data,
 		MsgID:   fmt.Sprintf("location-aggregate-%s-%d", aggregate.RideID, time.Now().UnixNano()),
 		Timeout: 10 * time.Second,

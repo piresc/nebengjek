@@ -10,7 +10,7 @@ import (
 	time "time"
 
 	gomock "github.com/golang/mock/gomock"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/websocket"
 )
 
 // MockWSConnectionRegistry is a mock of WSConnectionRegistry interface.
@@ -52,10 +52,10 @@ func (mr *MockWSConnectionRegistryMockRecorder) GetConnectedUsers(ctx interface{
 }
 
 // GetConnection mocks base method.
-func (m *MockWSConnectionRegistry) GetConnection(ctx context.Context, userID string) (*models.WSSessionData, error) {
+func (m *MockWSConnectionRegistry) GetConnection(ctx context.Context, userID string) (*websocket.WSSessionData, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetConnection", ctx, userID)
-	ret0, _ := ret[0].(*models.WSSessionData)
+	ret0, _ := ret[0].(*websocket.WSSessionData)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -112,7 +112,7 @@ func (mr *MockWSConnectionRegistryMockRecorder) IsUserConnected(ctx, userID inte
 }
 
 // RegisterConnection mocks base method.
-func (m *MockWSConnectionRegistry) RegisterConnection(ctx context.Context, userID string, session *models.WSSessionData) error {
+func (m *MockWSConnectionRegistry) RegisterConnection(ctx context.Context, userID string, session *websocket.WSSessionData) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RegisterConnection", ctx, userID, session)
 	ret0, _ := ret[0].(error)

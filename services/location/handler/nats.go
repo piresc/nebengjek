@@ -8,7 +8,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+		locationmodels "github.com/piresc/nebengjek/internal/pkg/models/location"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/location"
 )
@@ -80,7 +80,7 @@ func (h *LocationHandler) handleLocationUpdateJS(msg jetstream.Msg) error {
 
 // handleLocationUpdate processes location update events
 func (h *LocationHandler) handleLocationUpdate(ctx context.Context, msg []byte) error {
-	var update models.LocationUpdate
+	var update locationmodels.LocationUpdate
 	if err := json.Unmarshal(msg, &update); err != nil {
 		logger.ErrorCtx(ctx, "Failed to unmarshal location update", logger.Err(err))
 		return err

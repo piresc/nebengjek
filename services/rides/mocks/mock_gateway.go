@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	models "github.com/piresc/nebengjek/internal/pkg/models"
+	ridemodels "github.com/piresc/nebengjek/internal/pkg/models/ride"
 )
 
 // MockRideGW is a mock of RideGW interface.
@@ -36,7 +36,7 @@ func (m *MockRideGW) EXPECT() *MockRideGWMockRecorder {
 }
 
 // PublishRideCompleted mocks base method.
-func (m *MockRideGW) PublishRideCompleted(arg0 context.Context, arg1 models.RideComplete) error {
+func (m *MockRideGW) PublishRideCompleted(arg0 context.Context, arg1 ridemodels.RideComplete) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PublishRideCompleted", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -50,7 +50,7 @@ func (mr *MockRideGWMockRecorder) PublishRideCompleted(arg0, arg1 interface{}) *
 }
 
 // PublishRidePickup mocks base method.
-func (m *MockRideGW) PublishRidePickup(arg0 context.Context, arg1 *models.Ride) error {
+func (m *MockRideGW) PublishRidePickup(arg0 context.Context, arg1 *ridemodels.Ride) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PublishRidePickup", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -64,7 +64,7 @@ func (mr *MockRideGWMockRecorder) PublishRidePickup(arg0, arg1 interface{}) *gom
 }
 
 // PublishRideStarted mocks base method.
-func (m *MockRideGW) PublishRideStarted(arg0 context.Context, arg1 *models.Ride) error {
+func (m *MockRideGW) PublishRideStarted(arg0 context.Context, arg1 *ridemodels.Ride) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PublishRideStarted", arg0, arg1)
 	ret0, _ := ret[0].(error)

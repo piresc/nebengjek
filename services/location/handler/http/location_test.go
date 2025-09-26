@@ -10,7 +10,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/labstack/echo/v4"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/match"
 	"github.com/piresc/nebengjek/services/location/mocks"
 	"github.com/stretchr/testify/assert"
 )
@@ -394,7 +394,7 @@ func TestLocationHandler_FindNearbyDrivers(t *testing.T) {
 			mockSetup: func(mockUC *mocks.MockLocationUC) {
 				mockUC.EXPECT().
 					FindNearbyDrivers(gomock.Any(), gomock.Any(), float64(5)).
-					Return([]*models.NearbyUser{
+					Return([]*match.NearbyUser{
 						{ID: "driver-1", Distance: 1.5},
 						{ID: "driver-2", Distance: 3.2},
 					}, nil).

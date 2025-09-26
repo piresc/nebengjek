@@ -3,7 +3,7 @@ package handler
 import (
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/middleware"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/match"
 	httpHandler "github.com/piresc/nebengjek/services/match/handler/http"
@@ -14,14 +14,14 @@ import (
 type Handler struct {
 	matchHTTP *httpHandler.MatchHandler
 	matchNATS *natsHandler.MatchHandler
-	cfg       *models.Config
+	cfg       *core.Config
 }
 
 // NewHandler creates a new combined handler
 func NewHandler(
 	matchUC match.MatchUC,
 	natsClient *natspkg.Client,
-	cfg *models.Config,
+	cfg *core.Config,
 ) *Handler {
 	return &Handler{
 		matchHTTP: httpHandler.NewMatchHandler(matchUC),

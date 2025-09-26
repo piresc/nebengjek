@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	matchmodels "github.com/piresc/nebengjek/internal/pkg/models/match"
 	"github.com/piresc/nebengjek/internal/utils"
 	"github.com/piresc/nebengjek/services/match"
 )
@@ -28,7 +28,7 @@ func (h *MatchHandler) ConfirmMatch(c echo.Context) error {
 		return utils.BadRequestResponse(c, "Match ID is required")
 	}
 
-	var req models.MatchConfirmRequest
+	var req matchmodels.MatchConfirmRequest
 	if err := c.Bind(&req); err != nil {
 		return utils.BadRequestResponse(c, "Invalid request body: "+err.Error())
 	}
@@ -39,7 +39,7 @@ func (h *MatchHandler) ConfirmMatch(c echo.Context) error {
 		return utils.BadRequestResponse(c, "User ID is required")
 	}
 
-	if req.Status != string(models.MatchStatusAccepted) && req.Status != string(models.MatchStatusRejected) {
+	if req.Status != string(matchmodels.MatchStatusAccepted) && req.Status != string(matchmodels.MatchStatusRejected) {
 		return utils.BadRequestResponse(c, "Status must be either ACCEPTED or REJECTED")
 	}
 

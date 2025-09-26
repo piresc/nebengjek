@@ -14,7 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/piresc/nebengjek/internal/pkg/database"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
+	usermodels "github.com/piresc/nebengjek/internal/pkg/models/user"
 )
 
 func setupUserRepoTest(t *testing.T) (*UserRepo, sqlmock.Sqlmock, func()) {
@@ -32,7 +33,7 @@ func setupUserRepoTest(t *testing.T) (*UserRepo, sqlmock.Sqlmock, func()) {
 	repo := &UserRepo{
 		db:          sqlxDB,
 		redisClient: redisClient,
-		cfg:         &models.Config{},
+		cfg:         &coremodels.Config{},
 	}
 
 	// Return cleanup function
@@ -49,7 +50,7 @@ func TestGetUserByMSISDN(t *testing.T) {
 		name       string
 		msisdn     string
 		mockSetup  func(mock sqlmock.Sqlmock)
-		assertFunc func(t *testing.T, user *models.User, err error)
+		assertFunc func(t *testing.T, user *usermodels.User, err error)
 	}{
 		{
 			name:   "Success - Regular User",
@@ -62,7 +63,7 @@ func TestGetUserByMSISDN(t *testing.T) {
 					WithArgs("+628123456789").
 					WillReturnRows(rows)
 			},
-			assertFunc: func(t *testing.T, user *models.User, err error) {
+			assertFunc: func(t *testing.T, user *usermodels.User, err error) {
 				assert.NoError(t, err)
 				assert.NotNil(t, user)
 				assert.Equal(t, "+628123456789", user.MSISDN)
@@ -90,7 +91,7 @@ func TestGetUserByMSISDN(t *testing.T) {
 					WithArgs(userID).
 					WillReturnRows(driverRows)
 			},
-			assertFunc: func(t *testing.T, user *models.User, err error) {
+			assertFunc: func(t *testing.T, user *usermodels.User, err error) {
 				assert.NoError(t, err)
 				assert.NotNil(t, user)
 				assert.Equal(t, "+628123456790", user.MSISDN)
@@ -109,7 +110,7 @@ func TestGetUserByMSISDN(t *testing.T) {
 					WithArgs("+628999999999").
 					WillReturnError(sql.ErrNoRows)
 			},
-			assertFunc: func(t *testing.T, user *models.User, err error) {
+			assertFunc: func(t *testing.T, user *usermodels.User, err error) {
 				assert.Error(t, err)
 				assert.Nil(t, user)
 				assert.Contains(t, err.Error(), "user not found")
@@ -123,7 +124,7 @@ func TestGetUserByMSISDN(t *testing.T) {
 					WithArgs("+628123456789").
 					WillReturnError(errors.New("database error"))
 			},
-			assertFunc: func(t *testing.T, user *models.User, err error) {
+			assertFunc: func(t *testing.T, user *usermodels.User, err error) {
 				assert.Error(t, err)
 				assert.Nil(t, user)
 				assert.Contains(t, err.Error(), "failed to get user")
@@ -145,7 +146,7 @@ func TestGetUserByMSISDN(t *testing.T) {
 					WithArgs(userID).
 					WillReturnError(errors.New("driver info error"))
 			},
-			assertFunc: func(t *testing.T, user *models.User, err error) {
+			assertFunc: func(t *testing.T, user *usermodels.User, err error) {
 				assert.Error(t, err)
 				assert.Nil(t, user)
 				assert.Contains(t, err.Error(), "failed to get driver info")
@@ -177,13 +178,13 @@ func TestGetUserByMSISDN(t *testing.T) {
 func TestCreateUser(t *testing.T) {
 	testCases := []struct {
 		name       string
-		user       models.User
+		user       usermodels.User
 		mockSetup  func(mock sqlmock.Sqlmock)
 		assertFunc func(t *testing.T, err error)
 	}{
 		{
 			name: "Success",
-			user: models.User{
+			user: usermodels.User{
 				MSISDN:   "+628123456789",
 				FullName: "John Doe",
 				Role:     "user",
@@ -201,7 +202,7 @@ func TestCreateUser(t *testing.T) {
 		},
 		{
 			name: "Begin Transaction Error",
-			user: models.User{
+			user: usermodels.User{
 				MSISDN:   "+628123456789",
 				FullName: "John Doe",
 				Role:     "user",
@@ -217,7 +218,7 @@ func TestCreateUser(t *testing.T) {
 		},
 		{
 			name: "Insert User Error",
-			user: models.User{
+			user: usermodels.User{
 				MSISDN:   "+628123456789",
 				FullName: "John Doe",
 				Role:     "user",
@@ -236,7 +237,7 @@ func TestCreateUser(t *testing.T) {
 		},
 		{
 			name: "Commit Error",
-			user: models.User{
+			user: usermodels.User{
 				MSISDN:   "+628123456789",
 				FullName: "John Doe",
 				Role:     "user",
@@ -282,7 +283,7 @@ func TestGetUserByField(t *testing.T) {
 		field      string
 		value      string
 		mockSetup  func(mock sqlmock.Sqlmock)
-		assertFunc func(t *testing.T, user *models.User, err error)
+		assertFunc func(t *testing.T, user *usermodels.User, err error)
 	}{
 		{
 			name:  "Success - Regular User",
@@ -303,7 +304,7 @@ func TestGetUserByField(t *testing.T) {
 					WithArgs("550e8400-e29b-41d4-a716-446655440000").
 					WillReturnRows(rows)
 			},
-			assertFunc: func(t *testing.T, user *models.User, err error) {
+			assertFunc: func(t *testing.T, user *usermodels.User, err error) {
 				assert.NoError(t, err)
 				assert.NotNil(t, user)
 				assert.Equal(t, "+628123456789", user.MSISDN)
@@ -339,7 +340,7 @@ func TestGetUserByField(t *testing.T) {
 					WithArgs(userID).
 					WillReturnRows(driverRows)
 			},
-			assertFunc: func(t *testing.T, user *models.User, err error) {
+			assertFunc: func(t *testing.T, user *usermodels.User, err error) {
 				assert.NoError(t, err)
 				assert.NotNil(t, user)
 				assert.Equal(t, "+628123456790", user.MSISDN)
@@ -358,7 +359,7 @@ func TestGetUserByField(t *testing.T) {
 					WithArgs("+628999999999").
 					WillReturnError(sql.ErrNoRows)
 			},
-			assertFunc: func(t *testing.T, user *models.User, err error) {
+			assertFunc: func(t *testing.T, user *usermodels.User, err error) {
 				assert.Error(t, err)
 				assert.Nil(t, user)
 				assert.Contains(t, err.Error(), "user not found")

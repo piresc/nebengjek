@@ -3,13 +3,13 @@ package newrelic
 import (
 	"testing"
 
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestInitNewRelic_Disabled(t *testing.T) {
-	config := &models.Config{
-		NewRelic: models.NewRelicConfig{
+	config := &core.Config{
+		NewRelic: core.NewRelicConfig{
 			Enabled:   false,
 			LicenseKey: "test-license",
 			AppName:   "test-app",
@@ -21,8 +21,8 @@ func TestInitNewRelic_Disabled(t *testing.T) {
 }
 
 func TestInitNewRelic_NoLicenseKey(t *testing.T) {
-	config := &models.Config{
-		NewRelic: models.NewRelicConfig{
+	config := &core.Config{
+		NewRelic: core.NewRelicConfig{
 			Enabled:   true,
 			LicenseKey: "",
 			AppName:   "test-app",
@@ -34,8 +34,8 @@ func TestInitNewRelic_NoLicenseKey(t *testing.T) {
 }
 
 func TestInitNewRelic_EnabledWithLicense(t *testing.T) {
-	config := &models.Config{
-		NewRelic: models.NewRelicConfig{
+	config := &core.Config{
+		NewRelic: core.NewRelicConfig{
 			Enabled:   true,
 			LicenseKey: "test-license",
 			AppName:   "test-app",
@@ -54,8 +54,8 @@ func TestInitNewRelic_NilConfig(t *testing.T) {
 }
 
 func TestInitNewRelic_EmptyAppName(t *testing.T) {
-	config := &models.Config{
-		NewRelic: models.NewRelicConfig{
+	config := &core.Config{
+		NewRelic: core.NewRelicConfig{
 			Enabled:   true,
 			LicenseKey: "test-license",
 			AppName:   "",
@@ -67,8 +67,8 @@ func TestInitNewRelic_EmptyAppName(t *testing.T) {
 }
 
 func TestInitNewRelic_ValidConfig(t *testing.T) {
-	config := &models.Config{
-		NewRelic: models.NewRelicConfig{
+	config := &core.Config{
+		NewRelic: core.NewRelicConfig{
 			Enabled:   true,
 			LicenseKey: "test-license-key-here",
 			AppName:   "nebengjek-test",
@@ -84,7 +84,7 @@ func TestInitNewRelic_ValidConfig(t *testing.T) {
 func TestInitNewRelic_ConfigEdgeCases(t *testing.T) {
 	tests := []struct {
 		name     string
-		config   *models.Config
+		config   *core.Config
 		expected bool
 	}{
 		{
@@ -94,8 +94,8 @@ func TestInitNewRelic_ConfigEdgeCases(t *testing.T) {
 		},
 		{
 			name: "Disabled with valid license",
-			config: &models.Config{
-				NewRelic: models.NewRelicConfig{
+			config: &core.Config{
+				NewRelic: core.NewRelicConfig{
 					Enabled:   false,
 					LicenseKey: "valid-license-key",
 					AppName:   "test-app",
@@ -105,8 +105,8 @@ func TestInitNewRelic_ConfigEdgeCases(t *testing.T) {
 		},
 		{
 			name: "Enabled with empty license",
-			config: &models.Config{
-				NewRelic: models.NewRelicConfig{
+			config: &core.Config{
+				NewRelic: core.NewRelicConfig{
 					Enabled:   true,
 					LicenseKey: "",
 					AppName:   "test-app",
@@ -116,8 +116,8 @@ func TestInitNewRelic_ConfigEdgeCases(t *testing.T) {
 		},
 		{
 			name: "Enabled with whitespace license",
-			config: &models.Config{
-				NewRelic: models.NewRelicConfig{
+			config: &core.Config{
+				NewRelic: core.NewRelicConfig{
 					Enabled:   true,
 					LicenseKey: "   ",
 					AppName:   "test-app",
@@ -127,8 +127,8 @@ func TestInitNewRelic_ConfigEdgeCases(t *testing.T) {
 		},
 		{
 			name: "Enabled with empty app name",
-			config: &models.Config{
-				NewRelic: models.NewRelicConfig{
+			config: &core.Config{
+				NewRelic: core.NewRelicConfig{
 					Enabled:   true,
 					LicenseKey: "test-license",
 					AppName:   "",
@@ -138,8 +138,8 @@ func TestInitNewRelic_ConfigEdgeCases(t *testing.T) {
 		},
 		{
 			name: "Enabled with valid config but invalid license",
-			config: &models.Config{
-				NewRelic: models.NewRelicConfig{
+			config: &core.Config{
+				NewRelic: core.NewRelicConfig{
 					Enabled:   true,
 					LicenseKey: "invalid-license-key",
 					AppName:   "test-app",

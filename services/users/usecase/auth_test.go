@@ -8,7 +8,8 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
+	usermodels "github.com/piresc/nebengjek/internal/pkg/models/user"
 	"github.com/piresc/nebengjek/services/users/mocks"
 	"github.com/stretchr/testify/assert"
 )
@@ -28,15 +29,15 @@ func TestGenerateOTP_Success(t *testing.T) {
 	// Expectations
 	mockRepo.EXPECT().
 		CreateOTP(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, otp *models.OTP) error {
+		DoAndReturn(func(ctx context.Context, otp *coremodels.OTP) error {
 			assert.Equal(t, formattedMSISDN, otp.MSISDN, "MSISDN should be formatted")
 			// Just to make the test pass - the implementation will use the last 4 digits
 			return nil
 		})
 
 	// Create usecase with mocked dependencies and test configuration
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "nebengjek-test",
@@ -63,7 +64,7 @@ func TestGenerateOTP_InvalidMSISDN(t *testing.T) {
 	invalidMSISDN := "12345" // Invalid MSISDN
 
 	// Create usecase with mocked dependencies
-	cfg := &models.Config{}
+	cfg := &coremodels.Config{}
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
 	// Act
@@ -90,13 +91,13 @@ func TestGenerateOTP_CreateOTPError(t *testing.T) {
 	// Expectations
 	mockRepo.EXPECT().
 		CreateOTP(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, otp *models.OTP) error {
+		DoAndReturn(func(ctx context.Context, otp *coremodels.OTP) error {
 			assert.Equal(t, formattedMSISDN, otp.MSISDN)
 			return expectedError
 		})
 
 	// Create usecase with mocked dependencies
-	cfg := &models.Config{}
+	cfg := &coremodels.Config{}
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
 	// Act
@@ -120,7 +121,7 @@ func TestVerifyOTP_Success_ExistingUser(t *testing.T) {
 	formattedMSISDN := "6281234567890" // Corrected: Added trailing zero to match implementation
 	code := "1234"
 	userID := uuid.New()
-	user := &models.User{
+	user := &usermodels.User{
 		ID:        userID,
 		MSISDN:    formattedMSISDN,
 		Role:      "passenger",
@@ -128,7 +129,7 @@ func TestVerifyOTP_Success_ExistingUser(t *testing.T) {
 		UpdatedAt: time.Now(),
 		IsActive:  true,
 	}
-	otp := &models.OTP{
+	otp := &coremodels.OTP{
 		ID:     uuid.New().String(),
 		MSISDN: formattedMSISDN,
 		Code:   code,
@@ -148,8 +149,8 @@ func TestVerifyOTP_Success_ExistingUser(t *testing.T) {
 		Return(nil)
 
 	// Create usecase with mocked dependencies and test configuration
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "nebengjek-test",
@@ -181,7 +182,7 @@ func TestVerifyOTP_Success_NewUser(t *testing.T) {
 	msisdn := "081234567890"
 	formattedMSISDN := "6281234567890" // Corrected: Added trailing zero to match implementation
 	code := "1234"
-	otp := &models.OTP{
+	otp := &coremodels.OTP{
 		ID:     uuid.New().String(),
 		MSISDN: formattedMSISDN,
 		Code:   code,
@@ -198,7 +199,7 @@ func TestVerifyOTP_Success_NewUser(t *testing.T) {
 
 	mockRepo.EXPECT().
 		CreateUser(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, user *models.User) error {
+		DoAndReturn(func(ctx context.Context, user *usermodels.User) error {
 			assert.Equal(t, formattedMSISDN, user.MSISDN)
 			assert.Equal(t, "passenger", user.Role)
 			assert.True(t, user.IsActive)
@@ -210,8 +211,8 @@ func TestVerifyOTP_Success_NewUser(t *testing.T) {
 		Return(nil)
 
 	// Create usecase with mocked dependencies and test configuration
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "nebengjek-test",
@@ -244,7 +245,7 @@ func TestVerifyOTP_InvalidMSISDN(t *testing.T) {
 	code := "1234"
 
 	// Create usecase with mocked dependencies
-	cfg := &models.Config{}
+	cfg := &coremodels.Config{}
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
 	// Act
@@ -275,7 +276,7 @@ func TestVerifyOTP_InvalidOTP(t *testing.T) {
 		Return(nil, errors.New("OTP not found"))
 
 	// Create usecase with mocked dependencies
-	cfg := &models.Config{}
+	cfg := &coremodels.Config{}
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
 	// Act
@@ -306,7 +307,7 @@ func TestVerifyOTP_NilOTP(t *testing.T) {
 		Return(nil, nil) // OTP not found, but no error
 
 	// Create usecase with mocked dependencies
-	cfg := &models.Config{}
+	cfg := &coremodels.Config{}
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
 	// Act
@@ -330,7 +331,7 @@ func TestVerifyOTP_OTPCodeMismatch(t *testing.T) {
 	msisdn := "081234567890"
 	formattedMSISDN := "6281234567890"
 	code := "1234"
-	otp := &models.OTP{
+	otp := &coremodels.OTP{
 		ID:     uuid.New().String(),
 		MSISDN: formattedMSISDN,
 		Code:   "5678", // Different code
@@ -342,7 +343,7 @@ func TestVerifyOTP_OTPCodeMismatch(t *testing.T) {
 		Return(otp, nil)
 
 	// Create usecase with mocked dependencies
-	cfg := &models.Config{}
+	cfg := &coremodels.Config{}
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
 	// Act
@@ -366,7 +367,7 @@ func TestVerifyOTP_CreateUserError(t *testing.T) {
 	msisdn := "081234567890"
 	formattedMSISDN := "6281234567890"
 	code := "1234"
-	otp := &models.OTP{
+	otp := &coremodels.OTP{
 		ID:     uuid.New().String(),
 		MSISDN: formattedMSISDN,
 		Code:   code,
@@ -387,7 +388,7 @@ func TestVerifyOTP_CreateUserError(t *testing.T) {
 		Return(expectedError)
 
 	// Create usecase with mocked dependencies
-	cfg := &models.Config{}
+	cfg := &coremodels.Config{}
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
 	// Act
@@ -412,7 +413,7 @@ func TestVerifyOTP_MarkOTPVerifiedError(t *testing.T) {
 	formattedMSISDN := "6281234567890" // Corrected: Added trailing zero to match implementation
 	code := "1234"
 	userID := uuid.New()
-	user := &models.User{
+	user := &usermodels.User{
 		ID:        userID,
 		MSISDN:    formattedMSISDN,
 		Role:      "passenger",
@@ -420,7 +421,7 @@ func TestVerifyOTP_MarkOTPVerifiedError(t *testing.T) {
 		UpdatedAt: time.Now(),
 		IsActive:  true,
 	}
-	otp := &models.OTP{
+	otp := &coremodels.OTP{
 		ID:     uuid.New().String(),
 		MSISDN: formattedMSISDN,
 		Code:   code,
@@ -440,8 +441,8 @@ func TestVerifyOTP_MarkOTPVerifiedError(t *testing.T) {
 		Return(errors.New("failed to mark OTP verified"))
 
 	// Create usecase with mocked dependencies and test configuration
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "nebengjek-test",

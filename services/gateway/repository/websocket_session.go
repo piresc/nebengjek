@@ -7,10 +7,9 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/database"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/websocket"
 )
 
 // WSSessionRepository manages WebSocket sessions in Redis
@@ -30,33 +29,33 @@ func NewWSSessionRepository(redisClient *database.RedisClient, serverID string) 
 }
 
 // RegisterConnection registers a new WebSocket connection in Redis
-func (r *WSSessionRepository) RegisterConnection(ctx context.Context, userID string, session *models.WSSessionData) error {
+func (r *WSSessionRepository) RegisterConnection(ctx context.Context, userID string, session *websocket.WSSessionData) error {
 	session.ServerID = r.serverID
 	
 	pipe := r.redisClient.Client.Pipeline()
 	
 	// Store session data as hash
-	sessionKey := fmt.Sprintf(constants.KeyWSSession, userID)
+	sessionKey := fmt.Sprintf(database.KeyWSSession, userID)
 	sessionFields := map[string]interface{}{
-		constants.FieldUserID:       session.UserID,
-		constants.FieldRole:         session.Role,
-		constants.FieldServerID:     session.ServerID,
-		constants.FieldConnectedAt:  session.ConnectedAt.Unix(),
-		constants.FieldLastActivity: session.LastActivity.Unix(),
-		constants.FieldLastPing:     session.LastPing.Unix(),
-		constants.FieldLastPong:     session.LastPong.Unix(),
-		constants.FieldMissedPings:  session.MissedPings,
-		constants.FieldIsHealthy:    session.IsHealthy,
+		database.FieldUserID:       session.UserID,
+		database.FieldRole:         session.Role,
+		database.FieldServerID:     session.ServerID,
+		database.FieldConnectedAt:  session.ConnectedAt.Unix(),
+		database.FieldLastActivity: session.LastActivity.Unix(),
+		database.FieldLastPing:     session.LastPing.Unix(),
+		database.FieldLastPong:     session.LastPong.Unix(),
+		database.FieldMissedPings:  session.MissedPings,
+		database.FieldIsHealthy:    session.IsHealthy,
 	}
 	
 	pipe.HMSet(ctx, sessionKey, sessionFields)
 	pipe.Expire(ctx, sessionKey, r.sessionTTL)
 	
 	// Add to global connections set
-	pipe.SAdd(ctx, constants.KeyWSConnections, userID)
+	pipe.SAdd(ctx, database.KeyWSConnections, userID)
 	
 	// Add to server-specific connections set
-	serverConnectionsKey := fmt.Sprintf(constants.KeyWSServerConnections, r.serverID)
+	serverConnectionsKey := fmt.Sprintf(database.KeyWSServerConnections, r.serverID)
 	pipe.SAdd(ctx, serverConnectionsKey, userID)
 	
 	if _, err := pipe.Exec(ctx); err != nil {
@@ -79,14 +78,14 @@ func (r *WSSessionRepository) UnregisterConnection(ctx context.Context, userID s
 	pipe := r.redisClient.Client.Pipeline()
 	
 	// Remove session data
-	sessionKey := fmt.Sprintf(constants.KeyWSSession, userID)
+	sessionKey := fmt.Sprintf(database.KeyWSSession, userID)
 	pipe.Del(ctx, sessionKey)
 	
 	// Remove from global connections set
-	pipe.SRem(ctx, constants.KeyWSConnections, userID)
+	pipe.SRem(ctx, database.KeyWSConnections, userID)
 	
 	// Remove from server-specific connections set
-	serverConnectionsKey := fmt.Sprintf(constants.KeyWSServerConnections, r.serverID)
+	serverConnectionsKey := fmt.Sprintf(database.KeyWSServerConnections, r.serverID)
 	pipe.SRem(ctx, serverConnectionsKey, userID)
 	
 	if _, err := pipe.Exec(ctx); err != nil {
@@ -105,8 +104,8 @@ func (r *WSSessionRepository) UnregisterConnection(ctx context.Context, userID s
 }
 
 // GetConnection retrieves WebSocket session data from Redis
-func (r *WSSessionRepository) GetConnection(ctx context.Context, userID string) (*models.WSSessionData, error) {
-	sessionKey := fmt.Sprintf(constants.KeyWSSession, userID)
+func (r *WSSessionRepository) GetConnection(ctx context.Context, userID string) (*websocket.WSSessionData, error) {
+	sessionKey := fmt.Sprintf(database.KeyWSSession, userID)
 	
 	result := r.redisClient.Client.HGetAll(ctx, sessionKey)
 	if err := result.Err(); err != nil {
@@ -121,43 +120,43 @@ func (r *WSSessionRepository) GetConnection(ctx context.Context, userID string) 
 		return nil, nil // Connection not found
 	}
 	
-	session := &models.WSSessionData{}
+	session := &websocket.WSSessionData{}
 	
-	if userID, exists := fields[constants.FieldUserID]; exists {
+	if userID, exists := fields[database.FieldUserID]; exists {
 		session.UserID = userID
 	}
-	if role, exists := fields[constants.FieldRole]; exists {
+	if role, exists := fields[database.FieldRole]; exists {
 		session.Role = role
 	}
-	if serverID, exists := fields[constants.FieldServerID]; exists {
+	if serverID, exists := fields[database.FieldServerID]; exists {
 		session.ServerID = serverID
 	}
-	if connectedAt, exists := fields[constants.FieldConnectedAt]; exists {
+	if connectedAt, exists := fields[database.FieldConnectedAt]; exists {
 		if timestamp, err := strconv.ParseInt(connectedAt, 10, 64); err == nil {
 			session.ConnectedAt = time.Unix(timestamp, 0)
 		}
 	}
-	if lastActivity, exists := fields[constants.FieldLastActivity]; exists {
+	if lastActivity, exists := fields[database.FieldLastActivity]; exists {
 		if timestamp, err := strconv.ParseInt(lastActivity, 10, 64); err == nil {
 			session.LastActivity = time.Unix(timestamp, 0)
 		}
 	}
-	if lastPing, exists := fields[constants.FieldLastPing]; exists {
+	if lastPing, exists := fields[database.FieldLastPing]; exists {
 		if timestamp, err := strconv.ParseInt(lastPing, 10, 64); err == nil {
 			session.LastPing = time.Unix(timestamp, 0)
 		}
 	}
-	if lastPong, exists := fields[constants.FieldLastPong]; exists {
+	if lastPong, exists := fields[database.FieldLastPong]; exists {
 		if timestamp, err := strconv.ParseInt(lastPong, 10, 64); err == nil {
 			session.LastPong = time.Unix(timestamp, 0)
 		}
 	}
-	if missedPings, exists := fields[constants.FieldMissedPings]; exists {
+	if missedPings, exists := fields[database.FieldMissedPings]; exists {
 		if count, err := strconv.Atoi(missedPings); err == nil {
 			session.MissedPings = count
 		}
 	}
-	if isHealthy, exists := fields[constants.FieldIsHealthy]; exists {
+	if isHealthy, exists := fields[database.FieldIsHealthy]; exists {
 		session.IsHealthy = isHealthy == "true" || isHealthy == "1"
 	}
 	
@@ -166,10 +165,10 @@ func (r *WSSessionRepository) GetConnection(ctx context.Context, userID string) 
 
 // UpdateActivity updates the last activity timestamp for a connection
 func (r *WSSessionRepository) UpdateActivity(ctx context.Context, userID string, activity time.Time) error {
-	sessionKey := fmt.Sprintf(constants.KeyWSSession, userID)
+	sessionKey := fmt.Sprintf(database.KeyWSSession, userID)
 	
 	pipe := r.redisClient.Client.Pipeline()
-	pipe.HSet(ctx, sessionKey, constants.FieldLastActivity, activity.Unix())
+	pipe.HSet(ctx, sessionKey, database.FieldLastActivity, activity.Unix())
 	pipe.Expire(ctx, sessionKey, r.sessionTTL) // Extend session TTL
 	
 	if _, err := pipe.Exec(ctx); err != nil {
@@ -184,18 +183,18 @@ func (r *WSSessionRepository) UpdateActivity(ctx context.Context, userID string,
 
 // UpdateHeartbeat updates heartbeat information for a connection
 func (r *WSSessionRepository) UpdateHeartbeat(ctx context.Context, userID string, ping, pong time.Time, missed int) error {
-	sessionKey := fmt.Sprintf(constants.KeyWSSession, userID)
+	sessionKey := fmt.Sprintf(database.KeyWSSession, userID)
 	
 	updates := map[string]interface{}{
-		constants.FieldMissedPings: missed,
-		constants.FieldIsHealthy:   missed < 3, // Health threshold
+		database.FieldMissedPings: missed,
+		database.FieldIsHealthy:   missed < 3, // Health threshold
 	}
 	
 	if !ping.IsZero() {
-		updates[constants.FieldLastPing] = ping.Unix()
+		updates[database.FieldLastPing] = ping.Unix()
 	}
 	if !pong.IsZero() {
-		updates[constants.FieldLastPong] = pong.Unix()
+		updates[database.FieldLastPong] = pong.Unix()
 	}
 	
 	pipe := r.redisClient.Client.Pipeline()
@@ -214,7 +213,7 @@ func (r *WSSessionRepository) UpdateHeartbeat(ctx context.Context, userID string
 
 // GetConnectedUsers returns all connected user IDs
 func (r *WSSessionRepository) GetConnectedUsers(ctx context.Context) ([]string, error) {
-	result := r.redisClient.Client.SMembers(ctx, constants.KeyWSConnections)
+	result := r.redisClient.Client.SMembers(ctx, database.KeyWSConnections)
 	if err := result.Err(); err != nil {
 		return nil, fmt.Errorf("failed to get connected users: %w", err)
 	}
@@ -224,7 +223,7 @@ func (r *WSSessionRepository) GetConnectedUsers(ctx context.Context) ([]string, 
 
 // GetServerConnections returns user IDs connected to a specific server
 func (r *WSSessionRepository) GetServerConnections(ctx context.Context, serverID string) ([]string, error) {
-	serverConnectionsKey := fmt.Sprintf(constants.KeyWSServerConnections, serverID)
+	serverConnectionsKey := fmt.Sprintf(database.KeyWSServerConnections, serverID)
 	
 	result := r.redisClient.Client.SMembers(ctx, serverConnectionsKey)
 	if err := result.Err(); err != nil {
@@ -236,7 +235,7 @@ func (r *WSSessionRepository) GetServerConnections(ctx context.Context, serverID
 
 // IsUserConnected checks if a user is currently connected
 func (r *WSSessionRepository) IsUserConnected(ctx context.Context, userID string) (bool, error) {
-	result := r.redisClient.Client.SIsMember(ctx, constants.KeyWSConnections, userID)
+	result := r.redisClient.Client.SIsMember(ctx, database.KeyWSConnections, userID)
 	if err := result.Err(); err != nil {
 		return false, fmt.Errorf("failed to check connection status: %w", err)
 	}
@@ -246,7 +245,7 @@ func (r *WSSessionRepository) IsUserConnected(ctx context.Context, userID string
 
 // GetConnectionCount returns the total number of connected users
 func (r *WSSessionRepository) GetConnectionCount(ctx context.Context) (int, error) {
-	result := r.redisClient.Client.SCard(ctx, constants.KeyWSConnections)
+	result := r.redisClient.Client.SCard(ctx, database.KeyWSConnections)
 	if err := result.Err(); err != nil {
 		return 0, fmt.Errorf("failed to get connection count: %w", err)
 	}
@@ -266,14 +265,14 @@ func (r *WSSessionRepository) CleanupExpiredSessions(ctx context.Context) error 
 	cleanedCount := 0
 	
 	for _, userID := range connectedUsers {
-		sessionKey := fmt.Sprintf(constants.KeyWSSession, userID)
+		sessionKey := fmt.Sprintf(database.KeyWSSession, userID)
 		exists := r.redisClient.Client.Exists(ctx, sessionKey)
 		
 		if exists.Err() == nil && exists.Val() == 0 {
 			// Session data expired but user still in sets - clean up
-			pipe.SRem(ctx, constants.KeyWSConnections, userID)
+			pipe.SRem(ctx, database.KeyWSConnections, userID)
 			
-			serverConnectionsKey := fmt.Sprintf(constants.KeyWSServerConnections, r.serverID)
+			serverConnectionsKey := fmt.Sprintf(database.KeyWSServerConnections, r.serverID)
 			pipe.SRem(ctx, serverConnectionsKey, userID)
 			
 			cleanedCount++

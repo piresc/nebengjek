@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -25,8 +25,8 @@ func (m *MockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 }
 
 func TestNewHTTPGateway(t *testing.T) {
-	config := &models.Config{
-		APIKey: models.APIKeyConfig{
+	config := &coremodels.Config{
+		APIKey: coremodels.APIKeyConfig{
 			UserService:    "test-users-key",
 			MatchService:    "test-match-key",
 			RidesService:    "test-rides-key",
@@ -74,8 +74,8 @@ func TestCallUsersService(t *testing.T) {
 	}))
 	defer server.Close()
 
-	config := &models.Config{
-		APIKey: models.APIKeyConfig{
+	config := &coremodels.Config{
+		APIKey: coremodels.APIKeyConfig{
 			UserService: "test-users-key",
 		},
 	}
@@ -111,8 +111,8 @@ func TestCallMatchService(t *testing.T) {
 	}))
 	defer server.Close()
 
-	config := &models.Config{
-		APIKey: models.APIKeyConfig{
+	config := &coremodels.Config{
+		APIKey: coremodels.APIKeyConfig{
 			MatchService: "test-match-key",
 		},
 	}
@@ -144,8 +144,8 @@ func TestCallRidesService(t *testing.T) {
 	}))
 	defer server.Close()
 
-	config := &models.Config{
-		APIKey: models.APIKeyConfig{
+	config := &coremodels.Config{
+		APIKey: coremodels.APIKeyConfig{
 			RidesService: "test-rides-key",
 		},
 	}
@@ -176,8 +176,8 @@ func TestCallLocationService(t *testing.T) {
 	}))
 	defer server.Close()
 
-	config := &models.Config{
-		APIKey: models.APIKeyConfig{
+	config := &coremodels.Config{
+		APIKey: coremodels.APIKeyConfig{
 			LocationService: "test-location-key",
 		},
 	}
@@ -204,8 +204,8 @@ func TestMakeHTTPCall_ContextCancellation(t *testing.T) {
 	}))
 	defer server.Close()
 
-	config := &models.Config{
-		APIKey: models.APIKeyConfig{
+	config := &coremodels.Config{
+		APIKey: coremodels.APIKeyConfig{
 			UserService: "test-key",
 		},
 	}
@@ -230,8 +230,8 @@ func TestMakeHTTPCall_ContextCancellation(t *testing.T) {
 }
 
 func TestMakeHTTPCall_RequestCreationError(t *testing.T) {
-	config := &models.Config{
-		APIKey: models.APIKeyConfig{
+	config := &coremodels.Config{
+		APIKey: coremodels.APIKeyConfig{
 			UserService: "test-key",
 		},
 	}
@@ -258,8 +258,8 @@ func TestMakeHTTPCall_RequestBodyMarshalError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	config := &models.Config{
-		APIKey: models.APIKeyConfig{
+	config := &coremodels.Config{
+		APIKey: coremodels.APIKeyConfig{
 			UserService: "test-key",
 		},
 	}
@@ -282,8 +282,8 @@ func TestMakeHTTPCall_RequestBodyMarshalError(t *testing.T) {
 }
 
 func TestMakeHTTPCall_NetworkError(t *testing.T) {
-	config := &models.Config{
-		APIKey: models.APIKeyConfig{
+	config := &coremodels.Config{
+		APIKey: coremodels.APIKeyConfig{
 			UserService: "test-key",
 		},
 	}
@@ -330,8 +330,8 @@ func TestMakeHTTPCall_SuccessWithAllFeatures(t *testing.T) {
 	}))
 	defer server.Close()
 
-	config := &models.Config{
-		APIKey: models.APIKeyConfig{
+	config := &coremodels.Config{
+		APIKey: coremodels.APIKeyConfig{
 			UserService: "test-api-key",
 		},
 	}
@@ -430,8 +430,8 @@ func TestMakeHTTPCall_QueryStringEncoding(t *testing.T) {
 	}))
 	defer server.Close()
 
-	config := &models.Config{
-		APIKey: models.APIKeyConfig{
+	config := &coremodels.Config{
+		APIKey: coremodels.APIKeyConfig{
 			UserService: "test-key",
 		},
 	}
@@ -463,8 +463,8 @@ func TestMakeHTTPCall_EmptyBody(t *testing.T) {
 	}))
 	defer server.Close()
 
-	config := &models.Config{
-		APIKey: models.APIKeyConfig{
+	config := &coremodels.Config{
+		APIKey: coremodels.APIKeyConfig{
 			UserService: "test-key",
 		},
 	}
@@ -491,8 +491,8 @@ func TestMakeHTTPCall_NilHeaders(t *testing.T) {
 	}))
 	defer server.Close()
 
-	config := &models.Config{
-		APIKey: models.APIKeyConfig{
+	config := &coremodels.Config{
+		APIKey: coremodels.APIKeyConfig{
 			UserService: "test-api-key",
 		},
 	}
@@ -521,8 +521,8 @@ func TestMakeHTTPCall_HeaderOverwriting(t *testing.T) {
 	}))
 	defer server.Close()
 
-	config := &models.Config{
-		APIKey: models.APIKeyConfig{
+	config := &coremodels.Config{
+		APIKey: coremodels.APIKeyConfig{
 			UserService: "test-api-key",
 		},
 	}
@@ -547,8 +547,8 @@ func TestMakeHTTPCall_HeaderOverwriting(t *testing.T) {
 }
 
 func TestServiceMethodsEdgeCases(t *testing.T) {
-	config := &models.Config{
-		APIKey: models.APIKeyConfig{
+	config := &coremodels.Config{
+		APIKey: coremodels.APIKeyConfig{
 			UserService:    "test-users-key",
 			MatchService:    "test-match-key",
 			RidesService:    "test-rides-key",
@@ -569,7 +569,7 @@ func TestServiceMethodsEdgeCases(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		method     func(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*models.ProxyResponse, error)
+		method     func(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*coremodels.ProxyResponse, error)
 		serviceKey string
 	}{
 		{"UsersService", gateway.CallUsersService, "test-users-key"},

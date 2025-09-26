@@ -8,8 +8,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/piresc/nebengjek/internal/pkg/constants"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
+	"github.com/piresc/nebengjek/internal/pkg/models/location"
+	"github.com/piresc/nebengjek/internal/pkg/models/ride"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -72,39 +73,39 @@ func NewTestableNATSGateway(client NATSClientInterface) *TestableNATSGateway {
 }
 
 // PublishBeaconEvent publishes a beacon event to NATS (same logic as real implementation)
-func (g *TestableNATSGateway) PublishBeaconEvent(ctx context.Context, event *models.BeaconEvent) error {
+func (g *TestableNATSGateway) PublishBeaconEvent(ctx context.Context, event *coremodels.BeaconEvent) error {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
-	return g.client.Publish(constants.SubjectUserBeacon, data)
+	return g.client.Publish(natspkg.SubjectUserBeacon, data)
 }
 
 // PublishFinderEvent publishes a finder event to NATS (same logic as real implementation)
-func (g *TestableNATSGateway) PublishFinderEvent(ctx context.Context, event *models.FinderEvent) error {
+func (g *TestableNATSGateway) PublishFinderEvent(ctx context.Context, event *coremodels.FinderEvent) error {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
-	return g.client.Publish(constants.SubjectUserFinder, data)
+	return g.client.Publish(natspkg.SubjectUserFinder, data)
 }
 
 // PublishRideStart publishes a ride start event to NATS (same logic as real implementation)
-func (g *TestableNATSGateway) PublishRideStart(ctx context.Context, event *models.RideStartTripEvent) error {
+func (g *TestableNATSGateway) PublishRideStart(ctx context.Context, event *ride.RideStartTripEvent) error {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
-	return g.client.Publish(constants.SubjectRideStarted, data)
+	return g.client.Publish(natspkg.SubjectRideStarted, data)
 }
 
 // PublishLocationUpdate publishes a location update event to NATS (same logic as real implementation)
-func (g *TestableNATSGateway) PublishLocationUpdate(ctx context.Context, locationEvent *models.LocationUpdate) error {
+func (g *TestableNATSGateway) PublishLocationUpdate(ctx context.Context, locationEvent *location.LocationUpdate) error {
 	data, err := json.Marshal(locationEvent)
 	if err != nil {
 		return err
 	}
-	return g.client.Publish(constants.SubjectLocationUpdate, data)
+	return g.client.Publish(natspkg.SubjectLocationUpdate, data)
 }
 
 // Ensure natspkg.Client implements our interface
@@ -139,15 +140,14 @@ func TestNATSGateway_PublishBeaconEvent_NilClient(t *testing.T) {
 	gateway := NewNATSGateway(nil)
 
 	ctx := context.Background()
-	event := &models.BeaconEvent{
+	event := &coremodels.BeaconEvent{
 		UserID:   "test-user-id",
 		IsActive: true,
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.2088,
 			Longitude: 106.8456,
 		},
-		Timestamp: time.Now(),
-	}
+			}
 
 	// Act & Assert - Should panic due to nil client
 	assert.Panics(t, func() {
@@ -161,19 +161,18 @@ func TestNATSGateway_PublishFinderEvent_NilClient(t *testing.T) {
 	gateway := NewNATSGateway(nil)
 
 	ctx := context.Background()
-	event := &models.FinderEvent{
+	event := &coremodels.FinderEvent{
 		UserID:   "test-user-id",
 		IsActive: true,
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.2088,
 			Longitude: 106.8456,
 		},
-		TargetLocation: models.Location{
+		TargetLocation: location.Location{
 			Latitude:  -6.2297,
 			Longitude: 106.8295,
 		},
-		Timestamp: time.Now(),
-	}
+			}
 
 	// Act & Assert - Should panic due to nil client
 	assert.Panics(t, func() {
@@ -215,29 +214,27 @@ func TestNATSGateway_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel the context before using it
 
-	beaconEvent := &models.BeaconEvent{
+	beaconEvent := &coremodels.BeaconEvent{
 		UserID:   "test-user-id",
 		IsActive: true,
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.2088,
 			Longitude: 106.8456,
 		},
-		Timestamp: time.Now(),
-	}
+			}
 
-	finderEvent := &models.FinderEvent{
+	finderEvent := &coremodels.FinderEvent{
 		UserID:   "test-user-id",
 		IsActive: true,
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.2088,
 			Longitude: 106.8456,
 		},
-		TargetLocation: models.Location{
+		TargetLocation: location.Location{
 			Latitude:  -6.2297,
 			Longitude: 106.8295,
 		},
-		Timestamp: time.Now(),
-	}
+			}
 
 	// Act & Assert - Should panic due to nil client
 	assert.Panics(t, func() {
@@ -256,29 +253,27 @@ func TestNATSGateway_WithRealClient(t *testing.T) {
 	gateway := NewNATSGateway(mockClient)
 
 	ctx := context.Background()
-	beaconEvent := &models.BeaconEvent{
+	beaconEvent := &coremodels.BeaconEvent{
 		UserID:   "test-user-id",
 		IsActive: true,
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.2088,
 			Longitude: 106.8456,
 		},
-		Timestamp: time.Now(),
-	}
+			}
 
-	finderEvent := &models.FinderEvent{
+	finderEvent := &coremodels.FinderEvent{
 		UserID:   "test-user-id",
 		IsActive: true,
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.2088,
 			Longitude: 106.8456,
 		},
-		TargetLocation: models.Location{
+		TargetLocation: location.Location{
 			Latitude:  -6.2297,
 			Longitude: 106.8295,
 		},
-		Timestamp: time.Now(),
-	}
+			}
 
 	// Act & Assert - Should panic due to nil NATS client connection
 	assert.Panics(t, func() {
@@ -296,16 +291,14 @@ func TestPublishBeaconEvent_Success(t *testing.T) {
 	mockClient := NewMockNATSClient()
 	natsGW := NewTestableNATSGateway(mockClient)
 
-	beaconEvent := &models.BeaconEvent{
+	beaconEvent := &coremodels.BeaconEvent{
 		UserID:   uuid.New().String(),
 		IsActive: true,
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
-			Timestamp: time.Now(),
-		},
-		Timestamp: time.Now(),
-	}
+					},
+			}
 
 	// Act
 	ctx := context.Background()
@@ -315,11 +308,11 @@ func TestPublishBeaconEvent_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the message was published to the correct subject
-	publishedData, exists := mockClient.GetPublishedMessage(constants.SubjectUserBeacon)
+	publishedData, exists := mockClient.GetPublishedMessage(natspkg.SubjectUserBeacon)
 	require.True(t, exists, "Message should be published to beacon subject")
 
 	// Verify the published data matches the original event
-	var receivedEvent models.BeaconEvent
+	var receivedEvent coremodels.BeaconEvent
 	err = json.Unmarshal(publishedData, &receivedEvent)
 	require.NoError(t, err)
 
@@ -338,16 +331,14 @@ func TestPublishBeaconEvent_Error(t *testing.T) {
 
 	natsGW := NewTestableNATSGateway(mockClient)
 
-	beaconEvent := &models.BeaconEvent{
+	beaconEvent := &coremodels.BeaconEvent{
 		UserID:   uuid.New().String(),
 		IsActive: true,
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
-			Timestamp: time.Now(),
-		},
-		Timestamp: time.Now(),
-	}
+					},
+			}
 
 	// Act
 	ctx := context.Background()
@@ -364,21 +355,18 @@ func TestPublishFinderEvent_Success(t *testing.T) {
 	mockClient := NewMockNATSClient()
 	natsGW := NewTestableNATSGateway(mockClient)
 
-	finderEvent := &models.FinderEvent{
+	finderEvent := &coremodels.FinderEvent{
 		UserID:   uuid.New().String(),
 		IsActive: true,
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
-			Timestamp: time.Now(),
-		},
-		TargetLocation: models.Location{
+					},
+		TargetLocation: location.Location{
 			Latitude:  -6.185392,
 			Longitude: 106.837153,
-			Timestamp: time.Now(),
-		},
-		Timestamp: time.Now(),
-	}
+					},
+			}
 
 	// Act
 	ctx := context.Background()
@@ -388,11 +376,11 @@ func TestPublishFinderEvent_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the message was published to the correct subject
-	publishedData, exists := mockClient.GetPublishedMessage(constants.SubjectUserFinder)
+	publishedData, exists := mockClient.GetPublishedMessage(natspkg.SubjectUserFinder)
 	require.True(t, exists, "Message should be published to finder subject")
 
 	// Verify the published data matches the original event
-	var receivedEvent models.FinderEvent
+	var receivedEvent coremodels.FinderEvent
 	err = json.Unmarshal(publishedData, &receivedEvent)
 	require.NoError(t, err)
 
@@ -411,20 +399,17 @@ func TestPublishRideStart_Success(t *testing.T) {
 	natsGW := NewTestableNATSGateway(mockClient)
 
 	// Create test data with the correct RideStartTripEvent structure
-	rideStartEvent := &models.RideStartTripEvent{
+	rideStartEvent := &ride.RideStartTripEvent{
 		RideID: uuid.New().String(),
-		DriverLocation: models.Location{
+		DriverLocation: location.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
-			Timestamp: time.Now(),
-		},
-		PassengerLocation: models.Location{
+					},
+		PassengerLocation: location.Location{
 			Latitude:  -6.185392,
 			Longitude: 106.837153,
-			Timestamp: time.Now(),
-		},
-		Timestamp: time.Now(),
-	}
+					},
+			}
 
 	// Act
 	ctx := context.Background()
@@ -434,11 +419,11 @@ func TestPublishRideStart_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the message was published to the correct subject
-	publishedData, exists := mockClient.GetPublishedMessage(constants.SubjectRideStarted)
+	publishedData, exists := mockClient.GetPublishedMessage(natspkg.SubjectRideStarted)
 	require.True(t, exists, "Message should be published to ride started subject")
 
 	// Verify the published data matches the original event
-	var receivedEvent models.RideStartTripEvent
+	var receivedEvent ride.RideStartTripEvent
 	err = json.Unmarshal(publishedData, &receivedEvent)
 	require.NoError(t, err)
 
@@ -455,14 +440,13 @@ func TestPublishLocationUpdate_Success(t *testing.T) {
 	mockClient := NewMockNATSClient()
 	natsGW := NewTestableNATSGateway(mockClient)
 
-	locationUpdate := &models.LocationUpdate{
+	locationUpdate := &location.LocationUpdate{
 		RideID:   "ride-123",
 		DriverID: uuid.New().String(),
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
-			Timestamp: time.Now(),
-		},
+					},
 		CreatedAt: time.Now(),
 	}
 
@@ -474,11 +458,11 @@ func TestPublishLocationUpdate_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the message was published to the correct subject
-	publishedData, exists := mockClient.GetPublishedMessage(constants.SubjectLocationUpdate)
+	publishedData, exists := mockClient.GetPublishedMessage(natspkg.SubjectLocationUpdate)
 	require.True(t, exists, "Message should be published to location update subject")
 
 	// Verify the published data matches the original event
-	var receivedUpdate models.LocationUpdate
+	var receivedUpdate location.LocationUpdate
 	err = json.Unmarshal(publishedData, &receivedUpdate)
 	require.NoError(t, err)
 
@@ -497,14 +481,13 @@ func TestPublishLocationUpdate_Error(t *testing.T) {
 
 	natsGW := NewTestableNATSGateway(mockClient)
 
-	locationUpdate := &models.LocationUpdate{
+	locationUpdate := &location.LocationUpdate{
 		RideID:   "ride-123",
 		DriverID: uuid.New().String(),
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
-			Timestamp: time.Now(),
-		},
+					},
 		CreatedAt: time.Now(),
 	}
 
@@ -526,32 +509,27 @@ func TestMultiplePublishes(t *testing.T) {
 	ctx := context.Background()
 
 	// Test data
-	beaconEvent := &models.BeaconEvent{
+	beaconEvent := &coremodels.BeaconEvent{
 		UserID:   uuid.New().String(),
 		IsActive: true,
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
-			Timestamp: time.Now(),
-		},
-		Timestamp: time.Now(),
-	}
+					},
+			}
 
-	finderEvent := &models.FinderEvent{
+	finderEvent := &coremodels.FinderEvent{
 		UserID:   uuid.New().String(),
 		IsActive: true,
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
-			Timestamp: time.Now(),
-		},
-		TargetLocation: models.Location{
+					},
+		TargetLocation: location.Location{
 			Latitude:  -6.185392,
 			Longitude: 106.837153,
-			Timestamp: time.Now(),
-		},
-		Timestamp: time.Now(),
-	}
+					},
+			}
 
 	// Act
 	err1 := natsGW.PublishBeaconEvent(ctx, beaconEvent)
@@ -562,8 +540,8 @@ func TestMultiplePublishes(t *testing.T) {
 	require.NoError(t, err2)
 
 	// Verify both messages were published to their respective subjects
-	_, beaconExists := mockClient.GetPublishedMessage(constants.SubjectUserBeacon)
-	_, finderExists := mockClient.GetPublishedMessage(constants.SubjectUserFinder)
+	_, beaconExists := mockClient.GetPublishedMessage(natspkg.SubjectUserBeacon)
+	_, finderExists := mockClient.GetPublishedMessage(natspkg.SubjectUserFinder)
 
 	assert.True(t, beaconExists, "Beacon message should be published")
 	assert.True(t, finderExists, "Finder message should be published")
@@ -576,20 +554,17 @@ func TestRideStartEventStructure(t *testing.T) {
 	natsGW := NewTestableNATSGateway(mockClient)
 
 	// Create a RideStartTripEvent with all expected fields based on the actual model
-	rideStartEvent := &models.RideStartTripEvent{
+	rideStartEvent := &ride.RideStartTripEvent{
 		RideID: uuid.New().String(),
-		DriverLocation: models.Location{
+		DriverLocation: location.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
-			Timestamp: time.Now(),
-		},
-		PassengerLocation: models.Location{
+					},
+		PassengerLocation: location.Location{
 			Latitude:  -6.185392,
 			Longitude: 106.837153,
-			Timestamp: time.Now(),
-		},
-		Timestamp: time.Now(),
-	}
+					},
+			}
 
 	// Act
 	ctx := context.Background()
@@ -599,10 +574,10 @@ func TestRideStartEventStructure(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the published message structure
-	publishedData, exists := mockClient.GetPublishedMessage(constants.SubjectRideStarted)
+	publishedData, exists := mockClient.GetPublishedMessage(natspkg.SubjectRideStarted)
 	require.True(t, exists)
 
-	var receivedEvent models.RideStartTripEvent
+	var receivedEvent ride.RideStartTripEvent
 	err = json.Unmarshal(publishedData, &receivedEvent)
 	require.NoError(t, err)
 

@@ -11,7 +11,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
 	"github.com/piresc/nebengjek/services/users/mocks"
 	"github.com/stretchr/testify/assert"
 )
@@ -171,7 +171,7 @@ func TestVerifyOTP_Success(t *testing.T) {
 
 	userID := uuid.New().String()
 	// Mock response from use case
-	authResponse := &models.AuthResponse{
+	authResponse := &coremodels.AuthResponse{
 		Token:     "jwt-token",
 		UserID:    userID,
 		Role:      "passenger",

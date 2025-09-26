@@ -5,7 +5,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/ride"
 	"github.com/piresc/nebengjek/internal/utils"
 	"github.com/piresc/nebengjek/services/rides"
 )
@@ -29,7 +29,7 @@ func (h *RidesHandler) StartRide(c echo.Context) error {
 		return utils.BadRequestResponse(c, "Ride ID is required")
 	}
 
-	var req models.RideStartRequest
+	var req ride.RideStartRequest
 	if err := c.Bind(&req); err != nil {
 		return utils.BadRequestResponse(c, "Invalid request body: "+err.Error())
 	}
@@ -74,7 +74,7 @@ func (h *RidesHandler) RideArrived(c echo.Context) error {
 		return utils.BadRequestResponse(c, "Ride ID is required")
 	}
 
-	var req models.RideArrivalReq
+	var req ride.RideArrivalReq
 	if err := c.Bind(&req); err != nil {
 		return utils.BadRequestResponse(c, "Invalid request body: "+err.Error())
 	}
@@ -94,7 +94,7 @@ func (h *RidesHandler) ProcessPayment(c echo.Context) error {
 		return utils.BadRequestResponse(c, "Ride ID is required")
 	}
 
-	var req models.PaymentProccessRequest
+	var req ride.PaymentProccessRequest
 	if err := c.Bind(&req); err != nil {
 		return utils.BadRequestResponse(c, "Invalid request body: "+err.Error())
 	}

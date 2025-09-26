@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	models "github.com/piresc/nebengjek/internal/pkg/models"
+	core "github.com/piresc/nebengjek/internal/pkg/models/core"
 )
 
 // MockUserGW is a mock of UserGW interface.
@@ -36,7 +36,7 @@ func (m *MockUserGW) EXPECT() *MockUserGWMockRecorder {
 }
 
 // PublishBeaconEvent mocks base method.
-func (m *MockUserGW) PublishBeaconEvent(arg0 context.Context, arg1 *models.BeaconEvent) error {
+func (m *MockUserGW) PublishBeaconEvent(arg0 context.Context, arg1 *core.BeaconEvent) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PublishBeaconEvent", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -50,7 +50,7 @@ func (mr *MockUserGWMockRecorder) PublishBeaconEvent(arg0, arg1 interface{}) *go
 }
 
 // PublishFinderEvent mocks base method.
-func (m *MockUserGW) PublishFinderEvent(arg0 context.Context, arg1 *models.FinderEvent) error {
+func (m *MockUserGW) PublishFinderEvent(arg0 context.Context, arg1 *core.FinderEvent) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PublishFinderEvent", arg0, arg1)
 	ret0, _ := ret[0].(error)

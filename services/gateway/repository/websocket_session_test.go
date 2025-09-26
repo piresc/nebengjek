@@ -12,9 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/database"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/websocket"
 )
 
 func setupTestRedis(t *testing.T) (*miniredis.Miniredis, *database.RedisClient, func()) {
@@ -53,7 +52,7 @@ func TestWSSessionRepository_RegisterConnection(t *testing.T) {
 	repo := NewWSSessionRepository(redisClient, "server-1")
 	ctx := context.Background()
 
-	session := &models.WSSessionData{
+	session := &websocket.WSSessionData{
 		UserID:       "user-123",
 		Role:         "driver",
 		ConnectedAt:  time.Now(),
@@ -73,10 +72,10 @@ func TestWSSessionRepository_RegisterConnection(t *testing.T) {
 	require.NoError(t, result.Err())
 	fields := result.Val()
 
-	assert.Equal(t, "user-123", fields[constants.FieldUserID])
-	assert.Equal(t, "driver", fields[constants.FieldRole])
-	assert.Equal(t, "server-1", fields[constants.FieldServerID])
-	assert.Equal(t, "1", fields[constants.FieldIsHealthy])
+	assert.Equal(t, "user-123", fields[database.FieldUserID])
+	assert.Equal(t, "driver", fields[database.FieldRole])
+	assert.Equal(t, "server-1", fields[database.FieldServerID])
+	assert.Equal(t, "1", fields[database.FieldIsHealthy])
 
 	// Verify user is in connections sets
 	assert.True(t, redisClient.Client.SIsMember(ctx, "ws:connections", "user-123").Val())
@@ -97,7 +96,7 @@ func TestWSSessionRepository_RegisterConnection_WithPipelineError(t *testing.T) 
 	// Close Redis client to simulate error
 	redisClient.Client.Close()
 
-	session := &models.WSSessionData{
+	session := &websocket.WSSessionData{
 		UserID:       "user-123",
 		Role:         "driver",
 		ConnectedAt:  time.Now(),
@@ -121,7 +120,7 @@ func TestWSSessionRepository_UnregisterConnection(t *testing.T) {
 	ctx := context.Background()
 
 	// First register a connection
-	session := &models.WSSessionData{
+	session := &websocket.WSSessionData{
 		UserID:       "user-123",
 		Role:         "driver",
 		ConnectedAt:  time.Now(),
@@ -157,7 +156,7 @@ func TestWSSessionRepository_GetConnection(t *testing.T) {
 
 	// First register a connection
 	now := time.Now()
-	session := &models.WSSessionData{
+	session := &websocket.WSSessionData{
 		UserID:       "user-123",
 		Role:         "driver",
 		ConnectedAt:  now,
@@ -196,9 +195,9 @@ func TestWSSessionRepository_GetConnection_WithPartialData(t *testing.T) {
 	// Manually store partial session data
 	sessionKey := "ws:session:user-123"
 	redisClient.Client.HSet(ctx, sessionKey, map[string]interface{}{
-		constants.FieldUserID:     "user-123",
-		constants.FieldRole:       "driver",
-		constants.FieldIsHealthy:  "1",
+		database.FieldUserID:     "user-123",
+		database.FieldRole:       "driver",
+		database.FieldIsHealthy:  "1",
 	})
 
 	retrieved, err := repo.GetConnection(ctx, "user-123")
@@ -222,8 +221,8 @@ func TestWSSessionRepository_GetConnection_WithInvalidTimestamp(t *testing.T) {
 	// Manually store session data with invalid timestamp
 	sessionKey := "ws:session:user-123"
 	redisClient.Client.HSet(ctx, sessionKey, map[string]interface{}{
-		constants.FieldUserID:      "user-123",
-		constants.FieldConnectedAt: "invalid-timestamp",
+		database.FieldUserID:      "user-123",
+		database.FieldConnectedAt: "invalid-timestamp",
 	})
 
 	retrieved, err := repo.GetConnection(ctx, "user-123")
@@ -242,7 +241,7 @@ func TestWSSessionRepository_UpdateActivity(t *testing.T) {
 	ctx := context.Background()
 
 	// First register a connection
-	session := &models.WSSessionData{
+	session := &websocket.WSSessionData{
 		UserID:       "user-123",
 		Role:         "driver",
 		ConnectedAt:  time.Now(),
@@ -274,7 +273,7 @@ func TestWSSessionRepository_UpdateHeartbeat(t *testing.T) {
 	ctx := context.Background()
 
 	// First register a connection
-	session := &models.WSSessionData{
+	session := &websocket.WSSessionData{
 		UserID:       "user-123",
 		Role:         "driver",
 		ConnectedAt:  time.Now(),
@@ -319,7 +318,7 @@ func TestWSSessionRepository_UpdateHeartbeat_ZeroTimes(t *testing.T) {
 	ctx := context.Background()
 
 	// First register a connection
-	session := &models.WSSessionData{
+	session := &websocket.WSSessionData{
 		UserID:       "user-123",
 		Role:         "driver",
 		ConnectedAt:  time.Now(),
@@ -355,7 +354,7 @@ func TestWSSessionRepository_GetConnectedUsers(t *testing.T) {
 	// Register multiple connections
 	users := []string{"user-1", "user-2", "user-3"}
 	for _, userID := range users {
-		session := &models.WSSessionData{
+		session := &websocket.WSSessionData{
 			UserID:       userID,
 			Role:         "driver",
 			ConnectedAt:  time.Now(),
@@ -388,7 +387,7 @@ func TestWSSessionRepository_GetServerConnections(t *testing.T) {
 	// Register connections
 	users := []string{"user-1", "user-2"}
 	for _, userID := range users {
-		session := &models.WSSessionData{
+		session := &websocket.WSSessionData{
 			UserID:       userID,
 			Role:         "driver",
 			ConnectedAt:  time.Now(),
@@ -428,7 +427,7 @@ func TestWSSessionRepository_IsUserConnected(t *testing.T) {
 	assert.False(t, connected)
 
 	// Register connection
-	session := &models.WSSessionData{
+	session := &websocket.WSSessionData{
 		UserID:       "user-123",
 		Role:         "driver",
 		ConnectedAt:  time.Now(),
@@ -462,7 +461,7 @@ func TestWSSessionRepository_GetConnectionCount(t *testing.T) {
 	// Register connections
 	users := []string{"user-1", "user-2", "user-3"}
 	for _, userID := range users {
-		session := &models.WSSessionData{
+		session := &websocket.WSSessionData{
 			UserID:       userID,
 			Role:         "driver",
 			ConnectedAt:  time.Now(),
@@ -492,7 +491,7 @@ func TestWSSessionRepository_CleanupExpiredSessions(t *testing.T) {
 	// Register connections
 	users := []string{"user-1", "user-2", "user-3"}
 	for _, userID := range users {
-		session := &models.WSSessionData{
+		session := &websocket.WSSessionData{
 			UserID:       userID,
 			Role:         "driver",
 			ConnectedAt:  time.Now(),
@@ -533,7 +532,7 @@ func TestWSSessionRepository_CleanupExpiredSessions_NoExpiredSessions(t *testing
 	// Register connections
 	users := []string{"user-1", "user-2"}
 	for _, userID := range users {
-		session := &models.WSSessionData{
+		session := &websocket.WSSessionData{
 			UserID:       userID,
 			Role:         "driver",
 			ConnectedAt:  time.Now(),
@@ -582,9 +581,9 @@ func TestWSSessionRepository_InvalidTimestampParsing(t *testing.T) {
 	// Manually store session data with invalid numeric timestamp
 	sessionKey := "ws:session:user-123"
 	redisClient.Client.HSet(ctx, sessionKey, map[string]interface{}{
-		constants.FieldUserID:      "user-123",
-		constants.FieldConnectedAt: "not-a-number",
-		constants.FieldMissedPings: "not-a-number",
+		database.FieldUserID:      "user-123",
+		database.FieldConnectedAt: "not-a-number",
+		database.FieldMissedPings: "not-a-number",
 	})
 
 	retrieved, err := repo.GetConnection(ctx, "user-123")
@@ -605,8 +604,8 @@ func TestWSSessionRepository_InvalidBooleanParsing(t *testing.T) {
 	// Manually store session data with invalid boolean
 	sessionKey := "ws:session:user-123"
 	redisClient.Client.HSet(ctx, sessionKey, map[string]interface{}{
-		constants.FieldUserID:     "user-123",
-		constants.FieldIsHealthy: "not-a-boolean",
+		database.FieldUserID:     "user-123",
+		database.FieldIsHealthy: "not-a-boolean",
 	})
 
 	retrieved, err := repo.GetConnection(ctx, "user-123")
@@ -632,7 +631,7 @@ func TestWSSessionRepository_ConcurrentAccess(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 			userID := "user-" + strconv.Itoa(id)
-			session := &models.WSSessionData{
+			session := &websocket.WSSessionData{
 				UserID:       userID,
 				Role:         "driver",
 				ConnectedAt:  time.Now(),

@@ -6,18 +6,18 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	locationmodels "github.com/piresc/nebengjek/internal/pkg/models/location"
 	"github.com/piresc/nebengjek/internal/utils"
-	"github.com/piresc/nebengjek/services/location"
+	locationsvc "github.com/piresc/nebengjek/services/location"
 )
 
 // LocationHandler handles HTTP requests for location operations
 type LocationHandler struct {
-	locationUC location.LocationUC
+	locationUC locationsvc.LocationUC
 }
 
 // NewLocationHandler creates a new location HTTP handler
-func NewLocationHandler(locationUC location.LocationUC) *LocationHandler {
+func NewLocationHandler(locationUC locationsvc.LocationUC) *LocationHandler {
 	return &LocationHandler{
 		locationUC: locationUC,
 	}
@@ -31,7 +31,7 @@ func (h *LocationHandler) AddAvailableDriver(c echo.Context) error {
 	}
 
 	var req struct {
-		Location models.Location `json:"location"`
+		Location locationmodels.Location `json:"location"`
 	}
 
 	if err := c.Bind(&req); err != nil {
@@ -74,7 +74,7 @@ func (h *LocationHandler) AddAvailablePassenger(c echo.Context) error {
 	}
 
 	var req struct {
-		Location models.Location `json:"location"`
+		Location locationmodels.Location `json:"location"`
 	}
 
 	if err := c.Bind(&req); err != nil {
@@ -134,7 +134,7 @@ func (h *LocationHandler) FindNearbyDrivers(c echo.Context) error {
 		return utils.BadRequestResponse(c, "invalid radius")
 	}
 
-	location := &models.Location{
+	location := &locationmodels.Location{
 		Latitude:  lat,
 		Longitude: lng,
 	}
@@ -186,7 +186,7 @@ func (h *LocationHandler) GetPassengerLocation(c echo.Context) error {
 
 // UpdateLocation handles location update requests
 func (h *LocationHandler) UpdateLocation(c echo.Context) error {
-	var req models.LocationUpdate
+	var req locationmodels.LocationUpdate
 	if err := c.Bind(&req); err != nil {
 		logger.Error("Failed to bind request", logger.ErrorField(err))
 		return utils.BadRequestResponse(c, "invalid request body")
