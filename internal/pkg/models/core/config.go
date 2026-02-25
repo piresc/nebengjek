@@ -7,7 +7,6 @@ type Config struct {
 	Database DatabaseConfig
 	Redis    RedisConfig
 	NATS     NATSConfig
-	Auth     AuthConfig
 	JWT      JWTConfig
 	APIKey   APIKeyConfig
 	Pricing  PricingConfig
@@ -90,19 +89,6 @@ type APIKeyConfig struct {
 	LocationService     string
 	GatewayService      string
 	NotificationService string
-}
-
-// AuthConfig contains authentication configuration
-type AuthConfig struct {
-	Enabled   bool
-	JWTSecret string
-	APIKeys   []APIKey
-}
-
-// APIKey represents an API key for service-to-service authentication
-type APIKey struct {
-	Key     string `json:"key"`
-	Service string `json:"service"`
 }
 
 type PricingConfig struct {

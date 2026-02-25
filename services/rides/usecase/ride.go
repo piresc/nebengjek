@@ -84,7 +84,7 @@ func (uc *rideUC) CreateRide(ctx context.Context, mp match.MatchProposal) error 
 		return err
 	}
 
-	err = uc.ridesGW.PublishRidePickup(context.Background(), createdRide)
+	err = uc.ridesGW.PublishRidePickup(ctx, createdRide)
 	if err != nil {
 		logger.Error("Failed to publish ride pickup event to NATS",
 			logger.String("ride_id", createdRide.RideID.String()),

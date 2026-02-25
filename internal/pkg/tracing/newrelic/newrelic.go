@@ -36,7 +36,9 @@ func (t *NewRelicTracer) StartHTTPRequest(r *http.Request) (context.Context, tra
 	// Add distributed tracing headers
 	txn.InsertDistributedTraceHeaders(r.Header)
 
-	return newrelic.NewContext(context.Background(), txn), &newRelicTransaction{txn: txn}
+	// Preserve the incoming request context so deadlines, cancellation,
+	// and values from upstream middleware are not lost.
+	return newrelic.NewContext(r.Context(), txn), &newRelicTransaction{txn: txn}
 }
 
 // StartExternalCall starts an external call segment

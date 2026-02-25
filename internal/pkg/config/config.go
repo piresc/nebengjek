@@ -62,20 +62,6 @@ func loadConfigFromEnv() *core.Config {
 	// NATS config
 	configs.NATS.URL = GetEnv("NATS_URL", "")
 
-	// Auth config
-	configs.Auth.Enabled = GetEnvAsBool("AUTH_ENABLED", true)
-	configs.Auth.JWTSecret = GetEnv("JWT_SECRET", "")
-	
-	// Load API keys
-	configs.Auth.APIKeys = []core.APIKey{
-		{Key: GetEnv("API_KEY_USER_SERVICE", ""), Service: "users-service"},
-		{Key: GetEnv("API_KEY_MATCH_SERVICE", ""), Service: "match-service"},
-		{Key: GetEnv("API_KEY_RIDES_SERVICE", ""), Service: "rides-service"},
-		{Key: GetEnv("API_KEY_LOCATION_SERVICE", ""), Service: "location-service"},
-		{Key: GetEnv("API_KEY_GATEWAY_SERVICE", ""), Service: "gateway-service"},
-		{Key: GetEnv("API_KEY_NOTIFICATION_SERVICE", ""), Service: "notification-service"},
-	}
-	
 	// JWT config
 	configs.JWT.Secret = GetEnv("JWT_SECRET", "")
 	configs.JWT.Expiration = GetEnvAsInt("JWT_EXPIRATION", 0)

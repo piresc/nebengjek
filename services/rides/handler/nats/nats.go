@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/models/core"
 	"github.com/piresc/nebengjek/internal/pkg/models/match"
@@ -21,6 +22,7 @@ import (
 type RidesHandler struct {
 	ridesUC    rides.RideUC
 	natsClient *natspkg.Client
+	nrApp      *newrelic.Application
 	subs       []*nats.Subscription
 	cfg        *core.Config
 }
@@ -30,13 +32,18 @@ func NewRidesHandler(
 	ridesUC rides.RideUC,
 	client *natspkg.Client,
 	cfg *core.Config,
+	nrApp ...*newrelic.Application,
 ) *RidesHandler {
-	return &RidesHandler{
+	h := &RidesHandler{
 		ridesUC:    ridesUC,
 		natsClient: client,
 		subs:       make([]*nats.Subscription, 0),
 		cfg:        cfg,
 	}
+	if len(nrApp) > 0 {
+		h.nrApp = nrApp[0]
+	}
+	return h
 }
 
 // InitNATSConsumers initializes all JetStream consumers for the rides service
@@ -85,6 +92,13 @@ func (h *RidesHandler) InitNATSConsumers() error {
 func (h *RidesHandler) handleMatchAcceptedJS(msg jetstream.Msg) error {
 	ctx := context.Background()
 
+	// Start a New Relic background transaction for async NATS processing
+	if h.nrApp != nil {
+		txn := h.nrApp.StartTransaction("NATS/match.accepted.rides")
+		defer txn.End()
+		ctx = newrelic.NewContext(ctx, txn)
+	}
+
 	logger.InfoCtx(ctx, "Received match accepted event from JetStream",
 		logger.String("subject", msg.Subject()))
 
@@ -99,6 +113,13 @@ func (h *RidesHandler) handleMatchAcceptedJS(msg jetstream.Msg) error {
 // handleLocationAggregateJS processes location aggregate events from JetStream
 func (h *RidesHandler) handleLocationAggregateJS(msg jetstream.Msg) error {
 	ctx := context.Background()
+
+	// Start a New Relic background transaction for async NATS processing
+	if h.nrApp != nil {
+		txn := h.nrApp.StartTransaction("NATS/location.aggregate.rides")
+		defer txn.End()
+		ctx = newrelic.NewContext(ctx, txn)
+	}
 
 	logger.InfoCtx(ctx, "Received location aggregate event from JetStream",
 		logger.String("subject", msg.Subject()))

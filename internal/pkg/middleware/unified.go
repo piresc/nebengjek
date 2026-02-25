@@ -13,10 +13,25 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/piresc/nebengjek/internal/pkg/middleware/auth"
 	"github.com/piresc/nebengjek/internal/pkg/tracing"
 	"github.com/piresc/nebengjek/internal/pkg/models/core"
 )
+
+// existingTransaction wraps an already-started New Relic transaction
+// so the unified middleware can add attributes without creating a duplicate.
+type existingTransaction struct {
+	txn *newrelic.Transaction
+}
+
+func (t *existingTransaction) Context() context.Context {
+	return newrelic.NewContext(context.Background(), t.txn)
+}
+func (t *existingTransaction) SetName(name string)            { t.txn.SetName(name) }
+func (t *existingTransaction) AddAttribute(key, value string) { t.txn.AddAttribute(key, value) }
+func (t *existingTransaction) AddError(err error)             { t.txn.NoticeError(err) }
+func (t *existingTransaction) End()                           {} // Don't end — the tracing middleware owns the lifecycle
 
 // Middleware combines multiple middleware into a single, efficient handler
 type Middleware struct {
@@ -32,7 +47,7 @@ func NewMiddleware(config *core.Config, logger *slog.Logger, tracer tracing.Trac
 		config: config,
 		logger: logger,
 		tracer: tracer,
-		auth:   auth.NewAuthMiddleware(config, tracer),
+		auth:   auth.NewAuthMiddleware(config),
 	}
 }
 
@@ -114,26 +129,32 @@ func (m *Middleware) Handler() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			start := time.Now()
-			requestID := uuid.New().String()
+			requestID := c.Request().Header.Get("X-Request-ID")
+			if requestID == "" {
+				requestID = uuid.New().String()
+			}
 			
 			// Add request ID to context
 			c.Set("request_id", requestID)
 			c.Response().Header().Set("X-Request-ID", requestID)
 
-			// Start tracing if enabled
+			// Reuse existing New Relic transaction from context if the tracing middleware
+			// already created one; only start a new transaction if none exists.
 			var txn tracing.HTTPTransaction
 			if m.tracer != nil && m.tracer.IsEnabled() && m.tracer.ShouldTrace(c.Request().URL.Path) {
-				ctx, transaction := m.tracer.StartHTTPRequest(c.Request())
-				txn = transaction
-				c.SetRequest(c.Request().WithContext(ctx))
-				
-				// Add tracing attributes
-				txn.AddAttribute("request.id", requestID)
-				txn.AddAttribute("http.method", c.Request().Method)
-				txn.AddAttribute("http.url", c.Request().URL.String())
-				txn.AddAttribute("user.agent", c.Request().UserAgent())
-				
-				defer txn.End()
+				if existing := newrelic.FromContext(c.Request().Context()); existing != nil {
+					txn = &existingTransaction{txn: existing}
+					txn.AddAttribute("request.id", requestID)
+				} else {
+					ctx, transaction := m.tracer.StartHTTPRequest(c.Request())
+					txn = transaction
+					c.SetRequest(c.Request().WithContext(ctx))
+					txn.AddAttribute("request.id", requestID)
+					txn.AddAttribute("http.method", c.Request().Method)
+					txn.AddAttribute("http.url", c.Request().URL.String())
+					txn.AddAttribute("user.agent", c.Request().UserAgent())
+					defer txn.End()
+				}
 			}
 
 			// Capture response body for logging (only if response writer is not already captured)
@@ -267,7 +288,15 @@ func (r *responseBodyCapture) Header() http.Header {
 }
 
 func (r *responseBodyCapture) Write(b []byte) (int, error) {
-	r.body = append(r.body, b...)
+	// Capture response body (limit to 1KB to avoid memory issues)
+	if len(r.body) < 1024 {
+		remaining := 1024 - len(r.body)
+		if len(b) <= remaining {
+			r.body = append(r.body, b...)
+		} else {
+			r.body = append(r.body, b[:remaining]...)
+		}
+	}
 	return r.ResponseWriter.Write(b)
 }
 
