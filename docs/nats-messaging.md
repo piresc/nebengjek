@@ -2,468 +2,215 @@
 
 ## Overview
 
-NebengJek uses NATS JetStream for asynchronous and event-driven communication between microservices. This enables scalable, reliable message delivery with persistence and replay capabilities.
+NebengJek uses NATS JetStream for asynchronous event-driven communication between microservices. All streams use `WorkQueuePolicy` (messages deleted after ACK) with `FileStorage` for persistence.
 
-## JetStream Architecture
+## Streams
 
-### Stream Configuration
+| Stream | Subjects | Purpose |
+|--------|----------|---------|
+| `LOCATION` | `location.>` | Real-time location updates and tracking |
+| `MATCH` | `match.>` | Driver-passenger matching events |
+| `RIDE` | `ride.>` | Ride lifecycle management |
+| `USER` | `user.>` | User management and beacon events |
+| `NOTIFICATION` | `notification.>` | Gateway-bound user notifications |
 
-The system implements 4 main JetStream streams with specific retention policies:
+All streams: 24h max age, file storage, work queue retention.
 
-#### 1. Location Stream
-- **Name**: `LOCATION`
-- **Subjects**: `location.>` (all location-related events)
-- **Retention**: `WorkQueuePolicy` (messages deleted after acknowledgment)
-- **Storage**: `FileStorage` for persistence
-- **Purpose**: Real-time location updates and tracking
+## Service Communication Map
 
-#### 2. Match Stream  
-- **Name**: `MATCH`
-- **Subjects**: `match.>` (all matching-related events)
-- **Retention**: `WorkQueuePolicy`
-- **Storage**: `FileStorage`
-- **Purpose**: Driver-passenger matching events
+```
+Users/Gateway ──publish──→ location.update, match.request, user.beacon
+                ←subscribe── match.found, match.confirmed, ride.*, payment.*, notification.deliver
 
-#### 3. Ride Stream
-- **Name**: `RIDE` 
-- **Subjects**: `ride.>` (all ride-related events)
-- **Retention**: `WorkQueuePolicy`
-- **Storage**: `FileStorage`
-- **Purpose**: Ride lifecycle management events
+Location      ──publish──→ location.stored
+                ←subscribe── location.update
 
-#### 4. User Stream
-- **Name**: `USER`
-- **Subjects**: `user.>` (all user-related events)
-- **Retention**: `WorkQueuePolicy`
-- **Storage**: `FileStorage`
-- **Purpose**: User management and authentication events
+Match         ──publish──→ match.found, match.confirmed, match.cancelled
+                ←subscribe── match.request, match.response, user.beacon, location.update
 
-### Stream Architecture Diagram
+Rides         ──publish──→ ride.created, ride.started, ride.completed, payment.requested
+                ←subscribe── match.confirmed
 
-```mermaid
-graph TB
-    subgraph "NATS JetStream Cluster"
-        LS[Location Stream<br/>location.*]
-        MS[Match Stream<br/>match.*]
-        RS[Ride Stream<br/>ride.*]
-        US[User Stream<br/>user.*]
-    end
-    
-    subgraph "Services"
-        UserSvc[Users Service<br/>:9990]
-        LocationSvc[Location Service<br/>:9994]
-        MatchSvc[Match Service<br/>:9993]
-        RideSvc[Rides Service<br/>:9992]
-    end
-    
-    UserSvc -->|Publishes| US
-    UserSvc -->|Publishes| LS
-    UserSvc -->|Subscribes| MS
-    UserSvc -->|Subscribes| RS
-    
-    LocationSvc -->|Publishes| LS
-    LocationSvc -->|Subscribes| LS
-    
-    MatchSvc -->|Publishes| MS
-    MatchSvc -->|Subscribes| LS
-    MatchSvc -->|Subscribes| US
-    
-    RideSvc -->|Publishes| RS
-    RideSvc -->|Subscribes| MS
+Notification  ──publish──→ notification.deliver
+                ←subscribe── match.*, ride.*, payment.* (selective)
 ```
 
-## Event-Driven Communication Patterns
+## Event Schemas
 
-### 1. Location Update Flow
+### Location Events
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant UserSvc as Users Service
-    participant NATS
-    participant LocationSvc as Location Service
-    participant Redis
-    
-    Client->>UserSvc: WebSocket Location Update
-    UserSvc->>NATS: Publish location.update
-    NATS->>LocationSvc: Deliver location.update
-    LocationSvc->>Redis: Store location with TTL
-    LocationSvc->>NATS: Publish location.stored
-    NATS->>UserSvc: Deliver location.stored
-    UserSvc->>Client: WebSocket Confirmation
+**`location.update`** — User sends GPS position
+```json
+{
+  "user_id": "uuid",
+  "user_type": "driver|passenger",
+  "location": { "latitude": -6.2088, "longitude": 106.8456, "accuracy": 10.5 },
+  "ride_id": "uuid",
+  "timestamp": "2025-01-08T10:00:00Z"
+}
 ```
 
-### 2. Driver Matching Flow
-
-```mermaid
-sequenceDiagram
-    participant Passenger
-    participant UserSvc as Users Service
-    participant NATS
-    participant MatchSvc as Match Service
-    participant Driver
-    
-    Passenger->>UserSvc: Request Match
-    UserSvc->>NATS: Publish match.request
-    NATS->>MatchSvc: Deliver match.request
-    MatchSvc->>NATS: Publish match.proposal
-    NATS->>UserSvc: Deliver match.proposal
-    UserSvc->>Driver: WebSocket Match Proposal
-    Driver->>UserSvc: Accept Match
-    UserSvc->>NATS: Publish match.accepted
-    NATS->>MatchSvc: Deliver match.accepted
-    MatchSvc->>NATS: Publish match.confirmed
+**`location.driver.available`** — Driver availability change
+```json
+{
+  "driver_id": "uuid",
+  "is_available": true,
+  "location": { "latitude": -6.2088, "longitude": 106.8456, "geohash": "qqgux4" },
+  "vehicle_info": { "type": "motorcycle", "license_plate": "B1234XYZ" }
+}
 ```
 
-### 3. Ride Lifecycle Flow
+### Match Events
 
-```mermaid
-sequenceDiagram
-    participant MatchSvc as Match Service
-    participant NATS
-    participant RideSvc as Rides Service
-    participant UserSvc as Users Service
-    participant Clients
-    
-    MatchSvc->>NATS: Publish ride.create
-    NATS->>RideSvc: Deliver ride.create
-    RideSvc->>NATS: Publish ride.created
-    NATS->>UserSvc: Deliver ride.created
-    UserSvc->>Clients: WebSocket Ride Updates
-    
-    Note over RideSvc: Ride Progress Events
-    RideSvc->>NATS: Publish ride.started
-    RideSvc->>NATS: Publish ride.completed
-    RideSvc->>NATS: Publish ride.payment
+**`match.request`** — Passenger requests a ride
+```json
+{
+  "match_request_id": "uuid",
+  "passenger_id": "uuid",
+  "pickup_location": { "latitude": -6.2088, "longitude": 106.8456 },
+  "destination_location": { "latitude": -6.2200, "longitude": 106.8300 },
+  "preferences": { "vehicle_type": "motorcycle", "max_distance_km": 5.0 }
+}
 ```
 
-## Subject Patterns and Routing
+**`match.found`** — Match service found a driver
+```json
+{
+  "match_id": "uuid",
+  "driver_id": "uuid",
+  "passenger_id": "uuid",
+  "estimates": { "distance_km": 3.2, "duration_minutes": 15, "fare_estimate": 9600 },
+  "expires_at": "2025-01-08T10:05:00Z"
+}
+```
 
-### Subject Naming Convention
-- **Pattern**: `{service}.{action}.{entity}`
-- **Examples**:
-  - `location.update.driver`
-  - `match.request.passenger`
-  - `ride.start.trip`
-  - `user.beacon.status`
+**`match.response`** — Driver/passenger accepts or rejects
+```json
+{
+  "match_id": "uuid",
+  "user_id": "uuid",
+  "user_type": "driver|passenger",
+  "response": "accepted|rejected",
+  "reason": "too_far|price_too_high|other"
+}
+```
 
-### Subject Routing Table
+**`match.confirmed`** — Both parties accepted
+```json
+{
+  "match_id": "uuid",
+  "driver_id": "uuid",
+  "passenger_id": "uuid",
+  "pickup_location": { "latitude": -6.2088, "longitude": 106.8456 },
+  "destination_location": { "latitude": -6.2200, "longitude": 106.8300 }
+}
+```
 
-| Subject Pattern | Publisher | Subscribers | Purpose |
-|----------------|-----------|-------------|---------|
-| `location.update.*` | Users Service | Location Service | Real-time location updates |
-| `location.stored.*` | Location Service | Users Service | Location storage confirmation |
-| `match.request.*` | Users Service | Match Service | Match requests from passengers |
-| `match.proposal.*` | Match Service | Users Service | Driver match proposals |
-| `match.accepted.*` | Users Service | Match Service | Driver acceptance |
-| `match.confirmed.*` | Match Service | Rides Service | Confirmed matches |
-| `ride.create.*` | Match Service | Rides Service | New ride creation |
-| `ride.started.*` | Rides Service | Users Service | Ride start notifications |
-| `ride.completed.*` | Rides Service | Users Service | Ride completion |
-| `ride.payment.*` | Rides Service | Users Service | Payment processing |
-| `user.beacon.*` | Users Service | Match Service | Driver availability |
+### Ride Events
+
+**`ride.created`** — New ride from confirmed match
+```json
+{
+  "ride_id": "uuid",
+  "match_id": "uuid",
+  "driver_id": "uuid",
+  "passenger_id": "uuid",
+  "pricing": { "base_rate_per_km": 3000, "estimated_fare": 9600 }
+}
+```
+
+**`ride.completed`** — Ride finished with billing
+```json
+{
+  "ride_id": "uuid",
+  "driver_id": "uuid",
+  "passenger_id": "uuid",
+  "trip_summary": { "total_distance_km": 3.2, "total_duration_minutes": 15 },
+  "billing": {
+    "base_fare": 9600,
+    "adjustment_factor": 0.9,
+    "adjusted_fare": 8640,
+    "admin_fee_percent": 5.0,
+    "admin_fee": 432,
+    "final_fare": 8208
+  }
+}
+```
+
+### Payment Events
+
+**`payment.requested`** — Payment needed for completed ride
+```json
+{
+  "payment_id": "uuid",
+  "ride_id": "uuid",
+  "passenger_id": "uuid",
+  "amount": 8208,
+  "payment_methods": ["wallet", "bank_transfer"]
+}
+```
+
+**`payment.completed`** / **`payment.failed`** — Payment result
+```json
+{
+  "payment_id": "uuid",
+  "ride_id": "uuid",
+  "amount": 8208,
+  "payment_method": "wallet",
+  "transaction_id": "uuid"
+}
+```
+
+### Notification Events
+
+**`notification.deliver`** — Notification service → Gateway for WebSocket delivery
+```json
+{
+  "user_id": "uuid",
+  "type": "match_proposal|ride_started|ride_completed|payment_processed",
+  "data": { ... },
+  "timestamp": "2025-01-08T10:00:00Z"
+}
+```
 
 ## Consumer Configuration
 
-### Durable Consumers
-
-Each service implements durable consumers for reliable message processing:
-
-#### Users Service Consumers
-```go
-// Location update consumer
-consumer, err := js.AddConsumer("LOCATION", &nats.ConsumerConfig{
-    Durable:       "users-location-consumer",
-    FilterSubject: "location.stored.*",
-    AckPolicy:     nats.AckExplicitPolicy,
-    MaxDeliver:    3,
-})
-
-// Match proposal consumer  
-consumer, err := js.AddConsumer("MATCH", &nats.ConsumerConfig{
-    Durable:       "users-match-consumer",
-    FilterSubject: "match.proposal.*",
-    AckPolicy:     nats.AckExplicitPolicy,
-    MaxDeliver:    3,
-})
-```
-
-#### Match Service Consumers
-```go
-// Beacon status consumer
-consumer, err := js.AddConsumer("USER", &nats.ConsumerConfig{
-    Durable:       "match-beacon-consumer",
-    FilterSubject: "user.beacon.*",
-    AckPolicy:     nats.AckExplicitPolicy,
-    MaxDeliver:    3,
-})
-
-// Location update consumer
-consumer, err := js.AddConsumer("LOCATION", &nats.ConsumerConfig{
-    Durable:       "match-location-consumer", 
-    FilterSubject: "location.update.*",
-    AckPolicy:     nats.AckExplicitPolicy,
-    MaxDeliver:    3,
-})
-```
-
-### Consumer Implementation Pattern
+All consumers use explicit ACK, max 3 delivery attempts, durable names:
 
 ```go
-// Example consumer implementation
-func (h *NatsHandler) InitConsumers() error {
-    js, err := h.natsClient.JetStream()
-    if err != nil {
-        return fmt.Errorf("failed to get JetStream context: %w", err)
-    }
-
-    // Subscribe to match proposals
-    _, err = js.Subscribe("match.proposal.*", h.handleMatchProposal, nats.Durable("users-match-consumer"))
-    if err != nil {
-        return fmt.Errorf("failed to subscribe to match proposals: %w", err)
-    }
-
-    return nil
-}
-
-func (h *NatsHandler) handleMatchProposal(msg *nats.Msg) {
-    var proposal models.MatchProposal
-    if err := json.Unmarshal(msg.Data, &proposal); err != nil {
-        logger.Error("Failed to unmarshal match proposal", logger.Err(err))
-        msg.Nak()
-        return
-    }
-
-    // Process the match proposal
-    if err := h.processMatchProposal(proposal); err != nil {
-        logger.Error("Failed to process match proposal", logger.Err(err))
-        msg.Nak()
-        return
-    }
-
-    msg.Ack()
-}
+// Example: Match service consuming beacon events
+js.Subscribe("user.beacon.*", handler, nats.Durable("match-beacon-consumer"))
 ```
 
-## Message Serialization and Validation
+### Consumer Naming Convention
+`{service}-{event-type}-consumer`, e.g. `users-match-consumer`, `match-location-consumer`
 
-### JSON Message Format
-All messages use JSON serialization with strict validation:
+## Event Flow: Complete Ride
 
-```go
-type LocationUpdate struct {
-    UserID    string    `json:"user_id" validate:"required,uuid"`
-    Latitude  float64   `json:"latitude" validate:"required,latitude"`
-    Longitude float64   `json:"longitude" validate:"required,longitude"`
-    Timestamp time.Time `json:"timestamp" validate:"required"`
-}
-
-type MatchProposal struct {
-    MatchID      string  `json:"match_id" validate:"required,uuid"`
-    DriverID     string  `json:"driver_id" validate:"required,uuid"`
-    PassengerID  string  `json:"passenger_id" validate:"required,uuid"`
-    Distance     float64 `json:"distance" validate:"required,min=0"`
-    EstimatedETA int     `json:"estimated_eta" validate:"required,min=0"`
-}
+```
+Gateway  →  match.request  →  Match Service
+Match    →  match.found    →  Gateway (WebSocket to driver)
+Gateway  →  match.response →  Match Service
+Match    →  match.confirmed → Gateway + Rides Service
+Rides    →  ride.created   →  Gateway
+Rides    →  ride.started   →  Gateway
+Rides    →  ride.completed →  Gateway + Notification
+Rides    →  payment.requested → Gateway
+Payment  →  payment.completed → Gateway + Rides
 ```
 
-### Message Validation
-```go
-func validateMessage(msg interface{}) error {
-    validate := validator.New()
-    if err := validate.Struct(msg); err != nil {
-        return fmt.Errorf("message validation failed: %w", err)
-    }
-    return nil
-}
-```
+## Error Handling
 
-## Error Handling and Reliability
-
-### Acknowledgment Policies
-- **Explicit Acknowledgment**: All consumers use explicit ACK/NAK
-- **Max Delivery**: 3 attempts before dead letter handling
-- **Retry Logic**: Exponential backoff for failed messages
-
-### Dead Letter Handling
-```go
-func (h *NatsHandler) handleFailedMessage(msg *nats.Msg, err error) {
-    logger.Error("Message processing failed",
-        logger.String("subject", msg.Subject),
-        logger.Err(err),
-        logger.Int("delivery_count", int(msg.Header.Get("Nats-Delivered-Count"))))
-    
-    // Send to dead letter queue after max retries
-    if msg.Header.Get("Nats-Delivered-Count") >= "3" {
-        h.sendToDeadLetter(msg)
-    }
-    
-    msg.Nak()
-}
-```
-
-### Circuit Breaker Pattern
-```go
-type CircuitBreaker struct {
-    maxFailures int
-    timeout     time.Duration
-    failures    int
-    lastFailure time.Time
-    state       string // "closed", "open", "half-open"
-}
-
-func (cb *CircuitBreaker) Call(fn func() error) error {
-    if cb.state == "open" {
-        if time.Since(cb.lastFailure) > cb.timeout {
-            cb.state = "half-open"
-        } else {
-            return errors.New("circuit breaker is open")
-        }
-    }
-    
-    err := fn()
-    if err != nil {
-        cb.failures++
-        cb.lastFailure = time.Now()
-        if cb.failures >= cb.maxFailures {
-            cb.state = "open"
-        }
-        return err
-    }
-    
-    cb.failures = 0
-    cb.state = "closed"
-    return nil
-}
-```
-
-## Performance and Monitoring
-
-### JetStream Metrics
-- **Stream Storage**: File-based persistence for durability
-- **Consumer Lag**: Monitored via NATS monitoring endpoints
-- **Message Throughput**: Tracked per stream and subject
-- **Acknowledgment Rates**: Success/failure ratios
-
-### Health Checks
-```go
-func (h *HealthChecker) CheckNATS() error {
-    js, err := h.natsClient.JetStream()
-    if err != nil {
-        return fmt.Errorf("JetStream not available: %w", err)
-    }
-    
-    // Check stream health
-    for _, streamName := range []string{"LOCATION", "MATCH", "RIDE", "USER"} {
-        _, err := js.StreamInfo(streamName)
-        if err != nil {
-            return fmt.Errorf("stream %s not healthy: %w", streamName, err)
-        }
-    }
-    
-    return nil
-}
-```
-
-### Performance Optimization
-- **Batch Processing**: Group related messages for efficiency
-- **Connection Pooling**: Reuse NATS connections across goroutines
-- **Message Compression**: Optional compression for large payloads
-- **Flow Control**: Backpressure handling for high-volume streams
+- **Explicit ACK/NAK** on all consumers
+- **Max 3 retries** with exponential backoff before dead letter
+- **Idempotent processing** — consumers handle duplicate delivery
+- Messages include `event_id` for deduplication
 
 ## Configuration
 
-### Environment Variables
 ```bash
-# NATS Configuration
 NATS_URL=nats://localhost:4222
-NATS_CLUSTER_ID=nebengjek-cluster
-NATS_CLIENT_ID=users-service-1
-
-# JetStream Configuration
 JETSTREAM_ENABLED=true
-JETSTREAM_DOMAIN=nebengjek
-JETSTREAM_MAX_MEMORY=1GB
-JETSTREAM_MAX_STORAGE=10GB
 ```
 
-### Stream Creation
-```go
-func createStreams(js nats.JetStreamContext) error {
-    streams := []nats.StreamConfig{
-        {
-            Name:      "LOCATION",
-            Subjects:  []string{"location.>"},
-            Retention: nats.WorkQueuePolicy,
-            Storage:   nats.FileStorage,
-            MaxAge:    24 * time.Hour,
-        },
-        {
-            Name:      "MATCH", 
-            Subjects:  []string{"match.>"},
-            Retention: nats.WorkQueuePolicy,
-            Storage:   nats.FileStorage,
-            MaxAge:    24 * time.Hour,
-        },
-        // ... other streams
-    }
-    
-    for _, stream := range streams {
-        _, err := js.AddStream(&stream)
-        if err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) {
-            return fmt.Errorf("failed to create stream %s: %w", stream.Name, err)
-        }
-    }
-    
-    return nil
-}
-```
-
-## Security Considerations
-
-### Authentication and Authorization
-- **TLS Encryption**: All NATS communication encrypted
-- **Token Authentication**: Service-specific authentication tokens
-- **Subject Permissions**: Fine-grained access control per service
-
-### Message Security
-- **Payload Validation**: Strict JSON schema validation
-- **Rate Limiting**: Per-service message rate limits
-- **Audit Logging**: All message publishing/consumption logged
-
-## Troubleshooting
-
-### Common Issues
-
-#### Consumer Lag
-```bash
-# Check consumer lag
-nats consumer info LOCATION users-location-consumer
-
-# Reset consumer position
-nats consumer reset LOCATION users-location-consumer
-```
-
-#### Stream Health
-```bash
-# Check stream status
-nats stream info LOCATION
-
-# View stream subjects
-nats stream subjects LOCATION
-```
-
-#### Message Debugging
-```bash
-# Monitor messages in real-time
-nats sub "location.>"
-
-# Publish test message
-nats pub location.test '{"test": "data"}'
-```
-
-## See Also
-- [Database Architecture](database-architecture.md)
-- [WebSocket Implementation](websocket-implementation.md)
-- [Monitoring and Observability](monitoring-observability.md)
-- [API Reference](api-reference.md)
+Streams are auto-created on service startup via `internal/pkg/nats/jetstream_helpers.go`.
