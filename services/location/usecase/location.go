@@ -4,21 +4,22 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	locationmodels "github.com/piresc/nebengjek/internal/pkg/models/location"
+	matchmodels "github.com/piresc/nebengjek/internal/pkg/models/match"
 	"github.com/piresc/nebengjek/internal/utils"
-	"github.com/piresc/nebengjek/services/location"
+	locationsvc "github.com/piresc/nebengjek/services/location"
 )
 
 type locationUC struct {
-	locationRepo location.LocationRepo
-	locationGW   location.LocationGW
+	locationRepo locationsvc.LocationRepo
+	locationGW   locationsvc.LocationGW
 }
 
 // NewLocationUC creates a new location use case instance
 func NewLocationUC(
-	locationRepo location.LocationRepo,
-	locationGW location.LocationGW,
-) location.LocationUC {
+	locationRepo locationsvc.LocationRepo,
+	locationGW locationsvc.LocationGW,
+) locationsvc.LocationUC {
 	return &locationUC{
 		locationRepo: locationRepo,
 		locationGW:   locationGW,
@@ -26,7 +27,7 @@ func NewLocationUC(
 }
 
 // StoreLocation stores a location update and publishes aggregated data
-func (uc *locationUC) StoreLocation(ctx context.Context, update models.LocationUpdate) error {
+func (uc *locationUC) StoreLocation(ctx context.Context, update locationmodels.LocationUpdate) error {
 
 	// Processing location update for ride
 
@@ -59,7 +60,7 @@ func (uc *locationUC) StoreLocation(ctx context.Context, update models.LocationU
 		return fmt.Errorf("failed to store location: %w", err)
 	}
 
-	aggregate := models.LocationAggregate{
+	aggregate := locationmodels.LocationAggregate{
 		RideID:    update.RideID,
 		Distance:  distance,
 		Latitude:  update.Location.Latitude,
@@ -75,7 +76,7 @@ func (uc *locationUC) StoreLocation(ctx context.Context, update models.LocationU
 }
 
 // AddAvailableDriver adds a driver to the available drivers geo set
-func (uc *locationUC) AddAvailableDriver(ctx context.Context, driverID string, location *models.Location) error {
+func (uc *locationUC) AddAvailableDriver(ctx context.Context, driverID string, location *locationmodels.Location) error {
 	return uc.locationRepo.AddAvailableDriver(ctx, driverID, location)
 }
 
@@ -85,7 +86,7 @@ func (uc *locationUC) RemoveAvailableDriver(ctx context.Context, driverID string
 }
 
 // AddAvailablePassenger adds a passenger to the Redis geospatial index
-func (uc *locationUC) AddAvailablePassenger(ctx context.Context, passengerID string, location *models.Location) error {
+func (uc *locationUC) AddAvailablePassenger(ctx context.Context, passengerID string, location *locationmodels.Location) error {
 	return uc.locationRepo.AddAvailablePassenger(ctx, passengerID, location)
 }
 
@@ -95,16 +96,16 @@ func (uc *locationUC) RemoveAvailablePassenger(ctx context.Context, passengerID 
 }
 
 // FindNearbyDrivers finds available drivers within the specified radius
-func (uc *locationUC) FindNearbyDrivers(ctx context.Context, location *models.Location, radiusKm float64) ([]*models.NearbyUser, error) {
+func (uc *locationUC) FindNearbyDrivers(ctx context.Context, location *locationmodels.Location, radiusKm float64) ([]*matchmodels.NearbyUser, error) {
 	return uc.locationRepo.FindNearbyDrivers(ctx, location, radiusKm)
 }
 
 // GetDriverLocation retrieves a driver's last known location
-func (uc *locationUC) GetDriverLocation(ctx context.Context, driverID string) (models.Location, error) {
+func (uc *locationUC) GetDriverLocation(ctx context.Context, driverID string) (locationmodels.Location, error) {
 	return uc.locationRepo.GetDriverLocation(ctx, driverID)
 }
 
 // GetPassengerLocation retrieves a passenger's last known location
-func (uc *locationUC) GetPassengerLocation(ctx context.Context, passengerID string) (models.Location, error) {
+func (uc *locationUC) GetPassengerLocation(ctx context.Context, passengerID string) (locationmodels.Location, error) {
 	return uc.locationRepo.GetPassengerLocation(ctx, passengerID)
 }

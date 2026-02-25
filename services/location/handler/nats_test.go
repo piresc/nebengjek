@@ -9,8 +9,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
-	"github.com/newrelic/go-agent/v3/newrelic"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/location"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
 	"github.com/piresc/nebengjek/services/location/mocks"
 	"github.com/stretchr/testify/assert"
@@ -24,16 +23,14 @@ func TestLocationHandler_Constructor(t *testing.T) {
 
 	mockLocationUC := mocks.NewMockLocationUC(ctrl)
 	mockNATSClient := &natspkg.Client{}
-	mockNRApp := &newrelic.Application{}
 
 	// Act
-	handler := NewLocationHandler(mockLocationUC, mockNATSClient, mockNRApp)
+	handler := NewLocationHandler(mockLocationUC, mockNATSClient)
 
 	// Assert
 	assert.NotNil(t, handler)
 	assert.Equal(t, mockLocationUC, handler.locationUC)
 	assert.Equal(t, mockNATSClient, handler.natsClient)
-	assert.Equal(t, mockNRApp, handler.nrApp)
 	assert.NotNil(t, handler.subs)
 	assert.Empty(t, handler.subs)
 }
@@ -49,13 +46,12 @@ func TestLocationHandler_handleLocationUpdate(t *testing.T) {
 		{
 			name: "successful location update processing",
 			eventData: func() []byte {
-				update := models.LocationUpdate{
+				update := location.LocationUpdate{
 					RideID:   uuid.New().String(),
 					DriverID: uuid.New().String(),
-					Location: models.Location{
+					Location: location.Location{
 						Latitude:  -6.175392,
 						Longitude: 106.827153,
-						Timestamp: time.Now(),
 					},
 					CreatedAt: time.Now(),
 				}
@@ -76,13 +72,12 @@ func TestLocationHandler_handleLocationUpdate(t *testing.T) {
 		{
 			name: "usecase returns error",
 			eventData: func() []byte {
-				update := models.LocationUpdate{
+				update := location.LocationUpdate{
 					RideID:   uuid.New().String(),
 					DriverID: uuid.New().String(),
-					Location: models.Location{
+					Location: location.Location{
 						Latitude:  -6.175392,
 						Longitude: 106.827153,
-						Timestamp: time.Now(),
 					},
 					CreatedAt: time.Now(),
 				}
@@ -106,8 +101,7 @@ func TestLocationHandler_handleLocationUpdate(t *testing.T) {
 			tt.setupMock(mockLocationUC)
 
 			mockNATSClient := &natspkg.Client{}
-			mockNRApp := &newrelic.Application{}
-			handler := NewLocationHandler(mockLocationUC, mockNATSClient, mockNRApp)
+			handler := NewLocationHandler(mockLocationUC, mockNATSClient)
 
 			// Act
 			err := handler.handleLocationUpdate(context.Background(), tt.eventData)

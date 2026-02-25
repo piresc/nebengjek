@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"net/http"
+
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/middleware"
 )
@@ -10,6 +12,13 @@ func (h *Handler) RegisterRoutes(e *echo.Echo, Middleware *middleware.Middleware
 	// WebSocket routes - use custom WebSocket JWT middleware
 	wsGroup := e.Group("/ws", h.GetWebSocketJWTMiddleware())
 	wsGroup.GET("", h.wsHandler.HandleWebSocket)
+
+	// WebSocket health monitoring endpoints - API key protected
+	health := e.Group("/health/websocket", Middleware.APIKeyHandler("gateway-service"))
+	health.GET("/stats", h.GetWebSocketHealthStats)
+	health.GET("/connections", h.GetAllWebSocketConnections)
+	health.GET("/connections/:user_id", h.GetWebSocketConnectionHealth)
+	health.GET("/connections/healthy/count", h.GetHealthyConnectionsCount)
 
 	// Public API routes (proxy to microservices)
 	h.registerPublicRoutes(e, Middleware)
@@ -59,4 +68,49 @@ func (h *Handler) registerPublicRoutes(e *echo.Echo, mw *middleware.Middleware) 
 	payments := e.Group("/payments", mw.JWTHandler())
 	payments.POST("/process", h.proxyHandler.ProxyToRidesService)
 	payments.GET("/:id", h.proxyHandler.ProxyToRidesService)
+}
+
+// WebSocket Health Monitoring Endpoints
+
+// GetWebSocketHealthStats returns overall WebSocket connection statistics
+func (h *Handler) GetWebSocketHealthStats(c echo.Context) error {
+	stats := h.wsHandler.GetHeartbeatStats()
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"success": true,
+		"data":    stats,
+	})
+}
+
+// GetAllWebSocketConnections returns health status for all WebSocket connections
+func (h *Handler) GetAllWebSocketConnections(c echo.Context) error {
+	connections := h.wsHandler.GetAllConnectionsHealth()
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"success": true,
+		"data":    connections,
+	})
+}
+
+// GetWebSocketConnectionHealth returns health status for a specific user's WebSocket connection
+func (h *Handler) GetWebSocketConnectionHealth(c echo.Context) error {
+	userID := c.Param("user_id")
+	if userID == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "user_id parameter is required")
+	}
+
+	health := h.wsHandler.GetConnectionHealth(userID)
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"success": true,
+		"data":    health,
+	})
+}
+
+// GetHealthyConnectionsCount returns the count of healthy WebSocket connections
+func (h *Handler) GetHealthyConnectionsCount(c echo.Context) error {
+	count := h.wsHandler.GetHealthyConnectionsCount()
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"success": true,
+		"data": map[string]interface{}{
+			"healthy_connections_count": count,
+		},
+	})
 }

@@ -10,11 +10,11 @@ import (
 	"github.com/google/uuid"
 	_ "github.com/newrelic/go-agent/v3/integrations/nrpq"
 	"github.com/newrelic/go-agent/v3/newrelic"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/user"
 )
 
 // GetUserByMSISDN retrieves a user by MSISDN
-func (r *UserRepo) GetUserByMSISDN(ctx context.Context, msisdn string) (*models.User, error) {
+func (r *UserRepo) GetUserByMSISDN(ctx context.Context, msisdn string) (*user.User, error) {
 	txn := newrelic.FromContext(ctx)
 	dbCtx := newrelic.NewContext(ctx, txn)
 
@@ -24,7 +24,7 @@ func (r *UserRepo) GetUserByMSISDN(ctx context.Context, msisdn string) (*models.
 		WHERE msisdn = $1
 	`
 
-	var user models.User
+	var user user.User
 	err := r.db.QueryRowContext(dbCtx, query, msisdn).Scan(
 		&user.ID,
 		&user.MSISDN,
@@ -56,7 +56,7 @@ func (r *UserRepo) GetUserByMSISDN(ctx context.Context, msisdn string) (*models.
 }
 
 // CreateUser creates a new user in the database
-func (r *UserRepo) CreateUser(ctx context.Context, user *models.User) error {
+func (r *UserRepo) CreateUser(ctx context.Context, user *user.User) error {
 	user.ID = uuid.New()
 	now := time.Now()
 	user.CreatedAt = now
@@ -90,7 +90,7 @@ func (r *UserRepo) CreateUser(ctx context.Context, user *models.User) error {
 }
 
 // getUserByField is a helper function to get a user by a specific field
-func (r *UserRepo) getUserByField(ctx context.Context, field, value string) (*models.User, error) {
+func (r *UserRepo) getUserByField(ctx context.Context, field, value string) (*user.User, error) {
 	txn := newrelic.FromContext(ctx)
 	dbCtx := newrelic.NewContext(ctx, txn)
 
@@ -98,7 +98,7 @@ func (r *UserRepo) getUserByField(ctx context.Context, field, value string) (*mo
 		SELECT * FROM users WHERE %s = $1
 	`, field)
 
-	var user models.User
+	var user user.User
 	err := r.db.GetContext(dbCtx, &user, query, value)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

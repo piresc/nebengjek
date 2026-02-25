@@ -13,7 +13,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/piresc/nebengjek/internal/pkg/database"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
+	locationmodels "github.com/piresc/nebengjek/internal/pkg/models/location"
+	matchmodels "github.com/piresc/nebengjek/internal/pkg/models/match"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -46,7 +48,7 @@ func TestCreateMatch_Success(t *testing.T) {
 	redisClient, miniRedis := setupMockRedis(t)
 	defer miniRedis.Close()
 
-	repo := NewMatchRepository(&models.Config{}, db, redisClient)
+	repo := NewMatchRepository(&coremodels.Config{}, db, redisClient)
 
 	// Note: The implementation will generate a new UUID inside CreateMatch
 	// so we can't predict the exact ID that will be used
@@ -54,15 +56,15 @@ func TestCreateMatch_Success(t *testing.T) {
 	passengerID := uuid.New()
 
 	// Location data
-	driverLoc := models.Location{Latitude: -6.175392, Longitude: 106.827153}
-	passengerLoc := models.Location{Latitude: -6.185392, Longitude: 106.837153}
-	targetLoc := models.Location{Latitude: -6.195392, Longitude: 106.847153}
+	driverLoc := locationmodels.Location{Latitude: -6.175392, Longitude: 106.827153}
+	passengerLoc := locationmodels.Location{Latitude: -6.185392, Longitude: 106.837153}
+	targetLoc := locationmodels.Location{Latitude: -6.195392, Longitude: 106.847153}
 
-	match := &models.Match{
+	match := &matchmodels.Match{
 		// Don't set ID because the implementation will generate a new one
 		DriverID:          driverID,
 		PassengerID:       passengerID,
-		Status:            models.MatchStatusPending,
+		Status:            matchmodels.MatchStatusPending,
 		DriverLocation:    driverLoc,
 		PassengerLocation: passengerLoc,
 		TargetLocation:    targetLoc,
@@ -83,7 +85,7 @@ func TestCreateMatch_Success(t *testing.T) {
 			passengerLoc.Latitude,
 			targetLoc.Longitude,
 			targetLoc.Latitude,
-			models.MatchStatusPending,
+			matchmodels.MatchStatusPending,
 			false,            // driver_confirmed
 			false,            // passenger_confirmed
 			sqlmock.AnyArg(), // created_at
@@ -105,7 +107,7 @@ func TestCreateMatch_Success(t *testing.T) {
 	assert.NotEqual(t, uuid.Nil, createdMatch.ID)
 	assert.Equal(t, driverID, createdMatch.DriverID)
 	assert.Equal(t, passengerID, createdMatch.PassengerID)
-	assert.Equal(t, models.MatchStatusPending, createdMatch.Status)
+	assert.Equal(t, matchmodels.MatchStatusPending, createdMatch.Status)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -115,7 +117,7 @@ func TestGetMatch_Success(t *testing.T) {
 	redisClient, miniRedis := setupMockRedis(t)
 	defer miniRedis.Close()
 
-	repo := NewMatchRepository(&models.Config{}, db, redisClient)
+	repo := NewMatchRepository(&coremodels.Config{}, db, redisClient)
 
 	matchID := uuid.New()
 	driverID := uuid.New()
@@ -143,7 +145,7 @@ func TestGetMatch_Success(t *testing.T) {
 			driverLongitude, driverLatitude,
 			passengerLongitude, passengerLatitude,
 			106.837153, -6.185392, // target location
-			models.MatchStatusPending, false, false, // confirmation flags
+			matchmodels.MatchStatusPending, false, false, // confirmation flags
 			now, now) // Use time.Time objects here
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
@@ -173,7 +175,7 @@ func TestGetMatch_Success(t *testing.T) {
 	assert.Equal(t, matchID, match.ID)
 	assert.Equal(t, driverID, match.DriverID)
 	assert.Equal(t, passengerID, match.PassengerID)
-	assert.Equal(t, models.MatchStatusPending, match.Status)
+	assert.Equal(t, matchmodels.MatchStatusPending, match.Status)
 	assert.Equal(t, driverLongitude, match.DriverLocation.Longitude)
 	assert.Equal(t, driverLatitude, match.DriverLocation.Latitude)
 	assert.Equal(t, passengerLongitude, match.PassengerLocation.Longitude)
@@ -187,12 +189,12 @@ func TestUpdateMatchStatus_Success(t *testing.T) {
 	redisClient, miniRedis := setupMockRedis(t)
 	defer miniRedis.Close()
 
-	repo := NewMatchRepository(&models.Config{}, db, redisClient)
+	repo := NewMatchRepository(&coremodels.Config{}, db, redisClient)
 
 	matchID := uuid.New().String()
 	driverID := uuid.New()
 	passengerID := uuid.New()
-	newStatus := models.MatchStatusAccepted
+	newStatus := matchmodels.MatchStatusAccepted
 	now := time.Now()
 
 	// First, the implementation will call GetMatch to retrieve the current match
@@ -206,7 +208,7 @@ func TestUpdateMatchStatus_Success(t *testing.T) {
 			matchID, driverID, passengerID,
 			106.827153, -6.175392,
 			106.837153, -6.185392,
-			models.MatchStatusPending, now, now)
+			matchmodels.MatchStatusPending, now, now)
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
 		SELECT 
@@ -251,7 +253,7 @@ func TestListMatchesByPassenger_Success(t *testing.T) {
 	redisClient, miniRedis := setupMockRedis(t)
 	defer miniRedis.Close()
 
-	repo := NewMatchRepository(&models.Config{}, db, redisClient)
+	repo := NewMatchRepository(&coremodels.Config{}, db, redisClient)
 
 	passengerID := uuid.New()
 	now := time.Now()
@@ -277,21 +279,21 @@ func TestListMatchesByPassenger_Success(t *testing.T) {
 		matchID1, driverID1, passengerID,
 		106.827153, -6.175392, 106.837153, -6.185392,
 		106.847153, -6.195392, // target location
-		models.MatchStatusAccepted, false, true, // confirmation flags
+		matchmodels.MatchStatusAccepted, false, true, // confirmation flags
 		now, now)
 
 	matchRows.AddRow(
 		matchID2, driverID2, passengerID,
 		106.827153, -6.175392, 106.837153, -6.185392,
 		106.847153, -6.195392, // target location
-		models.MatchStatusPending, false, false, // confirmation flags
+		matchmodels.MatchStatusPending, false, false, // confirmation flags
 		now, now)
 
 	matchRows.AddRow(
 		matchID3, driverID3, passengerID,
 		106.827153, -6.175392, 106.837153, -6.185392,
 		106.847153, -6.195392, // target location
-		models.MatchStatusRejected, false, false, // confirmation flags
+		matchmodels.MatchStatusRejected, false, false, // confirmation flags
 		now, now)
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
@@ -323,9 +325,9 @@ func TestListMatchesByPassenger_Success(t *testing.T) {
 	assert.Equal(t, driverID1, matches[0].DriverID)
 	assert.Equal(t, driverID2, matches[1].DriverID)
 	assert.Equal(t, driverID3, matches[2].DriverID)
-	assert.Equal(t, models.MatchStatusAccepted, matches[0].Status)
-	assert.Equal(t, models.MatchStatusPending, matches[1].Status)
-	assert.Equal(t, models.MatchStatusRejected, matches[2].Status)
+	assert.Equal(t, matchmodels.MatchStatusAccepted, matches[0].Status)
+	assert.Equal(t, matchmodels.MatchStatusPending, matches[1].Status)
+	assert.Equal(t, matchmodels.MatchStatusRejected, matches[2].Status)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -346,7 +348,7 @@ func TestGetMatch_NotFound(t *testing.T) {
 	redisClient, miniRedis := setupMockRedis(t)
 	defer miniRedis.Close()
 
-	repo := NewMatchRepository(&models.Config{}, db, redisClient)
+	repo := NewMatchRepository(&coremodels.Config{}, db, redisClient)
 
 	matchID := uuid.New().String()
 
@@ -383,7 +385,7 @@ func TestUpdateMatchStatus_NotFound(t *testing.T) {
 	redisClient, miniRedis := setupMockRedis(t)
 	defer miniRedis.Close()
 
-	repo := NewMatchRepository(&models.Config{}, db, redisClient)
+	repo := NewMatchRepository(&coremodels.Config{}, db, redisClient)
 
 	matchID := uuid.New().String()
 
@@ -402,7 +404,7 @@ func TestUpdateMatchStatus_NotFound(t *testing.T) {
 
 	// Act
 	ctx := context.Background()
-	err := repo.UpdateMatchStatus(ctx, matchID, models.MatchStatusAccepted)
+	err := repo.UpdateMatchStatus(ctx, matchID, matchmodels.MatchStatusAccepted)
 
 	// Assert
 	assert.Error(t, err)
@@ -417,7 +419,7 @@ func TestUpdateMatchStatus_TransactionError(t *testing.T) {
 	redisClient, miniRedis := setupMockRedis(t)
 	defer miniRedis.Close()
 
-	repo := NewMatchRepository(&models.Config{}, db, redisClient)
+	repo := NewMatchRepository(&coremodels.Config{}, db, redisClient)
 
 	matchID := uuid.New().String()
 	driverID := uuid.New()
@@ -435,7 +437,7 @@ func TestUpdateMatchStatus_TransactionError(t *testing.T) {
 			matchID, driverID, passengerID,
 			106.827153, -6.175392,
 			106.837153, -6.185392,
-			models.MatchStatusPending, now, now)
+			matchmodels.MatchStatusPending, now, now)
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
 		SELECT 
@@ -454,7 +456,7 @@ func TestUpdateMatchStatus_TransactionError(t *testing.T) {
 
 	// Act
 	ctx := context.Background()
-	err := repo.UpdateMatchStatus(ctx, matchID, models.MatchStatusAccepted)
+	err := repo.UpdateMatchStatus(ctx, matchID, matchmodels.MatchStatusAccepted)
 
 	// Assert
 	assert.Error(t, err)
@@ -469,7 +471,7 @@ func TestUpdateMatchStatus_NoRowsAffected(t *testing.T) {
 	redisClient, miniRedis := setupMockRedis(t)
 	defer miniRedis.Close()
 
-	repo := NewMatchRepository(&models.Config{}, db, redisClient)
+	repo := NewMatchRepository(&coremodels.Config{}, db, redisClient)
 
 	matchID := uuid.New().String()
 	driverID := uuid.New()
@@ -487,7 +489,7 @@ func TestUpdateMatchStatus_NoRowsAffected(t *testing.T) {
 			matchID, driverID, passengerID,
 			106.827153, -6.175392,
 			106.837153, -6.185392,
-			models.MatchStatusPending, now, now)
+			matchmodels.MatchStatusPending, now, now)
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
 		SELECT 
@@ -506,14 +508,14 @@ func TestUpdateMatchStatus_NoRowsAffected(t *testing.T) {
 
 	// Use a regexp that matches both PostgreSQL ($1) and MySQL (?) style placeholders
 	mock.ExpectExec(`UPDATE matches SET status = (.+), updated_at = (.+) WHERE id = (.+)`).
-		WithArgs(models.MatchStatusAccepted, sqlmock.AnyArg(), matchID).
+		WithArgs(matchmodels.MatchStatusAccepted, sqlmock.AnyArg(), matchID).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
 	mock.ExpectRollback()
 
 	// Act
 	ctx := context.Background()
-	err := repo.UpdateMatchStatus(ctx, matchID, models.MatchStatusAccepted)
+	err := repo.UpdateMatchStatus(ctx, matchID, matchmodels.MatchStatusAccepted)
 
 	// Assert
 	assert.Error(t, err)
@@ -528,7 +530,7 @@ func TestListMatchesByPassenger_RowError(t *testing.T) {
 	redisClient, miniRedis := setupMockRedis(t)
 	defer miniRedis.Close()
 
-	repo := NewMatchRepository(&models.Config{}, db, redisClient)
+	repo := NewMatchRepository(&coremodels.Config{}, db, redisClient)
 
 	passengerID := uuid.New()
 
@@ -545,7 +547,7 @@ func TestListMatchesByPassenger_RowError(t *testing.T) {
 			"not-a-float", "not-a-float",
 			"not-a-float", "not-a-float",
 			"not-a-float", "not-a-float",
-			models.MatchStatusAccepted, false, false,
+			matchmodels.MatchStatusAccepted, false, false,
 			"not-a-time", "not-a-time").
 		RowError(0, fmt.Errorf("scan error"))
 

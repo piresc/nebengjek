@@ -3,7 +3,7 @@ package notification
 import (
 	"context"
 
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/notification"
 )
 
 //go:generate mockgen -destination=mocks/mock_usecase.go -package=mocks github.com/piresc/nebengjek/services/notification NotificationUC
@@ -22,10 +22,10 @@ type NotificationUC interface {
 	ProcessPaymentProcessed(ctx context.Context, eventData []byte) error
 
 	// Notification management
-	GetNotificationHistory(ctx context.Context, userID string, limit, offset int) ([]*models.NotificationHistory, error)
-	GetUndeliveredNotifications(ctx context.Context, userID string) ([]*models.NotificationHistory, error)
+	GetNotificationHistory(ctx context.Context, userID string, limit, offset int) ([]*notification.NotificationHistory, error)
+	GetUndeliveredNotifications(ctx context.Context, userID string) ([]*notification.NotificationHistory, error)
 	MarkNotificationDelivered(ctx context.Context, notificationID string) error
 
 	// Send notification to gateway
-	SendNotificationToGateway(ctx context.Context, notification *models.UserNotification) error
+	SendNotificationToGateway(ctx context.Context, notification *notification.UserNotification) error
 }

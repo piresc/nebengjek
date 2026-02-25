@@ -1,0 +1,25 @@
+package location
+
+import "time"
+
+// Location represents a geographic location
+type Location struct {
+	Latitude  float64 `json:"latitude"`  // Valid range: [-90, 90]
+	Longitude float64 `json:"longitude"` // Valid range: [-180, 180]
+}
+
+// LocationUpdate represents a location update event
+type LocationUpdate struct {
+	RideID    string    `json:"ride_id"`
+	DriverID  string    `json:"driver_id"`
+	Location  Location  `json:"location"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// LocationAggregate represents aggregated location data for billing
+type LocationAggregate struct {
+	RideID    string  `json:"ride_id"`
+	Distance  float64 `json:"distance"`
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+}

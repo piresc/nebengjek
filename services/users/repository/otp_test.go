@@ -12,9 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/database"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
 )
 
 // setupMiniredis creates a new miniredis server and returns a Redis client connected to it
@@ -52,7 +51,7 @@ func TestCreateOTP(t *testing.T) {
 	defer mr.Close()
 
 	// Test data
-	otp := models.OTP{
+	otp := coremodels.OTP{
 		MSISDN: "+628123456789",
 		Code:   "123456",
 	}
@@ -64,11 +63,11 @@ func TestCreateOTP(t *testing.T) {
 	assert.NoError(t, err)
 	
 	// Verify data was stored in Redis
-	key := fmt.Sprintf(constants.KeyUserOTP, otp.MSISDN)
+	key := fmt.Sprintf(database.KeyUserOTP, otp.MSISDN)
 	val, err := mr.Get(key)
 	assert.NoError(t, err)
 	
-	var storedOTP models.OTP
+	var storedOTP coremodels.OTP
 	err = json.Unmarshal([]byte(val), &storedOTP)
 	assert.NoError(t, err)
 	assert.Equal(t, otp.MSISDN, storedOTP.MSISDN)
@@ -87,7 +86,7 @@ func TestCreateOTP_RedisError(t *testing.T) {
 	mr.Close()
 
 	// Test data
-	otp := models.OTP{
+	otp := coremodels.OTP{
 		MSISDN: "+628123456789",
 		Code:   "123456",
 	}
@@ -107,24 +106,24 @@ func TestGetOTP(t *testing.T) {
 		code      string
 		setupFunc func(mr *miniredis.Miniredis)
 		wantErr   bool
-		wantOTP   *models.OTP
+		wantOTP   *coremodels.OTP
 	}{
 		{
 			name:   "Success",
 			msisdn: "+628123456789",
 			code:   "123456",
 			setupFunc: func(mr *miniredis.Miniredis) {
-				otp := models.OTP{
+				otp := coremodels.OTP{
 					MSISDN: "+628123456789",
 					Code:   "123456",
 				}
 				otpJSON, _ := json.Marshal(otp)
-				key := fmt.Sprintf(constants.KeyUserOTP, otp.MSISDN)
+				key := fmt.Sprintf(database.KeyUserOTP, otp.MSISDN)
 				mr.Set(key, string(otpJSON))
 				mr.SetTTL(key, 5*time.Minute)
 			},
 			wantErr: false,
-			wantOTP: &models.OTP{
+			wantOTP: &coremodels.OTP{
 				MSISDN: "+628123456789",
 				Code:   "123456",
 			},
@@ -144,7 +143,7 @@ func TestGetOTP(t *testing.T) {
 			msisdn: "+628123456791",
 			code:   "123456",
 			setupFunc: func(mr *miniredis.Miniredis) {
-				key := fmt.Sprintf(constants.KeyUserOTP, "+628123456791")
+				key := fmt.Sprintf(database.KeyUserOTP, "+628123456791")
 				mr.Set(key, "invalid json")
 			},
 			wantErr: true,
@@ -191,12 +190,12 @@ func TestMarkOTPVerified(t *testing.T) {
 			msisdn: "+628123456789",
 			code:   "123456",
 			setupFunc: func(mr *miniredis.Miniredis) {
-				otp := models.OTP{
+				otp := coremodels.OTP{
 					MSISDN: "+628123456789",
 					Code:   "123456",
 				}
 				otpJSON, _ := json.Marshal(otp)
-				key := fmt.Sprintf(constants.KeyUserOTP, otp.MSISDN)
+				key := fmt.Sprintf(database.KeyUserOTP, otp.MSISDN)
 				mr.Set(key, string(otpJSON))
 			},
 			wantErr: false,
@@ -238,7 +237,7 @@ func TestMarkOTPVerified(t *testing.T) {
 				assert.NoError(t, err)
 				
 				// Verify OTP is deleted from Redis
-				key := fmt.Sprintf(constants.KeyUserOTP, tc.msisdn)
+				key := fmt.Sprintf(database.KeyUserOTP, tc.msisdn)
 				assert.False(t, mr.Exists(key))
 			}
 		})

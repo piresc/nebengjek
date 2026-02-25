@@ -5,11 +5,12 @@ import (
 	"time"
 
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
+	"github.com/piresc/nebengjek/internal/pkg/models/location"
 )
 
 // UpdateBeaconStatus updates a user's beacon status and location with Redis caching to prevent duplicate events
-func (uc *UserUC) UpdateBeaconStatus(ctx context.Context, beaconReq *models.BeaconRequest) error {
+func (uc *UserUC) UpdateBeaconStatus(ctx context.Context, beaconReq *core.BeaconRequest) error {
 	// Validate the request
 	user, err := uc.userRepo.GetUserByMSISDN(ctx, beaconReq.MSISDN)
 	if err != nil {
@@ -32,10 +33,10 @@ func (uc *UserUC) UpdateBeaconStatus(ctx context.Context, beaconReq *models.Beac
 	}
 
 	// Create and publish beacon event
-	beaconEvent := &models.BeaconEvent{
+	beaconEvent := &core.BeaconEvent{
 		UserID:   user.ID.String(),
 		IsActive: beaconReq.IsActive,
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  beaconReq.Latitude,
 			Longitude: beaconReq.Longitude,
 		},

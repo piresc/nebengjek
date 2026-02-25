@@ -3,7 +3,7 @@ package handler
 import (
 	"github.com/labstack/echo/v4"
 	"github.com/piresc/nebengjek/internal/pkg/middleware"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 	"github.com/piresc/nebengjek/services/users/handler/http"
 )
 
@@ -11,14 +11,14 @@ import (
 type Handler struct {
 	userHandler *http.UserHandler
 	authHandler *http.AuthHandler
-	cfg         *models.Config
+	cfg         *core.Config
 }
 
 // NewHandler creates and initializes all handlers
 func NewHandler(
 	userHandler *http.UserHandler,
 	authHandler *http.AuthHandler,
-	cfg *models.Config,
+	cfg *core.Config,
 ) *Handler {
 
 	return &Handler{

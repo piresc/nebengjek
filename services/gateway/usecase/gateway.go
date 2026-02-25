@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
+	"github.com/piresc/nebengjek/internal/pkg/models/location"
+	"github.com/piresc/nebengjek/internal/pkg/models/match"
+	"github.com/piresc/nebengjek/internal/pkg/models/ride"
 	"github.com/piresc/nebengjek/services/gateway"
 	"github.com/piresc/nebengjek/services/users"
 )
@@ -25,7 +28,7 @@ func NewGatewayUC(userUC users.UserUC, gatewayGW gateway.GatewayGW) gateway.Gate
 }
 
 // UpdateBeaconStatus updates beacon status through users service
-func (uc *GatewayUseCase) UpdateBeaconStatus(ctx context.Context, req *models.BeaconRequest) error {
+func (uc *GatewayUseCase) UpdateBeaconStatus(ctx context.Context, req *core.BeaconRequest) error {
 	// Call Users Service which will handle business logic and publish to NATS
 	resp, err := uc.gatewayGW.CallUsersService(
 		ctx,
@@ -48,7 +51,7 @@ func (uc *GatewayUseCase) UpdateBeaconStatus(ctx context.Context, req *models.Be
 }
 
 // UpdateFinderStatus updates finder status through users service
-func (uc *GatewayUseCase) UpdateFinderStatus(ctx context.Context, req *models.FinderRequest) error {
+func (uc *GatewayUseCase) UpdateFinderStatus(ctx context.Context, req *core.FinderRequest) error {
 	// Call Users Service which will handle business logic and publish to NATS
 	resp, err := uc.gatewayGW.CallUsersService(
 		ctx,
@@ -71,7 +74,7 @@ func (uc *GatewayUseCase) UpdateFinderStatus(ctx context.Context, req *models.Fi
 }
 
 // ConfirmMatch confirms a match through match service
-func (uc *GatewayUseCase) ConfirmMatch(ctx context.Context, req *models.MatchConfirmRequest) (*models.MatchProposal, error) {
+func (uc *GatewayUseCase) ConfirmMatch(ctx context.Context, req *match.MatchConfirmRequest) (*match.MatchProposal, error) {
 	// Call Match Service instead of Users Service
 	resp, err := uc.gatewayGW.CallMatchService(
 		ctx,
@@ -91,7 +94,7 @@ func (uc *GatewayUseCase) ConfirmMatch(ctx context.Context, req *models.MatchCon
 	}
 
 	// Parse response
-	var result models.MatchProposal
+	var result match.MatchProposal
 	if err := json.Unmarshal(resp.Body, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse match service response: %w", err)
 	}
@@ -100,7 +103,7 @@ func (uc *GatewayUseCase) ConfirmMatch(ctx context.Context, req *models.MatchCon
 }
 
 // UpdateUserLocation updates user location through location service
-func (uc *GatewayUseCase) UpdateUserLocation(ctx context.Context, req *models.LocationUpdate) error {
+func (uc *GatewayUseCase) UpdateUserLocation(ctx context.Context, req *location.LocationUpdate) error {
 	// Call Location Service instead of Users Service
 	resp, err := uc.gatewayGW.CallLocationService(
 		ctx,
@@ -123,7 +126,7 @@ func (uc *GatewayUseCase) UpdateUserLocation(ctx context.Context, req *models.Lo
 }
 
 // RideStart starts a ride through rides service
-func (uc *GatewayUseCase) RideStart(ctx context.Context, req *models.RideStartRequest) (*models.Ride, error) {
+func (uc *GatewayUseCase) RideStart(ctx context.Context, req *ride.RideStartRequest) (*ride.Ride, error) {
 	// Call Rides Service instead of Users Service
 	resp, err := uc.gatewayGW.CallRidesService(
 		ctx,
@@ -146,7 +149,7 @@ func (uc *GatewayUseCase) RideStart(ctx context.Context, req *models.RideStartRe
 	var wrappedResponse struct {
 		Success bool        `json:"success"`
 		Message string      `json:"message"`
-		Data    models.Ride `json:"data"`
+		Data    ride.Ride `json:"data"`
 	}
 	if err := json.Unmarshal(resp.Body, &wrappedResponse); err != nil {
 		return nil, fmt.Errorf("failed to parse rides service response: %w", err)
@@ -156,7 +159,7 @@ func (uc *GatewayUseCase) RideStart(ctx context.Context, req *models.RideStartRe
 }
 
 // RideArrived handles ride arrival through rides service
-func (uc *GatewayUseCase) RideArrived(ctx context.Context, req *models.RideArrivalReq) (*models.PaymentRequest, error) {
+func (uc *GatewayUseCase) RideArrived(ctx context.Context, req *ride.RideArrivalReq) (*ride.PaymentRequest, error) {
 	// Call Rides Service instead of Users Service
 	resp, err := uc.gatewayGW.CallRidesService(
 		ctx,
@@ -179,7 +182,7 @@ func (uc *GatewayUseCase) RideArrived(ctx context.Context, req *models.RideArriv
 	var wrappedResponse struct {
 		Success bool                  `json:"success"`
 		Message string                `json:"message"`
-		Data    models.PaymentRequest `json:"data"`
+		Data    ride.PaymentRequest `json:"data"`
 	}
 	if err := json.Unmarshal(resp.Body, &wrappedResponse); err != nil {
 		return nil, fmt.Errorf("failed to parse rides service response: %w", err)
@@ -189,7 +192,7 @@ func (uc *GatewayUseCase) RideArrived(ctx context.Context, req *models.RideArriv
 }
 
 // ProcessPayment processes payment through rides service
-func (uc *GatewayUseCase) ProcessPayment(ctx context.Context, req *models.PaymentProccessRequest) (*models.Payment, error) {
+func (uc *GatewayUseCase) ProcessPayment(ctx context.Context, req *ride.PaymentProccessRequest) (*ride.Payment, error) {
 	// Call Rides Service instead of Users Service
 	resp, err := uc.gatewayGW.CallRidesService(
 		ctx,
@@ -212,7 +215,7 @@ func (uc *GatewayUseCase) ProcessPayment(ctx context.Context, req *models.Paymen
 	var wrappedResponse struct {
 		Success bool           `json:"success"`
 		Message string         `json:"message"`
-		Data    models.Payment `json:"data"`
+		Data    ride.Payment `json:"data"`
 	}
 	if err := json.Unmarshal(resp.Body, &wrappedResponse); err != nil {
 		return nil, fmt.Errorf("failed to parse rides service response: %w", err)
@@ -222,18 +225,18 @@ func (uc *GatewayUseCase) ProcessPayment(ctx context.Context, req *models.Paymen
 }
 
 // Proxy operations using Gateway interface
-func (uc *GatewayUseCase) ProxyToUsersService(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*models.ProxyResponse, error) {
+func (uc *GatewayUseCase) ProxyToUsersService(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*core.ProxyResponse, error) {
 	return uc.gatewayGW.CallUsersService(ctx, method, path, body, headers, queryParams)
 }
 
-func (uc *GatewayUseCase) ProxyToMatchService(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*models.ProxyResponse, error) {
+func (uc *GatewayUseCase) ProxyToMatchService(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*core.ProxyResponse, error) {
 	return uc.gatewayGW.CallMatchService(ctx, method, path, body, headers, queryParams)
 }
 
-func (uc *GatewayUseCase) ProxyToRidesService(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*models.ProxyResponse, error) {
+func (uc *GatewayUseCase) ProxyToRidesService(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*core.ProxyResponse, error) {
 	return uc.gatewayGW.CallRidesService(ctx, method, path, body, headers, queryParams)
 }
 
-func (uc *GatewayUseCase) ProxyToLocationService(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*models.ProxyResponse, error) {
+func (uc *GatewayUseCase) ProxyToLocationService(ctx context.Context, method, path string, body interface{}, headers map[string]string, queryParams map[string]string) (*core.ProxyResponse, error) {
 	return uc.gatewayGW.CallLocationService(ctx, method, path, body, headers, queryParams)
 }

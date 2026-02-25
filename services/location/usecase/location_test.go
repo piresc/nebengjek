@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/location"
 	"github.com/piresc/nebengjek/services/location/mocks"
 	"github.com/stretchr/testify/assert"
 )
@@ -24,23 +24,21 @@ func TestStoreLocation_Success(t *testing.T) {
 
 	rideID := "ride-123"
 	timestamp := time.Now()
-	locationUpdate := models.LocationUpdate{
+	locationUpdate := location.LocationUpdate{
 		RideID:   rideID,
 		DriverID: "driver-456",
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
-			Timestamp: timestamp,
-		},
+					},
 		CreatedAt: timestamp,
 	}
 
 	// Previous location
-	lastLocation := &models.Location{
+	lastLocation := &location.Location{
 		Latitude:  -6.174392, // Slightly different
 		Longitude: 106.826153,
-		Timestamp: timestamp.Add(-1 * time.Minute),
-	}
+			}
 
 	// Set up expectations
 	mockRepo.EXPECT().
@@ -54,7 +52,7 @@ func TestStoreLocation_Success(t *testing.T) {
 	// Mock gateway call for location aggregate
 	mockGW.EXPECT().
 		PublishLocationAggregate(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, aggregate models.LocationAggregate) error {
+		DoAndReturn(func(_ context.Context, aggregate location.LocationAggregate) error {
 			assert.Equal(t, rideID, aggregate.RideID)
 			assert.Equal(t, locationUpdate.Location.Latitude, aggregate.Latitude)
 			assert.Equal(t, locationUpdate.Location.Longitude, aggregate.Longitude)
@@ -80,14 +78,13 @@ func TestStoreLocation_FirstLocation(t *testing.T) {
 	uc := NewLocationUC(mockRepo, mockGW)
 
 	rideID := "ride-123"
-	locationUpdate := models.LocationUpdate{
+	locationUpdate := location.LocationUpdate{
 		RideID:   rideID,
 		DriverID: "driver-456",
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
-			Timestamp: time.Now(),
-		},
+					},
 		CreatedAt: time.Now(),
 	}
 
@@ -119,14 +116,13 @@ func TestStoreLocation_GetLastLocationError(t *testing.T) {
 	uc := NewLocationUC(mockRepo, mockGW)
 
 	rideID := "ride-123"
-	locationUpdate := models.LocationUpdate{
+	locationUpdate := location.LocationUpdate{
 		RideID:   rideID,
 		DriverID: "driver-456",
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
-			Timestamp: time.Now(),
-		},
+					},
 		CreatedAt: time.Now(),
 	}
 
@@ -160,14 +156,13 @@ func TestStoreLocation_StoreLocationError(t *testing.T) {
 	uc := NewLocationUC(mockRepo, mockGW)
 
 	rideID := "ride-123"
-	locationUpdate := models.LocationUpdate{
+	locationUpdate := location.LocationUpdate{
 		RideID:   rideID,
 		DriverID: "driver-456",
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
-			Timestamp: time.Now(),
-		},
+					},
 		CreatedAt: time.Now(),
 	}
 
@@ -201,23 +196,21 @@ func TestStoreLocation_PublishError(t *testing.T) {
 
 	rideID := "ride-123"
 	timestamp := time.Now()
-	locationUpdate := models.LocationUpdate{
+	locationUpdate := location.LocationUpdate{
 		RideID:   rideID,
 		DriverID: "driver-456",
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
-			Timestamp: timestamp,
-		},
+					},
 		CreatedAt: timestamp,
 	}
 
 	// Previous location exists
-	lastLocation := &models.Location{
+	lastLocation := &location.Location{
 		Latitude:  -6.174392,
 		Longitude: 106.826153,
-		Timestamp: timestamp.Add(-1 * time.Minute),
-	}
+			}
 
 	mockRepo.EXPECT().
 		GetLastLocation(gomock.Any(), rideID).
@@ -253,23 +246,21 @@ func TestStoreLocation_SecondaryStoreLocationError(t *testing.T) {
 
 	rideID := "ride-123"
 	timestamp := time.Now()
-	locationUpdate := models.LocationUpdate{
+	locationUpdate := location.LocationUpdate{
 		RideID:   rideID,
 		DriverID: "driver-456",
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
-			Timestamp: timestamp,
-		},
+					},
 		CreatedAt: timestamp,
 	}
 
 	// Previous location exists
-	lastLocation := &models.Location{
+	lastLocation := &location.Location{
 		Latitude:  -6.174392,
 		Longitude: 106.826153,
-		Timestamp: timestamp.Add(-1 * time.Minute),
-	}
+			}
 
 	expectedError := errors.New("database error")
 
@@ -301,23 +292,21 @@ func TestStoreLocation_ZeroDistance(t *testing.T) {
 
 	rideID := "ride-123"
 	timestamp := time.Now()
-	locationUpdate := models.LocationUpdate{
+	locationUpdate := location.LocationUpdate{
 		RideID:   rideID,
 		DriverID: "driver-456",
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
-			Timestamp: timestamp,
-		},
+					},
 		CreatedAt: timestamp,
 	}
 
 	// Previous location - exactly the same coordinates
-	lastLocation := &models.Location{
+	lastLocation := &location.Location{
 		Latitude:  -6.175392,
 		Longitude: 106.827153,
-		Timestamp: timestamp.Add(-1 * time.Minute),
-	}
+			}
 
 	// Set up expectations
 	mockRepo.EXPECT().
@@ -331,7 +320,7 @@ func TestStoreLocation_ZeroDistance(t *testing.T) {
 	// Mock gateway call for location aggregate
 	mockGW.EXPECT().
 		PublishLocationAggregate(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, aggregate models.LocationAggregate) error {
+		DoAndReturn(func(_ context.Context, aggregate location.LocationAggregate) error {
 			assert.Equal(t, rideID, aggregate.RideID)
 			assert.Equal(t, locationUpdate.Location.Latitude, aggregate.Latitude)
 			assert.Equal(t, locationUpdate.Location.Longitude, aggregate.Longitude)
@@ -356,14 +345,13 @@ func TestStoreLocation_InvalidRideID(t *testing.T) {
 
 	uc := NewLocationUC(mockRepo, mockGW)
 
-	locationUpdate := models.LocationUpdate{
+	locationUpdate := location.LocationUpdate{
 		RideID:   "", // Empty ride ID
 		DriverID: "driver-456",
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
-			Timestamp: time.Now(),
-		},
+					},
 		CreatedAt: time.Now(),
 	}
 
@@ -397,23 +385,21 @@ func TestStoreLocation_MaxDistanceCase(t *testing.T) {
 
 	rideID := "ride-123"
 	timestamp := time.Now()
-	locationUpdate := models.LocationUpdate{
+	locationUpdate := location.LocationUpdate{
 		RideID:   rideID,
 		DriverID: "driver-456",
-		Location: models.Location{
+		Location: location.Location{
 			Latitude:  -6.175392, // Jakarta area
 			Longitude: 106.827153,
-			Timestamp: timestamp,
-		},
+					},
 		CreatedAt: timestamp,
 	}
 
 	// Previous location - New York (very far but not exactly antipodal)
-	lastLocation := &models.Location{
+	lastLocation := &location.Location{
 		Latitude:  40.712776, // New York
 		Longitude: -74.005974,
-		Timestamp: timestamp.Add(-1 * time.Minute),
-	}
+			}
 
 	// Set up expectations
 	mockRepo.EXPECT().
@@ -427,7 +413,7 @@ func TestStoreLocation_MaxDistanceCase(t *testing.T) {
 	// Mock gateway call for location aggregate - use explicit matching instead of comparing
 	mockGW.EXPECT().
 		PublishLocationAggregate(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, aggregate models.LocationAggregate) error {
+		DoAndReturn(func(_ context.Context, aggregate location.LocationAggregate) error {
 			assert.Equal(t, rideID, aggregate.RideID)
 			assert.Equal(t, locationUpdate.Location.Latitude, aggregate.Latitude)
 			assert.Equal(t, locationUpdate.Location.Longitude, aggregate.Longitude)

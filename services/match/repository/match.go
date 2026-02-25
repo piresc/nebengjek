@@ -11,22 +11,22 @@ import (
 	"github.com/lib/pq"
 	_ "github.com/newrelic/go-agent/v3/integrations/nrpq"
 	"github.com/newrelic/go-agent/v3/newrelic"
-	"github.com/piresc/nebengjek/internal/pkg/constants"
-	"github.com/piresc/nebengjek/internal/pkg/database"
+		"github.com/piresc/nebengjek/internal/pkg/database"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
+	matchmodels "github.com/piresc/nebengjek/internal/pkg/models/match"
 )
 
 // MatchRepo implements the match repository interface
 type MatchRepo struct {
-	cfg         *models.Config
+	cfg         *core.Config
 	db          *sqlx.DB
 	redisClient *database.RedisClient
 }
 
 // NewMatchRepository creates a new match repository
 func NewMatchRepository(
-	cfg *models.Config,
+	cfg *core.Config,
 	db *sqlx.DB,
 	redisClient *database.RedisClient,
 ) *MatchRepo {
@@ -38,7 +38,7 @@ func NewMatchRepository(
 }
 
 // checkExistingPendingMatch checks if a pending match already exists between driver and passenger
-func (r *MatchRepo) checkExistingPendingMatch(ctx context.Context, driverID, passengerID uuid.UUID) (*models.Match, error) {
+func (r *MatchRepo) checkExistingPendingMatch(ctx context.Context, driverID, passengerID uuid.UUID) (*matchmodels.Match, error) {
 	query := `
 		SELECT 
 			id, driver_id, passenger_id,
@@ -54,8 +54,8 @@ func (r *MatchRepo) checkExistingPendingMatch(ctx context.Context, driverID, pas
 		WHERE driver_id = $1 AND passenger_id = $2 AND status = $3
 	`
 
-	var dto models.MatchDTO
-	err := r.db.QueryRowContext(ctx, query, driverID, passengerID, models.MatchStatusPending).Scan(
+	var dto matchmodels.MatchDTO
+	err := r.db.QueryRowContext(ctx, query, driverID, passengerID, matchmodels.MatchStatusPending).Scan(
 		&dto.ID, &dto.DriverID, &dto.PassengerID,
 		&dto.DriverLongitude, &dto.DriverLatitude,
 		&dto.PassengerLongitude, &dto.PassengerLatitude,
@@ -72,7 +72,7 @@ func (r *MatchRepo) checkExistingPendingMatch(ctx context.Context, driverID, pas
 }
 
 // insertMatch inserts a new match into the database
-func (r *MatchRepo) insertMatch(ctx context.Context, match *models.Match) error {
+func (r *MatchRepo) insertMatch(ctx context.Context, match *matchmodels.Match) error {
 	dto := match.ToDTO()
 
 	tx, err := r.db.BeginTxx(ctx, nil)
@@ -105,7 +105,7 @@ func (r *MatchRepo) insertMatch(ctx context.Context, match *models.Match) error 
 }
 
 // CreateMatch creates a new match in the database
-func (r *MatchRepo) CreateMatch(ctx context.Context, match *models.Match) (*models.Match, error) {
+func (r *MatchRepo) CreateMatch(ctx context.Context, match *matchmodels.Match) (*matchmodels.Match, error) {
 	// Check for existing pending match
 	existingMatch, err := r.checkExistingPendingMatch(ctx, match.DriverID, match.PassengerID)
 	if err == nil {
@@ -120,7 +120,7 @@ func (r *MatchRepo) CreateMatch(ctx context.Context, match *models.Match) (*mode
 	}
 	match.UpdatedAt = now
 	if match.Status == "" {
-		match.Status = models.MatchStatusPending
+		match.Status = matchmodels.MatchStatusPending
 	}
 
 	if err := r.insertMatch(ctx, match); err != nil {
@@ -131,7 +131,7 @@ func (r *MatchRepo) CreateMatch(ctx context.Context, match *models.Match) (*mode
 }
 
 // GetMatch retrieves a match by ID
-func (r *MatchRepo) GetMatch(ctx context.Context, matchID string) (*models.Match, error) {
+func (r *MatchRepo) GetMatch(ctx context.Context, matchID string) (*matchmodels.Match, error) {
 	// Get New Relic transaction from context for database instrumentation
 	txn := newrelic.FromContext(ctx)
 	dbCtx := newrelic.NewContext(ctx, txn)
@@ -151,7 +151,7 @@ func (r *MatchRepo) GetMatch(ctx context.Context, matchID string) (*models.Match
 		WHERE id = $1
 	`
 
-	var dto models.MatchDTO
+	var dto matchmodels.MatchDTO
 	err := r.db.QueryRowContext(dbCtx, query, matchID).Scan(
 		&dto.ID, &dto.DriverID, &dto.PassengerID,
 		&dto.DriverLongitude, &dto.DriverLatitude,
@@ -169,7 +169,7 @@ func (r *MatchRepo) GetMatch(ctx context.Context, matchID string) (*models.Match
 }
 
 // UpdateMatchStatus updates the status of a match
-func (r *MatchRepo) UpdateMatchStatus(ctx context.Context, matchID string, status models.MatchStatus) error {
+func (r *MatchRepo) UpdateMatchStatus(ctx context.Context, matchID string, status matchmodels.MatchStatus) error {
 	// First, verify the match exists
 	selectQuery := `
 		SELECT 
@@ -183,7 +183,7 @@ func (r *MatchRepo) UpdateMatchStatus(ctx context.Context, matchID string, statu
 		WHERE id = $1
 	`
 
-	var dto models.MatchDTO
+	var dto matchmodels.MatchDTO
 	err := r.db.QueryRowContext(ctx, selectQuery, matchID).Scan(
 		&dto.ID, &dto.DriverID, &dto.PassengerID,
 		&dto.DriverLongitude, &dto.DriverLatitude,
@@ -226,7 +226,7 @@ func (r *MatchRepo) UpdateMatchStatus(ctx context.Context, matchID string, statu
 }
 
 // validateUserForMatch validates that the user is part of the match
-func (r *MatchRepo) validateUserForMatch(match *models.Match, userID string, isDriver bool) error {
+func (r *MatchRepo) validateUserForMatch(match *matchmodels.Match, userID string, isDriver bool) error {
 	userUUID, err := uuid.Parse(userID)
 	if err != nil {
 		return fmt.Errorf("invalid user ID format: %w", err)
@@ -243,7 +243,7 @@ func (r *MatchRepo) validateUserForMatch(match *models.Match, userID string, isD
 }
 
 // updateMatchConfirmationFlags updates the confirmation flags and determines new status
-func (r *MatchRepo) updateMatchConfirmationFlags(match *models.Match, isDriver bool) (models.MatchStatus, error) {
+func (r *MatchRepo) updateMatchConfirmationFlags(match *matchmodels.Match, isDriver bool) (matchmodels.MatchStatus, error) {
 	// Check if already confirmed
 	if isDriver && match.DriverConfirmed {
 		return "", fmt.Errorf("driver has already confirmed this match")
@@ -261,18 +261,18 @@ func (r *MatchRepo) updateMatchConfirmationFlags(match *models.Match, isDriver b
 
 	// Determine new status
 	if match.DriverConfirmed && match.PassengerConfirmed {
-		return models.MatchStatusAccepted, nil
+		return matchmodels.MatchStatusAccepted, nil
 	} else if match.DriverConfirmed {
-		return models.MatchStatusDriverConfirmed, nil
+		return matchmodels.MatchStatusDriverConfirmed, nil
 	} else if match.PassengerConfirmed {
-		return models.MatchStatusPassengerConfirmed, nil
+		return matchmodels.MatchStatusPassengerConfirmed, nil
 	}
 
-	return models.MatchStatusPending, nil
+	return matchmodels.MatchStatusPending, nil
 }
 
 // ConfirmMatchByUser handles confirmation by either driver or passenger
-func (r *MatchRepo) ConfirmMatchByUser(ctx context.Context, matchID string, userID string, isDriver bool) (*models.Match, error) {
+func (r *MatchRepo) ConfirmMatchByUser(ctx context.Context, matchID string, userID string, isDriver bool) (*matchmodels.Match, error) {
 	// Get New Relic transaction from context for database instrumentation
 	txn := newrelic.FromContext(ctx)
 	dbCtx := newrelic.NewContext(ctx, txn)
@@ -300,7 +300,7 @@ func (r *MatchRepo) ConfirmMatchByUser(ctx context.Context, matchID string, user
 		FOR UPDATE
 	`
 
-	var dto models.MatchDTO
+	var dto matchmodels.MatchDTO
 	err = tx.QueryRowContext(dbCtx, query, matchID).Scan(
 		&dto.ID, &dto.DriverID, &dto.PassengerID,
 		&dto.DriverLongitude, &dto.DriverLatitude,
@@ -320,9 +320,9 @@ func (r *MatchRepo) ConfirmMatchByUser(ctx context.Context, matchID string, user
 		return nil, err
 	}
 
-	if match.Status != models.MatchStatusPending &&
-		match.Status != models.MatchStatusDriverConfirmed &&
-		match.Status != models.MatchStatusPassengerConfirmed {
+	if match.Status != matchmodels.MatchStatusPending &&
+		match.Status != matchmodels.MatchStatusDriverConfirmed &&
+		match.Status != matchmodels.MatchStatusPassengerConfirmed {
 		return nil, fmt.Errorf("match cannot be confirmed: current status is %s", match.Status)
 	}
 
@@ -367,7 +367,7 @@ func (r *MatchRepo) ConfirmMatchByUser(ctx context.Context, matchID string, user
 }
 
 // ListMatchesByPassenger retrieves all matches for a passenger
-func (r *MatchRepo) ListMatchesByPassenger(ctx context.Context, passengerID uuid.UUID) ([]*models.Match, error) {
+func (r *MatchRepo) ListMatchesByPassenger(ctx context.Context, passengerID uuid.UUID) ([]*matchmodels.Match, error) {
 	query := `
         SELECT 
             id, driver_id, passenger_id,
@@ -390,9 +390,9 @@ func (r *MatchRepo) ListMatchesByPassenger(ctx context.Context, passengerID uuid
 	}
 	defer rows.Close()
 
-	var matches []*models.Match
+	var matches []*matchmodels.Match
 	for rows.Next() {
-		var dto models.MatchDTO
+		var dto matchmodels.MatchDTO
 		err := rows.Scan(
 			&dto.ID, &dto.DriverID, &dto.PassengerID,
 			&dto.DriverLongitude, &dto.DriverLatitude,
@@ -416,7 +416,7 @@ func (r *MatchRepo) ListMatchesByPassenger(ctx context.Context, passengerID uuid
 }
 
 // BatchUpdateMatchStatus updates the status of multiple matches
-func (r *MatchRepo) BatchUpdateMatchStatus(ctx context.Context, matchIDs []string, status models.MatchStatus) error {
+func (r *MatchRepo) BatchUpdateMatchStatus(ctx context.Context, matchIDs []string, status matchmodels.MatchStatus) error {
 	if len(matchIDs) == 0 {
 		return nil
 	}
@@ -467,13 +467,13 @@ func (r *MatchRepo) SetActiveRide(ctx context.Context, driverID, passengerID, ri
 	ttl := time.Duration(ttlHours) * time.Hour
 
 	// Set active ride for driver with TTL
-	driverKey := fmt.Sprintf(constants.KeyActiveRideDriver, driverID)
+	driverKey := fmt.Sprintf(database.KeyActiveRideDriver, driverID)
 	if err := r.redisClient.Set(redisCtx, driverKey, rideID, ttl); err != nil {
 		return fmt.Errorf("failed to set active ride for driver: %w", err)
 	}
 
 	// Set active ride for passenger with TTL
-	passengerKey := fmt.Sprintf(constants.KeyActiveRidePassenger, passengerID)
+	passengerKey := fmt.Sprintf(database.KeyActiveRidePassenger, passengerID)
 	if err := r.redisClient.Set(redisCtx, passengerKey, rideID, ttl); err != nil {
 		return fmt.Errorf("failed to set active ride for passenger: %w", err)
 	}
@@ -492,7 +492,7 @@ func (r *MatchRepo) RemoveActiveRide(ctx context.Context, driverID, passengerID 
 	redisCtx := newrelic.NewContext(ctx, txn)
 
 	// Remove active ride for driver
-	driverKey := fmt.Sprintf(constants.KeyActiveRideDriver, driverID)
+	driverKey := fmt.Sprintf(database.KeyActiveRideDriver, driverID)
 	if err := r.redisClient.Delete(redisCtx, driverKey); err != nil {
 		logger.Warn("Failed to remove active ride for driver",
 			logger.String("driver_id", driverID),
@@ -501,7 +501,7 @@ func (r *MatchRepo) RemoveActiveRide(ctx context.Context, driverID, passengerID 
 	}
 
 	// Remove active ride for passenger
-	passengerKey := fmt.Sprintf(constants.KeyActiveRidePassenger, passengerID)
+	passengerKey := fmt.Sprintf(database.KeyActiveRidePassenger, passengerID)
 	if err := r.redisClient.Delete(redisCtx, passengerKey); err != nil {
 		logger.Warn("Failed to remove active ride for passenger",
 			logger.String("passenger_id", passengerID),
@@ -521,7 +521,7 @@ func (r *MatchRepo) GetActiveRideByDriver(ctx context.Context, driverID string) 
 	txn := newrelic.FromContext(ctx)
 	redisCtx := newrelic.NewContext(ctx, txn)
 
-	driverKey := fmt.Sprintf(constants.KeyActiveRideDriver, driverID)
+	driverKey := fmt.Sprintf(database.KeyActiveRideDriver, driverID)
 	rideID, err := r.redisClient.Get(redisCtx, driverKey)
 	if err != nil {
 		// If key doesn't exist, it's not an error - just means no active ride
@@ -539,7 +539,7 @@ func (r *MatchRepo) GetActiveRideByPassenger(ctx context.Context, passengerID st
 	txn := newrelic.FromContext(ctx)
 	redisCtx := newrelic.NewContext(ctx, txn)
 
-	passengerKey := fmt.Sprintf(constants.KeyActiveRidePassenger, passengerID)
+	passengerKey := fmt.Sprintf(database.KeyActiveRidePassenger, passengerID)
 	rideID, err := r.redisClient.Get(redisCtx, passengerKey)
 	if err != nil {
 		// If key doesn't exist, it's not an error - just means no active ride

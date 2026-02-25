@@ -6,10 +6,10 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 )
 
-func InitConfig(configPath string) *models.Config {
+func InitConfig(configPath string) *core.Config {
 	local := GetEnv("APP_ENV", "local")
 	if local == "local" {
 		// Load config from file
@@ -24,8 +24,8 @@ func InitConfig(configPath string) *models.Config {
 	return loadConfigFromEnv()
 }
 
-func loadConfigFromEnv() *models.Config {
-	configs := &models.Config{}
+func loadConfigFromEnv() *core.Config {
+	configs := &core.Config{}
 
 	// App config
 	configs.App.Name = GetEnv("APP_NAME", "")

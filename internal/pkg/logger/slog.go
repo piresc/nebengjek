@@ -129,22 +129,38 @@ func (cl *ContextLogger) WithContext(ctx context.Context) *slog.Logger {
 
 	// Add request ID if available
 	if requestID := ctx.Value("request_id"); requestID != nil {
-		attrs = append(attrs, slog.String("request_id", requestID.(string)))
+		if requestIDStr, ok := requestID.(string); ok {
+			attrs = append(attrs, slog.String("request_id", requestIDStr))
+		} else {
+			attrs = append(attrs, slog.Any("request_id", requestID))
+		}
 	}
 
 	// Add user ID if available
 	if userID := ctx.Value("user_id"); userID != nil {
-		attrs = append(attrs, slog.String("user_id", userID.(string)))
+		if userIDStr, ok := userID.(string); ok {
+			attrs = append(attrs, slog.String("user_id", userIDStr))
+		} else {
+			attrs = append(attrs, slog.Any("user_id", userID))
+		}
 	}
 
 	// Add service name if available
 	if serviceName := ctx.Value("service_name"); serviceName != nil {
-		attrs = append(attrs, slog.String("service_name", serviceName.(string)))
+		if serviceNameStr, ok := serviceName.(string); ok {
+			attrs = append(attrs, slog.String("service_name", serviceNameStr))
+		} else {
+			attrs = append(attrs, slog.Any("service_name", serviceName))
+		}
 	}
 
 	// Add trace ID if available
 	if traceID := ctx.Value("trace_id"); traceID != nil {
-		attrs = append(attrs, slog.String("trace_id", traceID.(string)))
+		if traceIDStr, ok := traceID.(string); ok {
+			attrs = append(attrs, slog.String("trace_id", traceIDStr))
+		} else {
+			attrs = append(attrs, slog.Any("trace_id", traceID))
+		}
 	}
 
 	if len(attrs) > 0 {

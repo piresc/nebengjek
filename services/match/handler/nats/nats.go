@@ -5,19 +5,20 @@ import (
 	"encoding/json"
 
 	"github.com/nats-io/nats.go/jetstream"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
+		ridemodels "github.com/piresc/nebengjek/internal/pkg/models/ride"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
-	"github.com/piresc/nebengjek/services/match"
+	matchsvc "github.com/piresc/nebengjek/services/match"
 )
 
 // MatchHandler handles JetStream subscriptions for the match service
 type MatchHandler struct {
-	matchUC    match.MatchUC
+	matchUC    matchsvc.MatchUC
 	natsClient *natspkg.Client
 }
 
 // NewMatchHandler creates a new match NATS handler
-func NewMatchHandler(matchUC match.MatchUC, client *natspkg.Client) *MatchHandler {
+func NewMatchHandler(matchUC matchsvc.MatchUC, client *natspkg.Client) *MatchHandler {
 	return &MatchHandler{
 		matchUC:    matchUC,
 		natsClient: client,
@@ -89,7 +90,7 @@ func (h *MatchHandler) handleRideCompletedJS(msg jetstream.Msg) error {
 
 // handleBeaconEvent processes beacon events from the user service
 func (h *MatchHandler) handleBeaconEvent(ctx context.Context, msg []byte) error {
-	var event models.BeaconEvent
+	var event coremodels.BeaconEvent
 	if err := json.Unmarshal(msg, &event); err != nil {
 		return err
 	}
@@ -99,7 +100,7 @@ func (h *MatchHandler) handleBeaconEvent(ctx context.Context, msg []byte) error 
 
 // handleFinderEvent processes finder events from the user service
 func (h *MatchHandler) handleFinderEvent(ctx context.Context, msg []byte) error {
-	var event models.FinderEvent
+	var event coremodels.FinderEvent
 	if err := json.Unmarshal(msg, &event); err != nil {
 		return err
 	}
@@ -109,7 +110,7 @@ func (h *MatchHandler) handleFinderEvent(ctx context.Context, msg []byte) error 
 
 // handleRidePickup processes ride pickup events to lock drivers
 func (h *MatchHandler) handleRidePickup(ctx context.Context, msg []byte) error {
-	var ridePickup models.RideResp
+	var ridePickup ridemodels.RideResp
 	if err := json.Unmarshal(msg, &ridePickup); err != nil {
 		return err
 	}
@@ -128,7 +129,7 @@ func (h *MatchHandler) handleRidePickup(ctx context.Context, msg []byte) error {
 
 // handleRideCompleted processes ride completed events to unlock users
 func (h *MatchHandler) handleRideCompleted(ctx context.Context, msg []byte) error {
-	var rideComplete models.RideComplete
+	var rideComplete ridemodels.RideComplete
 	if err := json.Unmarshal(msg, &rideComplete); err != nil {
 		return err
 	}

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/notification"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,9 +21,9 @@ func TestCreateNotificationFromEvent(t *testing.T) {
 		"type":    "test",
 	}
 	
-	userNotification := &models.UserNotification{
+	userNotification := &notification.UserNotification{
 		UserID:    userID,
-		Type:      models.NotificationTypeMatchProposal,
+		Type:      notification.NotificationTypeMatchProposal,
 		Data:      testData,
 		Timestamp: now,
 	}
@@ -32,7 +32,7 @@ func TestCreateNotificationFromEvent(t *testing.T) {
 	
 	assert.NoError(t, err)
 	assert.Equal(t, userID, notification.UserID)
-	assert.Equal(t, models.NotificationTypeMatchProposal, notification.Type)
+	assert.Equal(t, "match_proposal", notification.Type)
 	assert.Equal(t, now, notification.Timestamp)
 	assert.False(t, notification.Delivered)
 	

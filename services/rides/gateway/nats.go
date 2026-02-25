@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
+	ridemodels "github.com/piresc/nebengjek/internal/pkg/models/ride"
 	"github.com/piresc/nebengjek/services/rides"
 )
 
@@ -26,8 +25,8 @@ func NewRideGW(client *natspkg.Client) rides.RideGW {
 }
 
 // PublishRidePickup publishes a ride pickup event to JetStream with delivery guarantees
-func (g *RideGW) PublishRidePickup(ctx context.Context, ride *models.Ride) error {
-	rideResponse := models.RideResp{
+func (g *RideGW) PublishRidePickup(ctx context.Context, ride *ridemodels.Ride) error {
+	rideResponse := ridemodels.RideResp{
 		RideID:      ride.RideID.String(),
 		MatchID:     ride.MatchID.String(),
 		DriverID:    ride.DriverID.String(),
@@ -48,7 +47,7 @@ func (g *RideGW) PublishRidePickup(ctx context.Context, ride *models.Ride) error
 
 	// Use JetStream publish with options for reliability
 	opts := natspkg.PublishOptions{
-		Subject: constants.SubjectRidePickup,
+		Subject: natspkg.SubjectRidePickup,
 		Data:    data,
 		MsgID:   fmt.Sprintf("ride-pickup-%s-%d", ride.RideID.String(), time.Now().UnixNano()),
 		Timeout: 15 * time.Second, // Longer timeout for critical ride events
@@ -73,8 +72,8 @@ func (g *RideGW) PublishRidePickup(ctx context.Context, ride *models.Ride) error
 }
 
 // PublishRideStarted publishes a ride started event to JetStream with delivery guarantees
-func (g *RideGW) PublishRideStarted(ctx context.Context, ride *models.Ride) error {
-	rideResponse := models.RideResp{
+func (g *RideGW) PublishRideStarted(ctx context.Context, ride *ridemodels.Ride) error {
+	rideResponse := ridemodels.RideResp{
 		RideID:      ride.RideID.String(),
 		DriverID:    ride.DriverID.String(),
 		PassengerID: ride.PassengerID.String(),
@@ -91,7 +90,7 @@ func (g *RideGW) PublishRideStarted(ctx context.Context, ride *models.Ride) erro
 
 	// Use JetStream publish with options for reliability
 	opts := natspkg.PublishOptions{
-		Subject: constants.SubjectRideStarted,
+		Subject: natspkg.SubjectRideStarted,
 		Data:    data,
 		MsgID:   fmt.Sprintf("ride-started-%s-%d", ride.RideID.String(), time.Now().UnixNano()),
 		Timeout: 15 * time.Second, // Longer timeout for critical ride events
@@ -116,7 +115,7 @@ func (g *RideGW) PublishRideStarted(ctx context.Context, ride *models.Ride) erro
 }
 
 // PublishRideCompleted publishes a ride completed event to JetStream with delivery guarantees
-func (g *RideGW) PublishRideCompleted(ctx context.Context, rideComplete models.RideComplete) error {
+func (g *RideGW) PublishRideCompleted(ctx context.Context, rideComplete ridemodels.RideComplete) error {
 	data, err := json.Marshal(rideComplete)
 	if err != nil {
 		return fmt.Errorf("failed to marshal ride complete event: %w", err)
@@ -124,7 +123,7 @@ func (g *RideGW) PublishRideCompleted(ctx context.Context, rideComplete models.R
 
 	// Use JetStream publish with options for reliability
 	opts := natspkg.PublishOptions{
-		Subject: constants.SubjectRideCompleted,
+		Subject: natspkg.SubjectRideCompleted,
 		Data:    data,
 		MsgID:   fmt.Sprintf("ride-completed-%s-%d", rideComplete.Ride.RideID.String(), time.Now().UnixNano()),
 		Timeout: 15 * time.Second, // Longer timeout for critical ride events

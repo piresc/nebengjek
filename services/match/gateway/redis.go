@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/piresc/nebengjek/internal/pkg/database"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	locationmodels "github.com/piresc/nebengjek/internal/pkg/models/location"
+	matchmodels "github.com/piresc/nebengjek/internal/pkg/models/match"
 )
 
 // RedisGateway handles Redis geospatial operations for location-based matching
@@ -30,7 +32,7 @@ const (
 )
 
 // AddAvailableDriver adds a driver to the available drivers geo set
-func (gw *RedisGateway) AddAvailableDriver(ctx context.Context, driverID string, location *models.Location) error {
+func (gw *RedisGateway) AddAvailableDriver(ctx context.Context, driverID string, location *locationmodels.Location) error {
 	// Add to geospatial set
 	if err := gw.redisClient.GeoAdd(ctx, KeyAvailableDrivers, location.Longitude, location.Latitude, driverID); err != nil {
 		return fmt.Errorf("failed to add driver to geo set: %w", err)
@@ -41,7 +43,7 @@ func (gw *RedisGateway) AddAvailableDriver(ctx context.Context, driverID string,
 	locationData := map[string]interface{}{
 		"latitude":  location.Latitude,
 		"longitude": location.Longitude,
-		"timestamp": location.Timestamp.Unix(),
+		"timestamp": time.Now().Unix(),
 	}
 
 	if err := gw.redisClient.HMSet(ctx, locationKey, locationData); err != nil {
@@ -68,7 +70,7 @@ func (gw *RedisGateway) RemoveAvailableDriver(ctx context.Context, driverID stri
 }
 
 // AddAvailablePassenger adds a passenger to the Redis geospatial index
-func (gw *RedisGateway) AddAvailablePassenger(ctx context.Context, passengerID string, location *models.Location) error {
+func (gw *RedisGateway) AddAvailablePassenger(ctx context.Context, passengerID string, location *locationmodels.Location) error {
 	// Add to geospatial set
 	if err := gw.redisClient.GeoAdd(ctx, KeyAvailablePassengers, location.Longitude, location.Latitude, passengerID); err != nil {
 		return fmt.Errorf("failed to add passenger to geo set: %w", err)
@@ -79,7 +81,7 @@ func (gw *RedisGateway) AddAvailablePassenger(ctx context.Context, passengerID s
 	locationData := map[string]interface{}{
 		"latitude":  location.Latitude,
 		"longitude": location.Longitude,
-		"timestamp": location.Timestamp.Unix(),
+		"timestamp": time.Now().Unix(),
 	}
 
 	if err := gw.redisClient.HMSet(ctx, locationKey, locationData); err != nil {
@@ -106,19 +108,19 @@ func (gw *RedisGateway) RemoveAvailablePassenger(ctx context.Context, passengerI
 }
 
 // FindNearbyDrivers finds available drivers within the specified radius
-func (gw *RedisGateway) FindNearbyDrivers(ctx context.Context, location *models.Location, radiusKm float64) ([]*models.NearbyUser, error) {
+func (gw *RedisGateway) FindNearbyDrivers(ctx context.Context, location *locationmodels.Location, radiusKm float64) ([]*matchmodels.NearbyUser, error) {
 	// Use Redis GEORADIUS to find nearby drivers
 	results, err := gw.redisClient.GeoRadius(ctx, KeyAvailableDrivers, location.Longitude, location.Latitude, radiusKm, "km")
 	if err != nil {
 		return nil, fmt.Errorf("failed to find nearby drivers: %w", err)
 	}
 
-	nearbyDrivers := make([]*models.NearbyUser, 0, len(results))
+	nearbyDrivers := make([]*matchmodels.NearbyUser, 0, len(results))
 	for _, result := range results {
-		nearbyDriver := &models.NearbyUser{
+		nearbyDriver := &matchmodels.NearbyUser{
 			ID:       result.Name,
 			Distance: result.Dist,
-			Location: models.Location{
+			Location: locationmodels.Location{
 				Latitude:  result.Latitude,
 				Longitude: result.Longitude,
 			},
@@ -130,29 +132,29 @@ func (gw *RedisGateway) FindNearbyDrivers(ctx context.Context, location *models.
 }
 
 // GetDriverLocation retrieves a driver's last known location
-func (gw *RedisGateway) GetDriverLocation(ctx context.Context, driverID string) (models.Location, error) {
+func (gw *RedisGateway) GetDriverLocation(ctx context.Context, driverID string) (locationmodels.Location, error) {
 	locationKey := fmt.Sprintf("%s:%s", KeyDriverLocations, driverID)
 	
 	locationData, err := gw.redisClient.HGetAll(ctx, locationKey)
 	if err != nil {
-		return models.Location{}, fmt.Errorf("failed to get driver location: %w", err)
+		return locationmodels.Location{}, fmt.Errorf("failed to get driver location: %w", err)
 	}
 
 	if len(locationData) == 0 {
-		return models.Location{}, fmt.Errorf("driver location not found")
+		return locationmodels.Location{}, fmt.Errorf("driver location not found")
 	}
 
-	location := models.Location{}
+	location := locationmodels.Location{}
 	
 	if lat, ok := locationData["latitude"]; ok {
 		if location.Latitude, err = strconv.ParseFloat(lat, 64); err != nil {
-			return models.Location{}, fmt.Errorf("failed to parse latitude: %w", err)
+			return locationmodels.Location{}, fmt.Errorf("failed to parse latitude: %w", err)
 		}
 	}
 	
 	if lng, ok := locationData["longitude"]; ok {
 		if location.Longitude, err = strconv.ParseFloat(lng, 64); err != nil {
-			return models.Location{}, fmt.Errorf("failed to parse longitude: %w", err)
+			return locationmodels.Location{}, fmt.Errorf("failed to parse longitude: %w", err)
 		}
 	}
 
@@ -161,29 +163,29 @@ func (gw *RedisGateway) GetDriverLocation(ctx context.Context, driverID string) 
 }
 
 // GetPassengerLocation retrieves a passenger's last known location
-func (gw *RedisGateway) GetPassengerLocation(ctx context.Context, passengerID string) (models.Location, error) {
+func (gw *RedisGateway) GetPassengerLocation(ctx context.Context, passengerID string) (locationmodels.Location, error) {
 	locationKey := fmt.Sprintf("%s:%s", KeyPassengerLocations, passengerID)
 	
 	locationData, err := gw.redisClient.HGetAll(ctx, locationKey)
 	if err != nil {
-		return models.Location{}, fmt.Errorf("failed to get passenger location: %w", err)
+		return locationmodels.Location{}, fmt.Errorf("failed to get passenger location: %w", err)
 	}
 
 	if len(locationData) == 0 {
-		return models.Location{}, fmt.Errorf("passenger location not found")
+		return locationmodels.Location{}, fmt.Errorf("passenger location not found")
 	}
 
-	location := models.Location{}
+	location := locationmodels.Location{}
 	
 	if lat, ok := locationData["latitude"]; ok {
 		if location.Latitude, err = strconv.ParseFloat(lat, 64); err != nil {
-			return models.Location{}, fmt.Errorf("failed to parse latitude: %w", err)
+			return locationmodels.Location{}, fmt.Errorf("failed to parse latitude: %w", err)
 		}
 	}
 	
 	if lng, ok := locationData["longitude"]; ok {
 		if location.Longitude, err = strconv.ParseFloat(lng, 64); err != nil {
-			return models.Location{}, fmt.Errorf("failed to parse longitude: %w", err)
+			return locationmodels.Location{}, fmt.Errorf("failed to parse longitude: %w", err)
 		}
 	}
 

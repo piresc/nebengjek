@@ -8,7 +8,10 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
+	ridemodels "github.com/piresc/nebengjek/internal/pkg/models/ride"
+	matchmodels "github.com/piresc/nebengjek/internal/pkg/models/match"
+	locationmodels "github.com/piresc/nebengjek/internal/pkg/models/location"
 	"github.com/piresc/nebengjek/services/rides/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,8 +25,8 @@ func TestCreateRide_Success(t *testing.T) {
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
 
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
 	}
@@ -34,25 +37,25 @@ func TestCreateRide_Success(t *testing.T) {
 	passengerID := uuid.New().String()
 	matchID := uuid.New().String()
 
-	matchProposal := models.MatchProposal{
+	matchProposal := matchmodels.MatchProposal{
 		ID:          matchID,
 		DriverID:    driverID,
 		PassengerID: passengerID,
-		UserLocation: models.Location{
+		UserLocation: locationmodels.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
 		},
-		DriverLocation: models.Location{
+		DriverLocation: locationmodels.Location{
 			Latitude:  -6.185392,
 			Longitude: 106.837153,
 		},
-		MatchStatus: models.MatchStatusAccepted,
+		MatchStatus: matchmodels.MatchStatusAccepted,
 	}
 
 	// Set up expectations
 	mockRepo.EXPECT().
 		CreateRide(gomock.Any()).
-		DoAndReturn(func(ride *models.Ride) (*models.Ride, error) {
+		DoAndReturn(func(ride *ridemodels.Ride) (*ridemodels.Ride, error) {
 			assert.Equal(t, uuid.MustParse(matchID), ride.MatchID)
 			assert.Equal(t, uuid.MustParse(driverID), ride.DriverID)
 			assert.Equal(t, uuid.MustParse(passengerID), ride.PassengerID)
@@ -81,8 +84,8 @@ func TestCreateRide_RepositoryError(t *testing.T) {
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
 
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
 	}
@@ -93,11 +96,11 @@ func TestCreateRide_RepositoryError(t *testing.T) {
 	passengerID := uuid.New().String()
 	matchID := uuid.New().String()
 
-	matchProposal := models.MatchProposal{
+	matchProposal := matchmodels.MatchProposal{
 		ID:          matchID,
 		DriverID:    driverID,
 		PassengerID: passengerID,
-		MatchStatus: models.MatchStatusAccepted,
+		MatchStatus: matchmodels.MatchStatusAccepted,
 	}
 
 	expectedError := errors.New("database error")
@@ -123,8 +126,8 @@ func TestCreateRide_PublishError(t *testing.T) {
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
 
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
 	}
@@ -135,11 +138,11 @@ func TestCreateRide_PublishError(t *testing.T) {
 	passengerID := uuid.New().String()
 	matchID := uuid.New().String()
 
-	matchProposal := models.MatchProposal{
+	matchProposal := matchmodels.MatchProposal{
 		ID:          matchID,
 		DriverID:    driverID,
 		PassengerID: passengerID,
-		MatchStatus: models.MatchStatusAccepted,
+		MatchStatus: matchmodels.MatchStatusAccepted,
 	}
 
 	expectedError := errors.New("publish error")
@@ -147,7 +150,7 @@ func TestCreateRide_PublishError(t *testing.T) {
 	// Set up expectations
 	mockRepo.EXPECT().
 		CreateRide(gomock.Any()).
-		DoAndReturn(func(ride *models.Ride) (*models.Ride, error) {
+		DoAndReturn(func(ride *ridemodels.Ride) (*ridemodels.Ride, error) {
 			ride.RideID = uuid.New()
 			return ride, nil
 		})
@@ -172,8 +175,8 @@ func TestProcessBillingUpdate_Success(t *testing.T) {
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
 
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
 	}
@@ -183,15 +186,15 @@ func TestProcessBillingUpdate_Success(t *testing.T) {
 	rideID := uuid.New().String()
 	rideUUID := uuid.MustParse(rideID)
 
-	entry := &models.BillingLedger{
+	entry := &ridemodels.BillingLedger{
 		RideID:   rideUUID,
 		Distance: 2.5,
 		Cost:     7500,
 	}
 
-	ride := &models.Ride{
+	ride := &ridemodels.Ride{
 		RideID:    rideUUID,
-		Status:    models.RideStatusOngoing,
+		Status:    ridemodels.RideStatusOngoing,
 		TotalCost: 10000,
 	}
 
@@ -223,8 +226,8 @@ func TestProcessBillingUpdate_GetRideError(t *testing.T) {
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
 
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
 	}
@@ -234,7 +237,7 @@ func TestProcessBillingUpdate_GetRideError(t *testing.T) {
 	rideID := uuid.New().String()
 	rideUUID := uuid.MustParse(rideID)
 
-	entry := &models.BillingLedger{
+	entry := &ridemodels.BillingLedger{
 		RideID:   rideUUID,
 		Distance: 2.5,
 		Cost:     7500,
@@ -263,8 +266,8 @@ func TestProcessBillingUpdate_InvalidRideStatus(t *testing.T) {
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
 
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
 	}
@@ -274,15 +277,15 @@ func TestProcessBillingUpdate_InvalidRideStatus(t *testing.T) {
 	rideID := uuid.New().String()
 	rideUUID := uuid.MustParse(rideID)
 
-	entry := &models.BillingLedger{
+	entry := &ridemodels.BillingLedger{
 		RideID:   rideUUID,
 		Distance: 2.5,
 		Cost:     7500,
 	}
 
-	ride := &models.Ride{
+	ride := &ridemodels.Ride{
 		RideID:    rideUUID,
-		Status:    models.RideStatusCompleted, // Ride is already completed
+		Status:    ridemodels.RideStatusCompleted, // Ride is already completed
 		TotalCost: 10000,
 	}
 
@@ -307,8 +310,8 @@ func TestStartRide_Success(t *testing.T) {
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
 
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
 	}
@@ -318,21 +321,21 @@ func TestStartRide_Success(t *testing.T) {
 	rideID := uuid.New().String()
 	rideUUID := uuid.MustParse(rideID)
 
-	req := models.RideStartRequest{
+	req := ridemodels.RideStartRequest{
 		RideID: rideID,
-		DriverLocation: &models.Location{
+		DriverLocation: &locationmodels.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
 		},
-		PassengerLocation: &models.Location{
+		PassengerLocation: &locationmodels.Location{
 			Latitude:  -6.175400, // Very close to driver
 			Longitude: 106.827160,
 		},
 	}
 
-	ride := &models.Ride{
+	ride := &ridemodels.Ride{
 		RideID: rideUUID,
-		Status: models.RideStatusDriverPickup,
+		Status: ridemodels.RideStatusDriverPickup,
 	}
 
 	// Set up expectations
@@ -341,7 +344,7 @@ func TestStartRide_Success(t *testing.T) {
 		Return(ride, nil)
 
 	mockRepo.EXPECT().
-		UpdateRideStatus(gomock.Any(), rideID, models.RideStatusOngoing).
+		UpdateRideStatus(gomock.Any(), rideID, ridemodels.RideStatusOngoing).
 		Return(nil)
 
 	// Act
@@ -350,7 +353,7 @@ func TestStartRide_Success(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
-	assert.Equal(t, models.RideStatusOngoing, result.Status)
+	assert.Equal(t, ridemodels.RideStatusOngoing, result.Status)
 }
 
 func TestStartRide_DriverTooFar(t *testing.T) {
@@ -361,8 +364,8 @@ func TestStartRide_DriverTooFar(t *testing.T) {
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
 
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
 	}
@@ -372,21 +375,21 @@ func TestStartRide_DriverTooFar(t *testing.T) {
 	rideID := uuid.New().String()
 	rideUUID := uuid.MustParse(rideID)
 
-	req := models.RideStartRequest{
+	req := ridemodels.RideStartRequest{
 		RideID: rideID,
-		DriverLocation: &models.Location{
+		DriverLocation: &locationmodels.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
 		},
-		PassengerLocation: &models.Location{
+		PassengerLocation: &locationmodels.Location{
 			Latitude:  -6.185392, // Too far from driver
 			Longitude: 106.837153,
 		},
 	}
 
-	ride := &models.Ride{
+	ride := &ridemodels.Ride{
 		RideID: rideUUID,
-		Status: models.RideStatusDriverPickup,
+		Status: ridemodels.RideStatusDriverPickup,
 	}
 
 	// Set up expectations
@@ -400,7 +403,7 @@ func TestStartRide_DriverTooFar(t *testing.T) {
 	// Assert
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "driver is too far from passenger")
-	assert.Equal(t, models.Ride{}, *result)
+	assert.Equal(t, ridemodels.Ride{}, *result)
 }
 
 func TestStartRide_InvalidStatus(t *testing.T) {
@@ -411,8 +414,8 @@ func TestStartRide_InvalidStatus(t *testing.T) {
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
 
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
 	}
@@ -422,21 +425,21 @@ func TestStartRide_InvalidStatus(t *testing.T) {
 	rideID := uuid.New().String()
 	rideUUID := uuid.MustParse(rideID)
 
-	req := models.RideStartRequest{
+	req := ridemodels.RideStartRequest{
 		RideID: rideID,
-		DriverLocation: &models.Location{
+		DriverLocation: &locationmodels.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
 		},
-		PassengerLocation: &models.Location{
+		PassengerLocation: &locationmodels.Location{
 			Latitude:  -6.175400,
 			Longitude: 106.827160,
 		},
 	}
 
-	ride := &models.Ride{
+	ride := &ridemodels.Ride{
 		RideID: rideUUID,
-		Status: models.RideStatusOngoing, // Wrong status
+		Status: ridemodels.RideStatusOngoing, // Wrong status
 	}
 
 	// Set up expectations
@@ -450,7 +453,7 @@ func TestStartRide_InvalidStatus(t *testing.T) {
 	// Assert
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot start trip for ride not in driver_pickup state")
-	assert.Equal(t, models.Ride{}, *result)
+	assert.Equal(t, ridemodels.Ride{}, *result)
 }
 
 func TestRideArrived_Success(t *testing.T) {
@@ -461,8 +464,8 @@ func TestRideArrived_Success(t *testing.T) {
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
 
-	cfg := &models.Config{
-		Pricing: models.PricingConfig{
+	cfg := &core.Config{
+		Pricing: core.PricingConfig{
 			AdminFeePercent: 5.0, // 5% admin fee
 		},
 	}
@@ -475,15 +478,15 @@ func TestRideArrived_Success(t *testing.T) {
 	adjustmentFactor := 0.8
 	totalCost := 10000
 
-	req := models.RideArrivalReq{
+	req := ridemodels.RideArrivalReq{
 		RideID:           rideID,
 		AdjustmentFactor: adjustmentFactor,
 	}
 
-	ride := &models.Ride{
+	ride := &ridemodels.Ride{
 		RideID:      rideUUID,
 		PassengerID: passengerID,
-		Status:      models.RideStatusOngoing,
+		Status:      ridemodels.RideStatusOngoing,
 	}
 
 	// Expected values
@@ -503,12 +506,12 @@ func TestRideArrived_Success(t *testing.T) {
 
 	mockRepo.EXPECT().
 		CreatePayment(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, payment *models.Payment) error {
+		DoAndReturn(func(_ context.Context, payment *ridemodels.Payment) error {
 			assert.Equal(t, rideUUID, payment.RideID)
 			assert.Equal(t, adjustedCost, payment.AdjustedCost)
 			assert.Equal(t, adminFee, payment.AdminFee)
 			assert.Equal(t, driverPayout, payment.DriverPayout)
-			assert.Equal(t, models.PaymentStatusPending, payment.Status)
+			assert.Equal(t, ridemodels.PaymentStatusPending, payment.Status)
 			return nil
 		})
 
@@ -531,8 +534,8 @@ func TestRideArrived_InvalidStatus(t *testing.T) {
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
 
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
 	}
@@ -542,14 +545,14 @@ func TestRideArrived_InvalidStatus(t *testing.T) {
 	rideID := uuid.New().String()
 	rideUUID := uuid.MustParse(rideID)
 
-	req := models.RideArrivalReq{
+	req := ridemodels.RideArrivalReq{
 		RideID:           rideID,
 		AdjustmentFactor: 0.8,
 	}
 
-	ride := &models.Ride{
+	ride := &ridemodels.Ride{
 		RideID: rideUUID,
-		Status: models.RideStatusCompleted, // Wrong status
+		Status: ridemodels.RideStatusCompleted, // Wrong status
 	}
 
 	// Set up expectations
@@ -574,8 +577,8 @@ func TestProcessPayment_Success(t *testing.T) {
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
 
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
 	}
@@ -587,22 +590,22 @@ func TestProcessPayment_Success(t *testing.T) {
 	paymentID := uuid.New()
 	totalCost := 8000
 
-	req := models.PaymentProccessRequest{
+	req := ridemodels.PaymentProccessRequest{
 		RideID:    rideID,
 		TotalCost: totalCost,
-		Status:    models.PaymentStatusAccepted,
+		Status:    ridemodels.PaymentStatusAccepted,
 	}
 
-	ride := &models.Ride{
+	ride := &ridemodels.Ride{
 		RideID: rideUUID,
-		Status: models.RideStatusOngoing,
+		Status: ridemodels.RideStatusOngoing,
 	}
 
-	payment := &models.Payment{
+	payment := &ridemodels.Payment{
 		PaymentID:    paymentID,
 		RideID:       rideUUID,
 		AdjustedCost: totalCost,
-		Status:       models.PaymentStatusPending,
+		Status:       ridemodels.PaymentStatusPending,
 	}
 
 	// Set up expectations
@@ -615,13 +618,13 @@ func TestProcessPayment_Success(t *testing.T) {
 		Return(payment, nil)
 
 	mockRepo.EXPECT().
-		UpdatePaymentStatus(gomock.Any(), paymentID.String(), models.PaymentStatusAccepted).
+		UpdatePaymentStatus(gomock.Any(), paymentID.String(), ridemodels.PaymentStatusAccepted).
 		Return(nil)
 
 	mockRepo.EXPECT().
 		CompleteRide(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, updatedRide *models.Ride) error {
-			assert.Equal(t, models.RideStatusCompleted, updatedRide.Status)
+		DoAndReturn(func(_ context.Context, updatedRide *ridemodels.Ride) error {
+			assert.Equal(t, ridemodels.RideStatusCompleted, updatedRide.Status)
 			return nil
 		})
 
@@ -635,7 +638,7 @@ func TestProcessPayment_Success(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
-	assert.Equal(t, models.PaymentStatusAccepted, result.Status)
+	assert.Equal(t, ridemodels.PaymentStatusAccepted, result.Status)
 }
 
 func TestProcessPayment_TotalCostMismatch(t *testing.T) {
@@ -646,8 +649,8 @@ func TestProcessPayment_TotalCostMismatch(t *testing.T) {
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
 
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
 	}
@@ -658,22 +661,22 @@ func TestProcessPayment_TotalCostMismatch(t *testing.T) {
 	rideUUID := uuid.MustParse(rideID)
 	paymentID := uuid.New()
 
-	req := models.PaymentProccessRequest{
+	req := ridemodels.PaymentProccessRequest{
 		RideID:    rideID,
 		TotalCost: 5000, // Different from payment record
-		Status:    models.PaymentStatusAccepted,
+		Status:    ridemodels.PaymentStatusAccepted,
 	}
 
-	ride := &models.Ride{
+	ride := &ridemodels.Ride{
 		RideID: rideUUID,
-		Status: models.RideStatusOngoing,
+		Status: ridemodels.RideStatusOngoing,
 	}
 
-	payment := &models.Payment{
+	payment := &ridemodels.Payment{
 		PaymentID:    paymentID,
 		RideID:       rideUUID,
 		AdjustedCost: 8000, // Different from request
-		Status:       models.PaymentStatusPending,
+		Status:       ridemodels.PaymentStatusPending,
 	}
 
 	// Set up expectations
@@ -702,8 +705,8 @@ func TestRideArrived_InvalidAdjustmentFactor(t *testing.T) {
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
 
-	cfg := &models.Config{
-		Pricing: models.PricingConfig{
+	cfg := &core.Config{
+		Pricing: core.PricingConfig{
 			AdminFeePercent: 5.0, // 5% admin fee
 		},
 	}
@@ -715,15 +718,15 @@ func TestRideArrived_InvalidAdjustmentFactor(t *testing.T) {
 	passengerID := uuid.New()
 	totalCost := 10000
 
-	req := models.RideArrivalReq{
+	req := ridemodels.RideArrivalReq{
 		RideID:           rideID,
 		AdjustmentFactor: 1.5, // Invalid - should be reset to 1.0
 	}
 
-	ride := &models.Ride{
+	ride := &ridemodels.Ride{
 		RideID:      rideUUID,
 		PassengerID: passengerID,
-		Status:      models.RideStatusOngoing,
+		Status:      ridemodels.RideStatusOngoing,
 	}
 
 	// Expected values with adjustment factor reset to 1.0
@@ -743,7 +746,7 @@ func TestRideArrived_InvalidAdjustmentFactor(t *testing.T) {
 
 	mockRepo.EXPECT().
 		CreatePayment(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, payment *models.Payment) error {
+		DoAndReturn(func(_ context.Context, payment *ridemodels.Payment) error {
 			assert.Equal(t, rideUUID, payment.RideID)
 			assert.Equal(t, adjustedCost, payment.AdjustedCost)
 			assert.Equal(t, adminFee, payment.AdminFee)
@@ -768,8 +771,8 @@ func TestProcessPayment_InvalidStatus(t *testing.T) {
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
 
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
 	}
@@ -779,15 +782,15 @@ func TestProcessPayment_InvalidStatus(t *testing.T) {
 	rideID := uuid.New().String()
 	rideUUID := uuid.MustParse(rideID)
 
-	req := models.PaymentProccessRequest{
+	req := ridemodels.PaymentProccessRequest{
 		RideID:    rideID,
 		TotalCost: 8000,
-		Status:    models.PaymentStatusAccepted,
+		Status:    ridemodels.PaymentStatusAccepted,
 	}
 
-	ride := &models.Ride{
+	ride := &ridemodels.Ride{
 		RideID: rideUUID,
-		Status: models.RideStatusCompleted, // Wrong status
+		Status: ridemodels.RideStatusCompleted, // Wrong status
 	}
 
 	// Set up expectations
@@ -812,8 +815,8 @@ func TestProcessPayment_PaymentAlreadyProcessed(t *testing.T) {
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
 
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
 	}
@@ -824,22 +827,22 @@ func TestProcessPayment_PaymentAlreadyProcessed(t *testing.T) {
 	rideUUID := uuid.MustParse(rideID)
 	paymentID := uuid.New()
 
-	req := models.PaymentProccessRequest{
+	req := ridemodels.PaymentProccessRequest{
 		RideID:    rideID,
 		TotalCost: 8000,
-		Status:    models.PaymentStatusAccepted,
+		Status:    ridemodels.PaymentStatusAccepted,
 	}
 
-	ride := &models.Ride{
+	ride := &ridemodels.Ride{
 		RideID: rideUUID,
-		Status: models.RideStatusOngoing,
+		Status: ridemodels.RideStatusOngoing,
 	}
 
-	payment := &models.Payment{
+	payment := &ridemodels.Payment{
 		PaymentID:    paymentID,
 		RideID:       rideUUID,
 		AdjustedCost: 8000,
-		Status:       models.PaymentStatusAccepted, // Already processed
+		Status:       ridemodels.PaymentStatusAccepted, // Already processed
 	}
 
 	// Set up expectations
@@ -868,8 +871,8 @@ func TestProcessPayment_RejectedPayment(t *testing.T) {
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
 
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
 	}
@@ -881,22 +884,22 @@ func TestProcessPayment_RejectedPayment(t *testing.T) {
 	paymentID := uuid.New()
 	totalCost := 8000
 
-	req := models.PaymentProccessRequest{
+	req := ridemodels.PaymentProccessRequest{
 		RideID:    rideID,
 		TotalCost: totalCost,
-		Status:    models.PaymentStatusRejected, // Rejected payment
+		Status:    ridemodels.PaymentStatusRejected, // Rejected payment
 	}
 
-	ride := &models.Ride{
+	ride := &ridemodels.Ride{
 		RideID: rideUUID,
-		Status: models.RideStatusOngoing,
+		Status: ridemodels.RideStatusOngoing,
 	}
 
-	payment := &models.Payment{
+	payment := &ridemodels.Payment{
 		PaymentID:    paymentID,
 		RideID:       rideUUID,
 		AdjustedCost: totalCost,
-		Status:       models.PaymentStatusPending,
+		Status:       ridemodels.PaymentStatusPending,
 	}
 
 	// Set up expectations
@@ -909,7 +912,7 @@ func TestProcessPayment_RejectedPayment(t *testing.T) {
 		Return(payment, nil)
 
 	mockRepo.EXPECT().
-		UpdatePaymentStatus(gomock.Any(), paymentID.String(), models.PaymentStatusRejected).
+		UpdatePaymentStatus(gomock.Any(), paymentID.String(), ridemodels.PaymentStatusRejected).
 		Return(nil)
 
 	// Note: No CompleteRide or PublishRideCompleted calls for rejected payment
@@ -920,7 +923,7 @@ func TestProcessPayment_RejectedPayment(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
-	assert.Equal(t, models.PaymentStatusRejected, result.Status)
+	assert.Equal(t, ridemodels.PaymentStatusRejected, result.Status)
 }
 
 // Additional unit tests (moved from integration test file)
@@ -931,8 +934,8 @@ func TestCreateRideWithFullConfig_Success(t *testing.T) {
 
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MinDistanceKm:      0.5,
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
@@ -941,29 +944,29 @@ func TestCreateRideWithFullConfig_Success(t *testing.T) {
 	uc, _ := NewRideUC(cfg, mockRepo, mockGW)
 
 	// Test data
-	matchProposal := models.MatchProposal{
+	matchProposal := matchmodels.MatchProposal{
 		ID:          uuid.New().String(),
 		PassengerID: uuid.New().String(),
 		DriverID:    uuid.New().String(),
-		UserLocation: models.Location{
+		UserLocation: locationmodels.Location{
 			Latitude:  -6.2088,
 			Longitude: 106.8456,
 		},
-		DriverLocation: models.Location{
+		DriverLocation: locationmodels.Location{
 			Latitude:  -6.2000,
 			Longitude: 106.8400,
 		},
-		TargetLocation: models.Location{
+		TargetLocation: locationmodels.Location{
 			Latitude:  -6.1751,
 			Longitude: 106.8650,
 		},
-		MatchStatus: models.MatchStatusDriverConfirmed,
+		MatchStatus: matchmodels.MatchStatusDriverConfirmed,
 	}
 
 	// Mock expectations
 	mockRepo.EXPECT().
 		CreateRide(gomock.Any()).
-		Return(&models.Ride{}, nil)
+		Return(&ridemodels.Ride{}, nil)
 
 	mockGW.EXPECT().
 		PublishRidePickup(gomock.Any(), gomock.Any()).
@@ -983,8 +986,8 @@ func TestStartRideWithValidDistance_Success(t *testing.T) {
 
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MinDistanceKm:      0.5,
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
@@ -994,13 +997,13 @@ func TestStartRideWithValidDistance_Success(t *testing.T) {
 
 	// Test data
 	rideID := uuid.New()
-	startRequest := models.RideStartRequest{
+	startRequest := ridemodels.RideStartRequest{
 		RideID: rideID.String(),
-		DriverLocation: &models.Location{
+		DriverLocation: &locationmodels.Location{
 			Latitude:  -6.2088,
 			Longitude: 106.8456,
 		},
-		PassengerLocation: &models.Location{
+		PassengerLocation: &locationmodels.Location{
 			Latitude:  -6.2090,
 			Longitude: 106.8458,
 		},
@@ -1009,15 +1012,15 @@ func TestStartRideWithValidDistance_Success(t *testing.T) {
 	// Mock expectations
 	mockRepo.EXPECT().
 		GetRide(gomock.Any(), rideID.String()).
-		Return(&models.Ride{
+		Return(&ridemodels.Ride{
 			RideID:      rideID,
-			Status:      models.RideStatusDriverPickup,
+			Status:      ridemodels.RideStatusDriverPickup,
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
 		}, nil)
 
 	mockRepo.EXPECT().
-		UpdateRideStatus(gomock.Any(), rideID.String(), models.RideStatusOngoing).
+		UpdateRideStatus(gomock.Any(), rideID.String(), ridemodels.RideStatusOngoing).
 		Return(nil)
 
 	// Act
@@ -1026,7 +1029,7 @@ func TestStartRideWithValidDistance_Success(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	assert.NotNil(t, ride)
-	assert.Equal(t, models.RideStatusOngoing, ride.Status)
+	assert.Equal(t, ridemodels.RideStatusOngoing, ride.Status)
 }
 
 func TestRideArrivalWithAdjustment_Success(t *testing.T) {
@@ -1036,12 +1039,12 @@ func TestRideArrivalWithAdjustment_Success(t *testing.T) {
 
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MinDistanceKm:      0.5,
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
-		Pricing: models.PricingConfig{
+		Pricing: core.PricingConfig{
 			RatePerKm:       2000,
 			AdminFeePercent: 10.0,
 		},
@@ -1051,12 +1054,12 @@ func TestRideArrivalWithAdjustment_Success(t *testing.T) {
 
 	// Test data
 	rideID := uuid.New()
-	arrivalReq := models.RideArrivalReq{
+	arrivalReq := ridemodels.RideArrivalReq{
 		RideID:           rideID.String(),
 		AdjustmentFactor: 0.8,
 	}
 
-	expectedPaymentRequest := &models.PaymentRequest{
+	expectedPaymentRequest := &ridemodels.PaymentRequest{
 		RideID:      rideID.String(),
 		PassengerID: uuid.New().String(),
 		TotalCost:   15000,
@@ -1066,10 +1069,10 @@ func TestRideArrivalWithAdjustment_Success(t *testing.T) {
 	// Mock expectations
 	mockRepo.EXPECT().
 		GetRide(gomock.Any(), rideID.String()).
-		Return(&models.Ride{
+		Return(&ridemodels.Ride{
 			RideID:      rideID,
 			PassengerID: uuid.MustParse(expectedPaymentRequest.PassengerID),
-			Status:      models.RideStatusOngoing,
+			Status:      ridemodels.RideStatusOngoing,
 		}, nil)
 
 	mockRepo.EXPECT().
@@ -1098,8 +1101,8 @@ func TestProcessPaymentWithFullFlow_Success(t *testing.T) {
 
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MinDistanceKm:      0.5,
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
@@ -1109,41 +1112,41 @@ func TestProcessPaymentWithFullFlow_Success(t *testing.T) {
 
 	// Test data
 	rideID := uuid.New()
-	paymentReq := models.PaymentProccessRequest{
+	paymentReq := ridemodels.PaymentProccessRequest{
 		RideID:    rideID.String(),
 		TotalCost: 25000,
-		Status:    models.PaymentStatusAccepted,
+		Status:    ridemodels.PaymentStatusAccepted,
 	}
 
-	expectedPayment := &models.Payment{
+	expectedPayment := &ridemodels.Payment{
 		PaymentID:    uuid.New(),
 		RideID:       rideID,
 		AdjustedCost: 25000,
 		AdminFee:     2500,
 		DriverPayout: 22500,
-		Status:       models.PaymentStatusAccepted,
+		Status:       ridemodels.PaymentStatusAccepted,
 		CreatedAt:    time.Now(),
 	}
 
 	// Mock expectations
 	mockRepo.EXPECT().
 		GetRide(gomock.Any(), rideID.String()).
-		Return(&models.Ride{
+		Return(&ridemodels.Ride{
 			RideID: rideID,
-			Status: models.RideStatusOngoing,
+			Status: ridemodels.RideStatusOngoing,
 		}, nil)
 
 	mockRepo.EXPECT().
 		GetPaymentByRideID(gomock.Any(), rideID.String()).
-		Return(&models.Payment{
+		Return(&ridemodels.Payment{
 			PaymentID:    expectedPayment.PaymentID,
 			RideID:       rideID,
 			AdjustedCost: 25000,
-			Status:       models.PaymentStatusPending,
+			Status:       ridemodels.PaymentStatusPending,
 		}, nil)
 
 	mockRepo.EXPECT().
-		UpdatePaymentStatus(gomock.Any(), expectedPayment.PaymentID.String(), models.PaymentStatusAccepted).
+		UpdatePaymentStatus(gomock.Any(), expectedPayment.PaymentID.String(), ridemodels.PaymentStatusAccepted).
 		Return(nil)
 
 	mockRepo.EXPECT().
@@ -1160,7 +1163,7 @@ func TestProcessPaymentWithFullFlow_Success(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	assert.NotNil(t, payment)
-	assert.Equal(t, models.PaymentStatusAccepted, payment.Status)
+	assert.Equal(t, ridemodels.PaymentStatusAccepted, payment.Status)
 	assert.Equal(t, 25000, payment.AdjustedCost)
 }
 
@@ -1171,8 +1174,8 @@ func TestProcessBillingWithLedger_Success(t *testing.T) {
 
 	mockRepo := mocks.NewMockRideRepo(ctrl)
 	mockGW := mocks.NewMockRideGW(ctrl)
-	cfg := &models.Config{
-		Rides: models.RidesConfig{
+	cfg := &core.Config{
+		Rides: core.RidesConfig{
 			MinDistanceKm:      0.5,
 			MaxPickupDistanceM: 100.0, // Set pickup distance for test
 		},
@@ -1182,7 +1185,7 @@ func TestProcessBillingWithLedger_Success(t *testing.T) {
 
 	// Test data
 	rideID := uuid.New().String()
-	billingEntry := &models.BillingLedger{
+	billingEntry := &ridemodels.BillingLedger{
 		EntryID:   uuid.New(),
 		RideID:    uuid.MustParse(rideID),
 		Distance:  5.2,
@@ -1193,9 +1196,9 @@ func TestProcessBillingWithLedger_Success(t *testing.T) {
 	// Mock expectations
 	mockRepo.EXPECT().
 		GetRide(gomock.Any(), rideID).
-		Return(&models.Ride{
+		Return(&ridemodels.Ride{
 			RideID: uuid.MustParse(rideID),
-			Status: models.RideStatusOngoing,
+			Status: ridemodels.RideStatusOngoing,
 		}, nil)
 
 	mockRepo.EXPECT().

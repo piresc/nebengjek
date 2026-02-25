@@ -7,9 +7,8 @@ import (
 	"testing"
 
 	"github.com/nats-io/nats.go"
-	"github.com/piresc/nebengjek/internal/pkg/constants"
-	"github.com/piresc/nebengjek/internal/pkg/models"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
+	"github.com/piresc/nebengjek/internal/pkg/models/location"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -79,7 +78,7 @@ func TestPublishLocationAggregate_Success(t *testing.T) {
 	gw := NewLocationGW(mockClient)
 
 	// Create test data
-	locationAggregate := models.LocationAggregate{
+	locationAggregate := location.LocationAggregate{
 		RideID:    "ride123",
 		Latitude:  -6.2088,
 		Longitude: 106.8456,
@@ -94,11 +93,11 @@ func TestPublishLocationAggregate_Success(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify the message was published to the correct subject
-	publishedData, exists := mockClient.GetPublishedMessage(constants.SubjectLocationAggregate)
+	publishedData, exists := mockClient.GetPublishedMessage(natspkg.SubjectLocationAggregate)
 	assert.True(t, exists)
 
 	// Verify the published data
-	var publishedAggregate models.LocationAggregate
+	var publishedAggregate location.LocationAggregate
 	err = json.Unmarshal(publishedData, &publishedAggregate)
 	assert.NoError(t, err)
 	assert.Equal(t, locationAggregate.RideID, publishedAggregate.RideID)
@@ -119,7 +118,7 @@ func TestPublishLocationAggregate_Error(t *testing.T) {
 	gw := NewLocationGW(mockClient)
 
 	// Create test data
-	locationAggregate := models.LocationAggregate{
+	locationAggregate := location.LocationAggregate{
 		RideID:    "ride123",
 		Latitude:  -6.2088,
 		Longitude: 106.8456,
@@ -147,7 +146,7 @@ func TestNewLocationGW(t *testing.T) {
 	assert.NotNil(t, gw)
 
 	// Test that it can publish (this also tests the functionality)
-	locationAggregate := models.LocationAggregate{
+	locationAggregate := location.LocationAggregate{
 		RideID:    "ride456",
 		Latitude:  -6.2088,
 		Longitude: 106.8456,
@@ -159,7 +158,7 @@ func TestNewLocationGW(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify the message was published
-	publishedData, exists := mockClient.GetPublishedMessage(constants.SubjectLocationAggregate)
+	publishedData, exists := mockClient.GetPublishedMessage(natspkg.SubjectLocationAggregate)
 	assert.True(t, exists)
 	assert.NotEmpty(t, publishedData)
 }

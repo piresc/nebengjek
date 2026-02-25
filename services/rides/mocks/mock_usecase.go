@@ -9,7 +9,8 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	models "github.com/piresc/nebengjek/internal/pkg/models"
+	ridemodels "github.com/piresc/nebengjek/internal/pkg/models/ride"
+	matchmodels "github.com/piresc/nebengjek/internal/pkg/models/match"
 )
 
 // MockRideUC is a mock of RideUC interface.
@@ -36,7 +37,7 @@ func (m *MockRideUC) EXPECT() *MockRideUCMockRecorder {
 }
 
 // CreateRide mocks base method.
-func (m *MockRideUC) CreateRide(arg0 context.Context, arg1 models.MatchProposal) error {
+func (m *MockRideUC) CreateRide(arg0 context.Context, arg1 matchmodels.MatchProposal) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateRide", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -50,7 +51,7 @@ func (mr *MockRideUCMockRecorder) CreateRide(arg0, arg1 interface{}) *gomock.Cal
 }
 
 // ProcessBillingUpdate mocks base method.
-func (m *MockRideUC) ProcessBillingUpdate(arg0 context.Context, arg1 string, arg2 *models.BillingLedger) error {
+func (m *MockRideUC) ProcessBillingUpdate(arg0 context.Context, arg1 string, arg2 *ridemodels.BillingLedger) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ProcessBillingUpdate", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -64,10 +65,10 @@ func (mr *MockRideUCMockRecorder) ProcessBillingUpdate(arg0, arg1, arg2 interfac
 }
 
 // ProcessPayment mocks base method.
-func (m *MockRideUC) ProcessPayment(arg0 context.Context, arg1 models.PaymentProccessRequest) (*models.Payment, error) {
+func (m *MockRideUC) ProcessPayment(arg0 context.Context, arg1 ridemodels.PaymentProccessRequest) (*ridemodels.Payment, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ProcessPayment", arg0, arg1)
-	ret0, _ := ret[0].(*models.Payment)
+	ret0, _ := ret[0].(*ridemodels.Payment)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -79,10 +80,10 @@ func (mr *MockRideUCMockRecorder) ProcessPayment(arg0, arg1 interface{}) *gomock
 }
 
 // RideArrived mocks base method.
-func (m *MockRideUC) RideArrived(arg0 context.Context, arg1 models.RideArrivalReq) (*models.PaymentRequest, error) {
+func (m *MockRideUC) RideArrived(arg0 context.Context, arg1 ridemodels.RideArrivalReq) (*ridemodels.PaymentRequest, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RideArrived", arg0, arg1)
-	ret0, _ := ret[0].(*models.PaymentRequest)
+	ret0, _ := ret[0].(*ridemodels.PaymentRequest)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -94,10 +95,10 @@ func (mr *MockRideUCMockRecorder) RideArrived(arg0, arg1 interface{}) *gomock.Ca
 }
 
 // StartRide mocks base method.
-func (m *MockRideUC) StartRide(arg0 context.Context, arg1 models.RideStartRequest) (*models.Ride, error) {
+func (m *MockRideUC) StartRide(arg0 context.Context, arg1 ridemodels.RideStartRequest) (*ridemodels.Ride, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "StartRide", arg0, arg1)
-	ret0, _ := ret[0].(*models.Ride)
+	ret0, _ := ret[0].(*ridemodels.Ride)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

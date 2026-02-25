@@ -10,7 +10,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/labstack/echo/v4"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
 	"github.com/piresc/nebengjek/services/gateway/mocks"
 	"github.com/stretchr/testify/assert"
 )
@@ -37,7 +37,7 @@ func TestProxyHandler_ProxyToUsersService(t *testing.T) {
 		headers        map[string]string
 		userID         interface{}
 		role           interface{}
-		mockResponse   *models.ProxyResponse
+		mockResponse   *coremodels.ProxyResponse
 		mockError      error
 		expectedStatus int
 		expectedBody   string
@@ -46,7 +46,7 @@ func TestProxyHandler_ProxyToUsersService(t *testing.T) {
 			name:   "successful proxy request",
 			method: "GET",
 			path:   "/api/v1/users/profile",
-			mockResponse: &models.ProxyResponse{
+			mockResponse: &coremodels.ProxyResponse{
 				StatusCode: 200,
 				Body:       []byte(`{"success": true}`),
 				Headers:    map[string][]string{"Content-Type": {"application/json"}},
@@ -59,7 +59,7 @@ func TestProxyHandler_ProxyToUsersService(t *testing.T) {
 			method: "POST",
 			path:   "/api/v1/users/register",
 			body:   map[string]interface{}{"msisdn": "1234567890"},
-			mockResponse: &models.ProxyResponse{
+			mockResponse: &coremodels.ProxyResponse{
 				StatusCode: 201,
 				Body:       []byte(`{"id": "123"}`),
 				Headers:    map[string][]string{"Content-Type": {"application/json"}},
@@ -73,7 +73,7 @@ func TestProxyHandler_ProxyToUsersService(t *testing.T) {
 			path:   "/api/v1/users/profile",
 			userID: "user-123",
 			role:   "driver",
-			mockResponse: &models.ProxyResponse{
+			mockResponse: &coremodels.ProxyResponse{
 				StatusCode: 200,
 				Body:       []byte(`{"user": "profile"}`),
 				Headers:    map[string][]string{},
@@ -92,7 +92,7 @@ func TestProxyHandler_ProxyToUsersService(t *testing.T) {
 			name:   "service returns error status",
 			method: "GET",
 			path:   "/api/v1/users/profile",
-			mockResponse: &models.ProxyResponse{
+			mockResponse: &coremodels.ProxyResponse{
 				StatusCode: 404,
 				Body:       []byte(`{"error": "not found"}`),
 				Headers:    map[string][]string{},
@@ -187,7 +187,7 @@ func TestProxyHandler_ProxyToMatchService(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockGatewayUC := mocks.NewMockGatewayUC(ctrl)
-	mockResponse := &models.ProxyResponse{
+	mockResponse := &coremodels.ProxyResponse{
 		StatusCode: 200,
 		Body:       []byte(`{"matches": []}`),
 		Headers:    map[string][]string{},
@@ -216,7 +216,7 @@ func TestProxyHandler_ProxyToRidesService(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockGatewayUC := mocks.NewMockGatewayUC(ctrl)
-	mockResponse := &models.ProxyResponse{
+	mockResponse := &coremodels.ProxyResponse{
 		StatusCode: 200,
 		Body:       []byte(`{"rides": []}`),
 		Headers:    map[string][]string{},
@@ -245,7 +245,7 @@ func TestProxyHandler_ProxyToLocationService(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockGatewayUC := mocks.NewMockGatewayUC(ctrl)
-	mockResponse := &models.ProxyResponse{
+	mockResponse := &coremodels.ProxyResponse{
 		StatusCode: 200,
 		Body:       []byte(`{"location": "updated"}`),
 		Headers:    map[string][]string{},

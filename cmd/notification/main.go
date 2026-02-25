@@ -16,9 +16,11 @@ import (
 	"github.com/piresc/nebengjek/internal/pkg/health"
 	slogpkg "github.com/piresc/nebengjek/internal/pkg/logger"
 	"github.com/piresc/nebengjek/internal/pkg/middleware"
+	middlewaretracing "github.com/piresc/nebengjek/internal/pkg/middleware/tracing"
 	"github.com/piresc/nebengjek/internal/pkg/nats"
 	nrpkg "github.com/piresc/nebengjek/internal/pkg/newrelic"
-	"github.com/piresc/nebengjek/internal/pkg/observability"
+	newrelictracer "github.com/piresc/nebengjek/internal/pkg/tracing/newrelic"
+	"github.com/piresc/nebengjek/internal/pkg/tracing"
 	"github.com/piresc/nebengjek/services/notification/handler"
 	httpHandler "github.com/piresc/nebengjek/services/notification/handler/http"
 	natsHandler "github.com/piresc/nebengjek/services/notification/handler/nats"
@@ -42,9 +44,11 @@ func main() {
 		Format:      "json",
 	})
 
-	// Initialize observability tracer
-	tracerFactory := observability.NewTracerFactory()
-	tracer := tracerFactory.CreateTracer(nrApp)
+	// Initialize unified tracer
+	tracer := newrelictracer.NewTracer(&tracing.Config{
+		Enabled:     configs.NewRelic.Enabled,
+		ServiceName: appName,
+	}, nrApp)
 
 	// Log startup
 	slogLogger.Info("Starting application",
@@ -59,7 +63,7 @@ func main() {
 		slogLogger.Error("Failed to connect to PostgreSQL", slog.Any("error", err))
 		os.Exit(1)
 	}
-	defer postgresClient.Close()
+	// Wrap PostgreSQL client with tracing (not used in this service)
 
 	// Initialize JetStream-enabled NATS client
 	natsClient, err := nats.NewClient(configs.NATS.URL)
@@ -67,7 +71,8 @@ func main() {
 		slogLogger.Error("Failed to connect to NATS with JetStream", slog.Any("error", err))
 		os.Exit(1)
 	}
-	defer natsClient.Close()
+	// Wrap NATS client with tracing
+	tracedNatsClient := nats.NewTracedClient(natsClient, tracer)
 
 	// Verify JetStream is available
 	if !natsClient.IsConnected() {
@@ -79,17 +84,25 @@ func main() {
 		slog.String("url", configs.NATS.URL),
 		slog.Bool("connected", natsClient.IsConnected()))
 
-	// Initialize repository
+	// Configure WebSocket streams for multi-gateway broadcasting
+	slogLogger.Info("Configuring WebSocket streams for multi-gateway broadcasting...")
+	if err := nats.ConfigureWebSocketStreams(context.Background(), tracedNatsClient.GetClient()); err != nil {
+		slogLogger.Error("Failed to configure WebSocket streams", slog.Any("error", err))
+		os.Exit(1)
+	}
+	slogLogger.Info("WebSocket streams configured successfully")
+
+	// Initialize repository with traced client
 	notificationRepo := repository.NewNotificationRepo(postgresClient.GetDB())
 
-	// Initialize usecase
-	notificationUC := usecase.NewNotificationUC(notificationRepo, natsClient, slogLogger)
+	// Initialize usecase with traced client
+	notificationUC := usecase.NewNotificationUC(notificationRepo, tracedNatsClient.GetClient(), slogLogger)
 
 	// Initialize HTTP handler
 	notificationHTTPHandler := httpHandler.NewNotificationHandler(notificationUC)
 
 	// Initialize NATS handler for consuming events
-	notificationNATSHandler := natsHandler.NewNotificationHandler(notificationUC, natsClient, slogLogger)
+	notificationNATSHandler := natsHandler.NewNotificationHandler(notificationUC, tracedNatsClient.GetClient(), slogLogger)
 
 	// Start NATS consumers
 	slogLogger.Info("Initializing NATS consumers for notification service...")
@@ -107,8 +120,12 @@ func main() {
 	healthService.AddChecker("postgres", health.NewPostgresHealthChecker(postgresClient))
 	healthService.AddChecker("nats", health.NewNATSHealthChecker(natsClient))
 
-	// Initialize middleware
+	// Initialize middleware with tracing
 	MW := middleware.NewMiddleware(configs, slogLogger, tracer)
+	tracingMiddleware := middlewaretracing.NewTracingMiddleware(&tracing.Config{
+		Enabled:     configs.NewRelic.Enabled,
+		ServiceName: appName,
+	}, tracer)
 
 	// Register enhanced health endpoints BEFORE applying middleware
 	health.RegisterEnhancedHealthEndpoints(e, appName, configs.App.Version, healthService)
@@ -119,6 +136,7 @@ func main() {
 		return c.JSON(http.StatusOK, map[string]interface{}{"status": "ok"})
 	})
 
+	e.Use(tracingMiddleware.Handler())
 	e.Use(MW.Handler())
 
 	// Register service routes

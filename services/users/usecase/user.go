@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/user"
 	"github.com/piresc/nebengjek/internal/utils"
 )
 
 // RegisterUser registers a new user
-func (u *UserUC) RegisterUser(ctx context.Context, user *models.User) error {
+func (u *UserUC) RegisterUser(ctx context.Context, user *user.User) error {
 	// Validate user data first
 	if err := validateUserData(user); err != nil {
 		return err
@@ -40,7 +40,7 @@ func (u *UserUC) RegisterUser(ctx context.Context, user *models.User) error {
 }
 
 // GetUserByID retrieves a user by ID
-func (u *UserUC) GetUserByID(ctx context.Context, id string) (*models.User, error) {
+func (u *UserUC) GetUserByID(ctx context.Context, id string) (*user.User, error) {
 	user, err := u.userRepo.GetUserByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func (u *UserUC) GetUserByID(ctx context.Context, id string) (*models.User, erro
 }
 
 // RegisterDriver registers a new driver
-func (u *UserUC) RegisterDriver(ctx context.Context, userDriver *models.User) error {
+func (u *UserUC) RegisterDriver(ctx context.Context, userDriver *user.User) error {
 	// Validate MSISDN format
 	isValid, formattedMSISDN, err := utils.ValidateMSISDN(userDriver.MSISDN)
 	if err != nil || !isValid {
@@ -92,7 +92,7 @@ func (u *UserUC) RegisterDriver(ctx context.Context, userDriver *models.User) er
 	return nil
 }
 
-func validateUserData(user *models.User) error {
+func validateUserData(user *user.User) error {
 	if user == nil {
 		return errors.New("user cannot be nil")
 	}
@@ -103,7 +103,7 @@ func validateUserData(user *models.User) error {
 	return nil
 }
 
-func validateDriverData(driver *models.Driver) error {
+func validateDriverData(driver *user.Driver) error {
 	if driver == nil {
 		return errors.New("driver info cannot be nil")
 	}

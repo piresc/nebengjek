@@ -11,34 +11,39 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
+	"github.com/piresc/nebengjek/internal/pkg/models/match"
+	"github.com/piresc/nebengjek/internal/pkg/models/ride"
+	"github.com/piresc/nebengjek/internal/pkg/models/location"
 	natspkg "github.com/piresc/nebengjek/internal/pkg/nats"
-	nrpkg "github.com/piresc/nebengjek/internal/pkg/newrelic"
 	"github.com/piresc/nebengjek/services/rides"
 )
 
 type RidesHandler struct {
 	ridesUC    rides.RideUC
 	natsClient *natspkg.Client
-	subs       []*nats.Subscription
-	cfg        *models.Config
 	nrApp      *newrelic.Application
+	subs       []*nats.Subscription
+	cfg        *core.Config
 }
 
 // NewRidesHandler creates a new rides NATS handler
 func NewRidesHandler(
 	ridesUC rides.RideUC,
 	client *natspkg.Client,
-	cfg *models.Config,
-	nrApp *newrelic.Application,
+	cfg *core.Config,
+	nrApp ...*newrelic.Application,
 ) *RidesHandler {
-	return &RidesHandler{
+	h := &RidesHandler{
 		ridesUC:    ridesUC,
 		natsClient: client,
 		subs:       make([]*nats.Subscription, 0),
 		cfg:        cfg,
-		nrApp:      nrApp,
 	}
+	if len(nrApp) > 0 {
+		h.nrApp = nrApp[0]
+	}
+	return h
 }
 
 // InitNATSConsumers initializes all JetStream consumers for the rides service
@@ -85,23 +90,19 @@ func (h *RidesHandler) InitNATSConsumers() error {
 
 // handleMatchAcceptedJS processes match accepted events from JetStream
 func (h *RidesHandler) handleMatchAcceptedJS(msg jetstream.Msg) error {
-	// Create background transaction for NATS message processing
-	txn := h.nrApp.StartTransaction("NATS.Rides.HandleMatchAccepted")
-	defer txn.End()
+	ctx := context.Background()
 
-	// Add message attributes
-	nrpkg.AddTransactionAttribute(txn, "message.subject", msg.Subject())
-	nrpkg.AddTransactionAttribute(txn, "message.size", len(msg.Data()))
-	nrpkg.AddTransactionAttribute(txn, "service", "rides")
-
-	// Create context with transaction
-	ctx := newrelic.NewContext(context.Background(), txn)
+	// Start a New Relic background transaction for async NATS processing
+	if h.nrApp != nil {
+		txn := h.nrApp.StartTransaction("NATS/match.accepted.rides")
+		defer txn.End()
+		ctx = newrelic.NewContext(ctx, txn)
+	}
 
 	logger.InfoCtx(ctx, "Received match accepted event from JetStream",
 		logger.String("subject", msg.Subject()))
 
 	if err := h.handleMatchAccepted(ctx, msg.Data()); err != nil {
-		nrpkg.NoticeTransactionError(txn, err)
 		logger.ErrorCtx(ctx, "Error handling match accepted event", logger.Err(err))
 		return err // Return error to trigger NAK and retry
 	}
@@ -111,23 +112,19 @@ func (h *RidesHandler) handleMatchAcceptedJS(msg jetstream.Msg) error {
 
 // handleLocationAggregateJS processes location aggregate events from JetStream
 func (h *RidesHandler) handleLocationAggregateJS(msg jetstream.Msg) error {
-	// Create background transaction for NATS message processing
-	txn := h.nrApp.StartTransaction("NATS.Rides.HandleLocationAggregate")
-	defer txn.End()
+	ctx := context.Background()
 
-	// Add message attributes
-	nrpkg.AddTransactionAttribute(txn, "message.subject", msg.Subject())
-	nrpkg.AddTransactionAttribute(txn, "message.size", len(msg.Data()))
-	nrpkg.AddTransactionAttribute(txn, "service", "rides")
-
-	// Create context with transaction
-	ctx := newrelic.NewContext(context.Background(), txn)
+	// Start a New Relic background transaction for async NATS processing
+	if h.nrApp != nil {
+		txn := h.nrApp.StartTransaction("NATS/location.aggregate.rides")
+		defer txn.End()
+		ctx = newrelic.NewContext(ctx, txn)
+	}
 
 	logger.InfoCtx(ctx, "Received location aggregate event from JetStream",
 		logger.String("subject", msg.Subject()))
 
 	if err := h.handleLocationAggregate(ctx, msg.Data()); err != nil {
-		nrpkg.NoticeTransactionError(txn, err)
 		logger.ErrorCtx(ctx, "Error handling location aggregate event", logger.Err(err))
 		return err // Return error to trigger NAK and retry
 	}
@@ -137,19 +134,12 @@ func (h *RidesHandler) handleLocationAggregateJS(msg jetstream.Msg) error {
 
 // handleMatchAccepted processes match acceptance events to create rides
 func (h *RidesHandler) handleMatchAccepted(ctx context.Context, msg []byte) error {
-	var matchProposal models.MatchProposal
+	var matchProposal match.MatchProposal
 	if err := json.Unmarshal(msg, &matchProposal); err != nil {
 		logger.ErrorCtx(ctx, "Failed to unmarshal match proposal",
 			logger.String("raw_message", string(msg)),
 			logger.ErrorField(err))
 		return err
-	}
-
-	// Add business attributes to transaction
-	if txn := nrpkg.FromContext(ctx); txn != nil {
-		nrpkg.AddTransactionAttribute(txn, "match.id", matchProposal.ID)
-		nrpkg.AddTransactionAttribute(txn, "driver.id", matchProposal.DriverID)
-		nrpkg.AddTransactionAttribute(txn, "passenger.id", matchProposal.PassengerID)
 	}
 
 	// Create a ride from the match proposal
@@ -169,16 +159,10 @@ func (h *RidesHandler) handleMatchAccepted(ctx context.Context, msg []byte) erro
 
 // handleLocationAggregate processes location aggregates for billing
 func (h *RidesHandler) handleLocationAggregate(ctx context.Context, msg []byte) error {
-	var update models.LocationAggregate
+	var update location.LocationAggregate
 	if err := json.Unmarshal(msg, &update); err != nil {
 		logger.ErrorCtx(ctx, "Failed to unmarshal location aggregate", logger.ErrorField(err))
 		return err
-	}
-
-	// Add business attributes to transaction
-	if txn := nrpkg.FromContext(ctx); txn != nil {
-		nrpkg.AddTransactionAttribute(txn, "ride.id", update.RideID)
-		nrpkg.AddTransactionAttribute(txn, "distance.km", update.Distance)
 	}
 
 	logger.InfoCtx(ctx, "Received location aggregate",
@@ -198,14 +182,8 @@ func (h *RidesHandler) handleLocationAggregate(ctx context.Context, msg []byte) 
 
 		cost := int(math.Round(update.Distance * h.cfg.Pricing.RatePerKm))
 
-		// Add billing attributes to transaction
-		if txn := nrpkg.FromContext(ctx); txn != nil {
-			nrpkg.AddTransactionAttribute(txn, "billing.cost", cost)
-			nrpkg.AddTransactionAttribute(txn, "billing.processed", true)
-		}
-
 		// Create billing entry
-		entry := &models.BillingLedger{
+		entry := &ride.BillingLedger{
 			RideID:   rideUUID,
 			Distance: update.Distance,
 			Cost:     cost,
@@ -217,12 +195,6 @@ func (h *RidesHandler) handleLocationAggregate(ctx context.Context, msg []byte) 
 				logger.String("ride_id", update.RideID),
 				logger.ErrorField(err))
 			return err
-		}
-	} else {
-		// Add attribute for skipped billing
-		if txn := nrpkg.FromContext(ctx); txn != nil {
-			nrpkg.AddTransactionAttribute(txn, "billing.processed", false)
-			nrpkg.AddTransactionAttribute(txn, "billing.skip_reason", "distance_below_minimum")
 		}
 	}
 

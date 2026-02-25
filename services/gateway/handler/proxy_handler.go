@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 	"github.com/piresc/nebengjek/services/gateway"
 )
 
@@ -93,7 +93,7 @@ func (h *ProxyHandler) proxyRequest(c echo.Context, targetService string) error 
 	}
 
 	// Call appropriate UseCase method based on target service
-	var resp *models.ProxyResponse
+	var resp *core.ProxyResponse
 	var err error
 
 	switch targetService {

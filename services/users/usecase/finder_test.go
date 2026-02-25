@@ -7,7 +7,9 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
+	usermodels "github.com/piresc/nebengjek/internal/pkg/models/user"
+	"github.com/piresc/nebengjek/internal/pkg/models/location"
 	"github.com/piresc/nebengjek/services/users/mocks"
 	"github.com/stretchr/testify/assert"
 )
@@ -20,8 +22,8 @@ func TestUpdateFinderStatus_Success(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -30,7 +32,7 @@ func TestUpdateFinderStatus_Success(t *testing.T) {
 
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
-	expectedUser := &models.User{
+	expectedUser := &usermodels.User{
 		ID:       uuid.New(),
 		MSISDN:   "+628123456789",
 		Role:     "passenger",
@@ -38,11 +40,11 @@ func TestUpdateFinderStatus_Success(t *testing.T) {
 		FullName: "Test User",
 	}
 
-	request := &models.FinderRequest{
+	request := &coremodels.FinderRequest{
 		MSISDN:         "+628123456789",
 		IsActive:       true,
-		Location:       models.Location{Latitude: -6.2088, Longitude: 106.8456},
-		TargetLocation: models.Location{Latitude: -6.1751, Longitude: 106.8650},
+		Location:       location.Location{Latitude: -6.2088, Longitude: 106.8456},
+		TargetLocation: location.Location{Latitude: -6.1751, Longitude: 106.8650},
 	}
 
 	mockRepo.EXPECT().GetUserByMSISDN(gomock.Any(), "+628123456789").Return(expectedUser, nil)
@@ -64,8 +66,8 @@ func TestUpdateFinderStatus_GatewayError(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -74,7 +76,7 @@ func TestUpdateFinderStatus_GatewayError(t *testing.T) {
 
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
-	expectedUser := &models.User{
+	expectedUser := &usermodels.User{
 		ID:       uuid.New(),
 		MSISDN:   "+628123456789",
 		Role:     "passenger",
@@ -82,11 +84,11 @@ func TestUpdateFinderStatus_GatewayError(t *testing.T) {
 		FullName: "Test User",
 	}
 
-	request := &models.FinderRequest{
+	request := &coremodels.FinderRequest{
 		MSISDN:         "+628123456789",
 		IsActive:       true,
-		Location:       models.Location{Latitude: -6.2088, Longitude: 106.8456},
-		TargetLocation: models.Location{Latitude: -6.1751, Longitude: 106.8650},
+		Location:       location.Location{Latitude: -6.2088, Longitude: 106.8456},
+		TargetLocation: location.Location{Latitude: -6.1751, Longitude: 106.8650},
 	}
 
 	expectedError := errors.New("gateway error")
@@ -110,8 +112,8 @@ func TestUpdateFinderStatus_UserNotFound(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -120,11 +122,11 @@ func TestUpdateFinderStatus_UserNotFound(t *testing.T) {
 
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
-	request := &models.FinderRequest{
+	request := &coremodels.FinderRequest{
 		MSISDN:         "+628123456789",
 		IsActive:       true,
-		Location:       models.Location{Latitude: -6.2088, Longitude: 106.8456},
-		TargetLocation: models.Location{Latitude: -6.1751, Longitude: 106.8650},
+		Location:       location.Location{Latitude: -6.2088, Longitude: 106.8456},
+		TargetLocation: location.Location{Latitude: -6.1751, Longitude: 106.8650},
 	}
 
 	expectedError := errors.New("user not found")
@@ -146,8 +148,8 @@ func TestUpdateFinderStatus_DeactivateFinder(t *testing.T) {
 	mockRepo := mocks.NewMockUserRepo(ctrl)
 	mockGW := mocks.NewMockUserGW(ctrl)
 
-	cfg := &models.Config{
-		JWT: models.JWTConfig{
+	cfg := &coremodels.Config{
+		JWT: coremodels.JWTConfig{
 			Secret:     "test-secret",
 			Expiration: 60,
 			Issuer:     "test-issuer",
@@ -156,7 +158,7 @@ func TestUpdateFinderStatus_DeactivateFinder(t *testing.T) {
 
 	uc := NewUserUC(mockRepo, mockGW, cfg)
 
-	expectedUser := &models.User{
+	expectedUser := &usermodels.User{
 		ID:       uuid.New(),
 		MSISDN:   "+628123456789",
 		Role:     "passenger",
@@ -164,11 +166,11 @@ func TestUpdateFinderStatus_DeactivateFinder(t *testing.T) {
 		FullName: "Test User",
 	}
 
-	request := &models.FinderRequest{
+	request := &coremodels.FinderRequest{
 		MSISDN:         "+628123456789",
 		IsActive:       false, // Deactivating finder
-		Location:       models.Location{Latitude: -6.2088, Longitude: 106.8456},
-		TargetLocation: models.Location{Latitude: -6.1751, Longitude: 106.8650},
+		Location:       location.Location{Latitude: -6.2088, Longitude: 106.8456},
+		TargetLocation: location.Location{Latitude: -6.1751, Longitude: 106.8650},
 	}
 
 	mockRepo.EXPECT().GetUserByMSISDN(gomock.Any(), "+628123456789").Return(expectedUser, nil)

@@ -7,7 +7,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/newrelic/go-agent/v3/integrations/nrpq"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 )
 
 // PostgresClient represents a PostgreSQL database client
@@ -16,7 +16,7 @@ type PostgresClient struct {
 }
 
 // NewPostgresClient creates a new PostgreSQL client
-func NewPostgresClient(config models.DatabaseConfig) (*PostgresClient, error) {
+func NewPostgresClient(config core.DatabaseConfig) (*PostgresClient, error) {
 	// Build connection string
 	connString := fmt.Sprintf(
 		"postgres://%s:%s@%s:%d/%s?sslmode=%s",

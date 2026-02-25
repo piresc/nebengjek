@@ -3,19 +3,19 @@ package repository
 import (
 	"github.com/jmoiron/sqlx"
 	"github.com/piresc/nebengjek/internal/pkg/database"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 )
 
 // UserRepo implements the user repository interface
 type UserRepo struct {
-	cfg         *models.Config
+	cfg         *core.Config
 	db          *sqlx.DB
 	redisClient *database.RedisClient
 }
 
 // NewUserRepo creates a new user repository instance
 func NewUserRepo(
-	cfg *models.Config,
+	cfg *core.Config,
 	db *sqlx.DB,
 	redisClient *database.RedisClient,
 ) *UserRepo {

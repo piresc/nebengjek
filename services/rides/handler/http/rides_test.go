@@ -11,7 +11,8 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	ridemodels "github.com/piresc/nebengjek/internal/pkg/models/ride"
+	locationmodels "github.com/piresc/nebengjek/internal/pkg/models/location"
 	"github.com/piresc/nebengjek/services/rides/mocks"
 	"github.com/stretchr/testify/assert"
 )
@@ -35,21 +36,21 @@ func TestRidesHandler_StartRide_Success(t *testing.T) {
 	handler := NewRidesHandler(mockRideUC)
 
 	rideID := uuid.New().String()
-	req := models.RideStartRequest{
+	req := ridemodels.RideStartRequest{
 		RideID: rideID,
-		DriverLocation: &models.Location{
+		DriverLocation: &locationmodels.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
 		},
-		PassengerLocation: &models.Location{
+		PassengerLocation: &locationmodels.Location{
 			Latitude:  -6.175400,
 			Longitude: 106.827160,
 		},
 	}
 
-	expectedResp := &models.Ride{
+	expectedResp := &ridemodels.Ride{
 		RideID: uuid.MustParse(rideID),
-		Status: models.RideStatusOngoing,
+		Status: ridemodels.RideStatusOngoing,
 	}
 
 	mockRideUC.EXPECT().
@@ -180,13 +181,13 @@ func TestRidesHandler_StartRide_UseCaseError(t *testing.T) {
 	handler := NewRidesHandler(mockRideUC)
 
 	rideID := uuid.New().String()
-	req := models.RideStartRequest{
+	req := ridemodels.RideStartRequest{
 		RideID: rideID,
-		DriverLocation: &models.Location{
+		DriverLocation: &locationmodels.Location{
 			Latitude:  -6.175392,
 			Longitude: 106.827153,
 		},
-		PassengerLocation: &models.Location{
+		PassengerLocation: &locationmodels.Location{
 			Latitude:  -6.175400,
 			Longitude: 106.827160,
 		},
@@ -223,12 +224,12 @@ func TestRidesHandler_RideArrived_Success(t *testing.T) {
 	handler := NewRidesHandler(mockRideUC)
 
 	rideID := uuid.New().String()
-	req := models.RideArrivalReq{
+	req := ridemodels.RideArrivalReq{
 		RideID:           rideID,
 		AdjustmentFactor: 1.0,
 	}
 
-	expectedPayment := &models.PaymentRequest{
+	expectedPayment := &ridemodels.PaymentRequest{
 		RideID:    rideID,
 		TotalCost: 100000,
 	}
@@ -302,7 +303,7 @@ func TestRidesHandler_RideArrived_UseCaseError(t *testing.T) {
 	handler := NewRidesHandler(mockRideUC)
 
 	rideID := uuid.New().String()
-	req := models.RideArrivalReq{
+	req := ridemodels.RideArrivalReq{
 		RideID:           rideID,
 		AdjustmentFactor: 1.0,
 	}
@@ -335,19 +336,19 @@ func TestRidesHandler_ProcessPayment_Success(t *testing.T) {
 	handler := NewRidesHandler(mockRideUC)
 
 	rideID := uuid.New().String()
-	req := models.PaymentProccessRequest{
+	req := ridemodels.PaymentProccessRequest{
 		RideID:    rideID,
 		TotalCost: 100000,
-		Status:    models.PaymentStatusAccepted,
+		Status:    ridemodels.PaymentStatusAccepted,
 	}
 
-	expectedPayment := &models.Payment{
+	expectedPayment := &ridemodels.Payment{
 		PaymentID:    uuid.New(),
 		RideID:       uuid.MustParse(rideID),
 		AdjustedCost: 100000,
 		AdminFee:     7500,
 		DriverPayout: 92500,
-		Status:       models.PaymentStatusAccepted,
+		Status:       ridemodels.PaymentStatusAccepted,
 	}
 
 	mockRideUC.EXPECT().
@@ -376,14 +377,14 @@ func TestRidesHandler_ProcessPayment_Success(t *testing.T) {
 	var response struct {
 		Success bool            `json:"success"`
 		Message string          `json:"message"`
-		Data    models.Payment  `json:"data"`
+		Data    ridemodels.Payment  `json:"data"`
 	}
 	err = json.Unmarshal(recorder.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.True(t, response.Success)
 	assert.Equal(t, uuid.MustParse(rideID), response.Data.RideID)
 	assert.Equal(t, 100000, response.Data.AdjustedCost)
-	assert.Equal(t, models.PaymentStatusAccepted, response.Data.Status)
+	assert.Equal(t, ridemodels.PaymentStatusAccepted, response.Data.Status)
 }
 
 func TestRidesHandler_ProcessPayment_MissingRideID(t *testing.T) {
@@ -435,10 +436,10 @@ func TestRidesHandler_ProcessPayment_UseCaseError(t *testing.T) {
 	handler := NewRidesHandler(mockRideUC)
 
 	rideID := uuid.New().String()
-	req := models.PaymentProccessRequest{
+	req := ridemodels.PaymentProccessRequest{
 		RideID:    rideID,
 		TotalCost: 100000,
-		Status:    models.PaymentStatusAccepted,
+		Status:    ridemodels.PaymentStatusAccepted,
 	}
 
 	mockRideUC.EXPECT().

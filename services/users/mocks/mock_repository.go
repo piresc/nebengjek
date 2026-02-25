@@ -10,7 +10,8 @@ import (
 	time "time"
 
 	gomock "github.com/golang/mock/gomock"
-	models "github.com/piresc/nebengjek/internal/pkg/models"
+	core "github.com/piresc/nebengjek/internal/pkg/models/core"
+	user "github.com/piresc/nebengjek/internal/pkg/models/user"
 )
 
 // MockUserRepo is a mock of UserRepo interface.
@@ -37,7 +38,7 @@ func (m *MockUserRepo) EXPECT() *MockUserRepoMockRecorder {
 }
 
 // CreateOTP mocks base method.
-func (m *MockUserRepo) CreateOTP(arg0 context.Context, arg1 *models.OTP) error {
+func (m *MockUserRepo) CreateOTP(arg0 context.Context, arg1 *core.OTP) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateOTP", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -51,7 +52,7 @@ func (mr *MockUserRepoMockRecorder) CreateOTP(arg0, arg1 interface{}) *gomock.Ca
 }
 
 // CreateUser mocks base method.
-func (m *MockUserRepo) CreateUser(arg0 context.Context, arg1 *models.User) error {
+func (m *MockUserRepo) CreateUser(arg0 context.Context, arg1 *user.User) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateUser", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -65,10 +66,10 @@ func (mr *MockUserRepoMockRecorder) CreateUser(arg0, arg1 interface{}) *gomock.C
 }
 
 // GetOTP mocks base method.
-func (m *MockUserRepo) GetOTP(arg0 context.Context, arg1, arg2 string) (*models.OTP, error) {
+func (m *MockUserRepo) GetOTP(arg0 context.Context, arg1, arg2 string) (*core.OTP, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetOTP", arg0, arg1, arg2)
-	ret0, _ := ret[0].(*models.OTP)
+	ret0, _ := ret[0].(*core.OTP)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -80,10 +81,10 @@ func (mr *MockUserRepoMockRecorder) GetOTP(arg0, arg1, arg2 interface{}) *gomock
 }
 
 // GetUserByID mocks base method.
-func (m *MockUserRepo) GetUserByID(arg0 context.Context, arg1 string) (*models.User, error) {
+func (m *MockUserRepo) GetUserByID(arg0 context.Context, arg1 string) (*user.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetUserByID", arg0, arg1)
-	ret0, _ := ret[0].(*models.User)
+	ret0, _ := ret[0].(*user.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -95,10 +96,10 @@ func (mr *MockUserRepoMockRecorder) GetUserByID(arg0, arg1 interface{}) *gomock.
 }
 
 // GetUserByMSISDN mocks base method.
-func (m *MockUserRepo) GetUserByMSISDN(arg0 context.Context, arg1 string) (*models.User, error) {
+func (m *MockUserRepo) GetUserByMSISDN(arg0 context.Context, arg1 string) (*user.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetUserByMSISDN", arg0, arg1)
-	ret0, _ := ret[0].(*models.User)
+	ret0, _ := ret[0].(*user.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -139,7 +140,7 @@ func (mr *MockUserRepoMockRecorder) SetEventCacheWithTTL(arg0, arg1, arg2, arg3,
 }
 
 // UpdateToDriver mocks base method.
-func (m *MockUserRepo) UpdateToDriver(arg0 context.Context, arg1 *models.User) error {
+func (m *MockUserRepo) UpdateToDriver(arg0 context.Context, arg1 *user.User) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateToDriver", arg0, arg1)
 	ret0, _ := ret[0].(error)

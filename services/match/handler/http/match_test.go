@@ -11,7 +11,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	matchmodels "github.com/piresc/nebengjek/internal/pkg/models/match"
 	"github.com/piresc/nebengjek/services/match/mocks"
 	"github.com/stretchr/testify/assert"
 )
@@ -36,15 +36,15 @@ func TestMatchHandler_ConfirmMatch_Success_Accepted(t *testing.T) {
 
 	matchID := uuid.New().String()
 	userID := uuid.New().String()
-	req := models.MatchConfirmRequest{
+	req := matchmodels.MatchConfirmRequest{
 		ID:     matchID,
 		UserID: userID,
-		Status: string(models.MatchStatusAccepted),
+		Status: string(matchmodels.MatchStatusAccepted),
 	}
 
-	expectedResult := &models.MatchProposal{
+	expectedResult := &matchmodels.MatchProposal{
 		ID:          matchID,
-		MatchStatus: models.MatchStatusAccepted,
+		MatchStatus: matchmodels.MatchStatusAccepted,
 	}
 
 	mockMatchUC.EXPECT().
@@ -55,7 +55,7 @@ func TestMatchHandler_ConfirmMatch_Success_Accepted(t *testing.T) {
 	e := echo.New()
 	reqBody, _ := json.Marshal(map[string]interface{}{
 		"user_id": userID,
-		"status":  string(models.MatchStatusAccepted),
+		"status":  string(matchmodels.MatchStatusAccepted),
 	})
 	request := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(reqBody))
 	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -84,15 +84,15 @@ func TestMatchHandler_ConfirmMatch_Success_Rejected(t *testing.T) {
 
 	matchID := uuid.New().String()
 	userID := uuid.New().String()
-	req := models.MatchConfirmRequest{
+	req := matchmodels.MatchConfirmRequest{
 		ID:     matchID,
 		UserID: userID,
-		Status: string(models.MatchStatusRejected),
+		Status: string(matchmodels.MatchStatusRejected),
 	}
 
-	expectedResult := &models.MatchProposal{
+	expectedResult := &matchmodels.MatchProposal{
 		ID:          matchID,
-		MatchStatus: models.MatchStatusRejected,
+		MatchStatus: matchmodels.MatchStatusRejected,
 	}
 
 	mockMatchUC.EXPECT().
@@ -103,7 +103,7 @@ func TestMatchHandler_ConfirmMatch_Success_Rejected(t *testing.T) {
 	e := echo.New()
 	reqBody, _ := json.Marshal(map[string]interface{}{
 		"user_id": userID,
-		"status":  string(models.MatchStatusRejected),
+		"status":  string(matchmodels.MatchStatusRejected),
 	})
 	request := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(reqBody))
 	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -180,7 +180,7 @@ func TestMatchHandler_ConfirmMatch_MissingUserID(t *testing.T) {
 
 	e := echo.New()
 	reqBody, _ := json.Marshal(map[string]interface{}{
-		"status": string(models.MatchStatusAccepted),
+		"status": string(matchmodels.MatchStatusAccepted),
 	})
 	request := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(reqBody))
 	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -268,21 +268,21 @@ func TestMatchHandler_ConfirmMatch_UseCaseError(t *testing.T) {
 
 	matchID := uuid.New().String()
 	userID := uuid.New().String()
-	req := models.MatchConfirmRequest{
+	req := matchmodels.MatchConfirmRequest{
 		ID:     matchID,
 		UserID: userID,
-		Status: string(models.MatchStatusAccepted),
+		Status: string(matchmodels.MatchStatusAccepted),
 	}
 
 	mockMatchUC.EXPECT().
 		ConfirmMatchStatus(gomock.Any(), &req).
-		Return(models.MatchProposal{}, errors.New("usecase error")).
+		Return(matchmodels.MatchProposal{}, errors.New("usecase error")).
 		Times(1)
 
 	e := echo.New()
 	reqBody, _ := json.Marshal(map[string]interface{}{
 		"user_id": userID,
-		"status":  string(models.MatchStatusAccepted),
+		"status":  string(matchmodels.MatchStatusAccepted),
 	})
 	request := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(reqBody))
 	request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)

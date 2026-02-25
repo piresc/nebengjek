@@ -2,7 +2,9 @@
 
 ## Overview
 
-The NebengJek WebSocket system provides real-time bidirectional communication between clients and the Users Service. This document specifies all WebSocket events, their payloads, and usage patterns for implementing real-time features.
+The NebengJek WebSocket system provides real-time bidirectional communication between clients and the Gateway Service. This document specifies all WebSocket events, their payloads, and usage patterns for implementing real-time features.
+
+**For complete architecture information, see [WebSocket Architecture](websocket-architecture.md)**
 
 ## Connection Management
 
@@ -17,7 +19,7 @@ Authorization: Bearer <jwt_token>
 ```mermaid
 sequenceDiagram
     participant C as Client
-    participant WS as WebSocket Handler
+    participant WS as Gateway WebSocket Handler
     participant MW as Middleware
     participant NATS as NATS JetStream
     
@@ -64,6 +66,22 @@ Sent when connection encounters an error.
   }
 }
 ```
+
+#### Heartbeat Events
+The WebSocket implementation includes automatic heartbeat monitoring using the `github.com/coder/websocket` library's built-in ping/pong mechanism. These events are handled automatically by the library and server.
+
+**Internal Heartbeat Flow:**
+1. Server sends ping frames every 30 seconds using `conn.Ping()`
+2. Client automatically responds with pong frames (handled by browser/WebSocket library)
+3. Server tracks missed pings and closes connections after 3 consecutive misses (90 seconds timeout)
+4. No explicit client-side heartbeat implementation is required
+
+**Heartbeat Configuration:**
+- **Ping Interval**: 30 seconds
+- **Connection Timeout**: 90 seconds (3 missed pings)
+- **Max Missed Pings**: 3
+
+**Note:** Heartbeat events are handled automatically by the WebSocket library and do not require explicit client-side implementation. The server monitors connection health and automatically closes unresponsive connections.
 
 ## Beacon Events
 

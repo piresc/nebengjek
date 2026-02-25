@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	models "github.com/piresc/nebengjek/internal/pkg/models"
+	core "github.com/piresc/nebengjek/internal/pkg/models/core"
 )
 
 // MockGatewayGW is a mock of GatewayGW interface.
@@ -36,10 +36,10 @@ func (m *MockGatewayGW) EXPECT() *MockGatewayGWMockRecorder {
 }
 
 // CallLocationService mocks base method.
-func (m *MockGatewayGW) CallLocationService(arg0 context.Context, arg1, arg2 string, arg3 interface{}, arg4, arg5 map[string]string) (*models.ProxyResponse, error) {
+func (m *MockGatewayGW) CallLocationService(arg0 context.Context, arg1, arg2 string, arg3 interface{}, arg4, arg5 map[string]string) (*core.ProxyResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CallLocationService", arg0, arg1, arg2, arg3, arg4, arg5)
-	ret0, _ := ret[0].(*models.ProxyResponse)
+	ret0, _ := ret[0].(*core.ProxyResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -51,10 +51,10 @@ func (mr *MockGatewayGWMockRecorder) CallLocationService(arg0, arg1, arg2, arg3,
 }
 
 // CallMatchService mocks base method.
-func (m *MockGatewayGW) CallMatchService(arg0 context.Context, arg1, arg2 string, arg3 interface{}, arg4, arg5 map[string]string) (*models.ProxyResponse, error) {
+func (m *MockGatewayGW) CallMatchService(arg0 context.Context, arg1, arg2 string, arg3 interface{}, arg4, arg5 map[string]string) (*core.ProxyResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CallMatchService", arg0, arg1, arg2, arg3, arg4, arg5)
-	ret0, _ := ret[0].(*models.ProxyResponse)
+	ret0, _ := ret[0].(*core.ProxyResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -66,10 +66,10 @@ func (mr *MockGatewayGWMockRecorder) CallMatchService(arg0, arg1, arg2, arg3, ar
 }
 
 // CallRidesService mocks base method.
-func (m *MockGatewayGW) CallRidesService(arg0 context.Context, arg1, arg2 string, arg3 interface{}, arg4, arg5 map[string]string) (*models.ProxyResponse, error) {
+func (m *MockGatewayGW) CallRidesService(arg0 context.Context, arg1, arg2 string, arg3 interface{}, arg4, arg5 map[string]string) (*core.ProxyResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CallRidesService", arg0, arg1, arg2, arg3, arg4, arg5)
-	ret0, _ := ret[0].(*models.ProxyResponse)
+	ret0, _ := ret[0].(*core.ProxyResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -81,10 +81,10 @@ func (mr *MockGatewayGWMockRecorder) CallRidesService(arg0, arg1, arg2, arg3, ar
 }
 
 // CallUsersService mocks base method.
-func (m *MockGatewayGW) CallUsersService(arg0 context.Context, arg1, arg2 string, arg3 interface{}, arg4, arg5 map[string]string) (*models.ProxyResponse, error) {
+func (m *MockGatewayGW) CallUsersService(arg0 context.Context, arg1, arg2 string, arg3 interface{}, arg4, arg5 map[string]string) (*core.ProxyResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CallUsersService", arg0, arg1, arg2, arg3, arg4, arg5)
-	ret0, _ := ret[0].(*models.ProxyResponse)
+	ret0, _ := ret[0].(*core.ProxyResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

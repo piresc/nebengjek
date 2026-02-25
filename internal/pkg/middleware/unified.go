@@ -11,27 +11,43 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
-	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
-	"github.com/piresc/nebengjek/internal/pkg/models"
-	"github.com/piresc/nebengjek/internal/pkg/observability"
+	"github.com/newrelic/go-agent/v3/newrelic"
+	"github.com/piresc/nebengjek/internal/pkg/middleware/auth"
+	"github.com/piresc/nebengjek/internal/pkg/tracing"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 )
+
+// existingTransaction wraps an already-started New Relic transaction
+// so the unified middleware can add attributes without creating a duplicate.
+type existingTransaction struct {
+	txn *newrelic.Transaction
+}
+
+func (t *existingTransaction) Context() context.Context {
+	return newrelic.NewContext(context.Background(), t.txn)
+}
+func (t *existingTransaction) SetName(name string)            { t.txn.SetName(name) }
+func (t *existingTransaction) AddAttribute(key, value string) { t.txn.AddAttribute(key, value) }
+func (t *existingTransaction) AddError(err error)             { t.txn.NoticeError(err) }
+func (t *existingTransaction) End()                           {} // Don't end — the tracing middleware owns the lifecycle
 
 // Middleware combines multiple middleware into a single, efficient handler
 type Middleware struct {
-	config *models.Config
-	logger *slog.Logger
-	tracer observability.Tracer
+	config      *core.Config
+	logger      *slog.Logger
+	tracer      tracing.Tracer
+	auth        *auth.AuthMiddleware
 }
 
 // NewMiddleware creates a new middleware instance
-func NewMiddleware(config *models.Config, logger *slog.Logger, tracer observability.Tracer) *Middleware {
+func NewMiddleware(config *core.Config, logger *slog.Logger, tracer tracing.Tracer) *Middleware {
 	return &Middleware{
 		config: config,
 		logger: logger,
 		tracer: tracer,
+		auth:   auth.NewAuthMiddleware(config),
 	}
 }
 
@@ -102,69 +118,72 @@ func (m *Middleware) RegisterHealthEndpoints(e *echo.Echo, serviceName, version 
 	// Liveness probe (for Kubernetes)
 	healthGroup.GET("/live", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]interface{}{
-			"status":  "alive",
+			"status":  "live",
 			"service": serviceName,
 		})
 	})
 }
 
-// Handler returns the main middleware handler that combines all functionality
+// Handler is the main middleware that combines logging, tracing, and error handling
 func (m *Middleware) Handler() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			start := time.Now()
-
-			// 1. Generate Request ID
 			requestID := c.Request().Header.Get("X-Request-ID")
 			if requestID == "" {
 				requestID = uuid.New().String()
 			}
+			
+			// Add request ID to context
+			c.Set("request_id", requestID)
 			c.Response().Header().Set("X-Request-ID", requestID)
 
-			// 2. Add to context for easy access
-			ctx := context.WithValue(c.Request().Context(), "request_id", requestID)
-			ctx = context.WithValue(ctx, "service_name", "gateway")
-			c.SetRequest(c.Request().WithContext(ctx))
-
-			// 3. Setup APM transaction (if tracer is enabled)
-			var txn observability.Transaction
-			if m.tracer != nil {
-				txn = m.tracer.StartTransaction(c.Request().URL.Path)
-				defer txn.End()
-				txn.SetWebRequest(c.Request())
-
-				// Add transaction context - this ensures New Relic context is available for logging
-				ctx = txn.GetContext()
-				c.SetRequest(c.Request().WithContext(ctx))
-
-				// Store transaction in Echo context for easy access
-				c.Set("nr_txn", txn)
+			// Reuse existing New Relic transaction from context if the tracing middleware
+			// already created one; only start a new transaction if none exists.
+			var txn tracing.HTTPTransaction
+			if m.tracer != nil && m.tracer.IsEnabled() && m.tracer.ShouldTrace(c.Request().URL.Path) {
+				if existing := newrelic.FromContext(c.Request().Context()); existing != nil {
+					txn = &existingTransaction{txn: existing}
+					txn.AddAttribute("request.id", requestID)
+				} else {
+					ctx, transaction := m.tracer.StartHTTPRequest(c.Request())
+					txn = transaction
+					c.SetRequest(c.Request().WithContext(ctx))
+					txn.AddAttribute("request.id", requestID)
+					txn.AddAttribute("http.method", c.Request().Method)
+					txn.AddAttribute("http.url", c.Request().URL.String())
+					txn.AddAttribute("user.agent", c.Request().UserAgent())
+					defer txn.End()
+				}
 			}
 
-			// 4. Wrap response writer to capture response body for error logging
-			responseCapture := &responseBodyCapture{
-				ResponseWriter: c.Response().Writer,
-				body:           make([]byte, 0),
+			// Capture response body for logging (only if response writer is not already captured)
+			var responseCapture *responseBodyCapture
+			if _, ok := c.Response().Writer.(*responseBodyCapture); !ok {
+				responseCapture = &responseBodyCapture{ResponseWriter: c.Response().Writer}
+				c.Response().Writer = responseCapture
+			} else {
+				// Use existing capture
+				responseCapture = c.Response().Writer.(*responseBodyCapture)
 			}
-			c.Response().Writer = responseCapture
 
-			// 5. Panic recovery
+			// Handle panics
 			defer func() {
 				if r := recover(); r != nil {
 					m.handlePanic(c, r, requestID, txn)
 				}
 			}()
 
-			// 6. Execute the actual handler
+			// Process request
 			err := next(c)
-
-			// 7. Log the request
+			
+			// Log the request
 			duration := time.Since(start)
-			m.logRequest(c, requestID, duration, err, responseCapture.body)
+			m.logRequest(c, requestID, duration, err, responseCapture.Bytes())
 
-			// 8. Set APM response (if enabled)
-			if txn != nil {
-				txn.SetWebResponse(c.Response().Writer)
+			// Add error to tracing if it exists
+			if err != nil && txn != nil {
+				txn.AddError(err)
 			}
 
 			return err
@@ -172,225 +191,104 @@ func (m *Middleware) Handler() echo.MiddlewareFunc {
 	}
 }
 
-// APIKeyHandler returns middleware for API key validation
+// APIKeyHandler returns the API key authentication handler
 func (m *Middleware) APIKeyHandler(allowedService string) echo.MiddlewareFunc {
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			apiKey := c.Request().Header.Get("X-API-Key")
-			if apiKey == "" {
-				return echo.NewHTTPError(http.StatusUnauthorized, "API key required")
-			}
-
-			// Get expected API key based on service name
-			var expectedKey string
-			switch allowedService {
-			case "users-service":
-				expectedKey = m.config.APIKey.UserService
-			case "match-service":
-				expectedKey = m.config.APIKey.MatchService
-			case "rides-service":
-				expectedKey = m.config.APIKey.RidesService
-			case "location-service":
-				expectedKey = m.config.APIKey.LocationService
-			case "gateway-service":
-				expectedKey = m.config.APIKey.GatewayService
-			case "notification-service":
-				expectedKey = m.config.APIKey.NotificationService
-			default:
-				return echo.NewHTTPError(http.StatusUnauthorized, "Unknown service")
-			}
-
-			// Validate API key
-			if expectedKey == "" || expectedKey != apiKey {
-				return echo.NewHTTPError(http.StatusUnauthorized, "Invalid API key")
-			}
-
-			c.Set("api_service", allowedService)
-
-			return next(c)
-		}
-	}
+	return m.auth.APIKeyHandler(allowedService)
 }
 
-// handlePanic handles panic recovery with enhanced diagnostic logging
-func (m *Middleware) handlePanic(c echo.Context, r interface{}, requestID string, txn observability.Transaction) {
+// JWTHandler returns the JWT authentication handler
+func (m *Middleware) JWTHandler() echo.MiddlewareFunc {
+	return m.auth.JWTHandler()
+}
+
+// handlePanic handles panics and logs them appropriately
+func (m *Middleware) handlePanic(c echo.Context, r interface{}, requestID string, txn tracing.HTTPTransaction) {
 	stack := debug.Stack()
+	
+	m.logger.Error("Panic recovered",
+		slog.String("request_id", requestID),
+		slog.String("method", c.Request().Method),
+		slog.String("path", c.Request().URL.Path),
+		slog.String("panic", fmt.Sprintf("%v", r)),
+		slog.String("stack", string(stack)),
+	)
 
-	// Enhanced diagnostic logging for WebSocket hijack failures
-	if m.logger != nil {
-		logFields := []slog.Attr{
-			slog.Any("panic", r),
-			slog.String("request_id", requestID),
-			slog.String("method", c.Request().Method),
-			slog.String("path", c.Request().URL.Path),
-			slog.String("ip", c.RealIP()),
-			slog.String("proto", c.Request().Proto),
-			slog.String("user_agent", c.Request().UserAgent()),
-		}
-
-		// Add WebSocket-specific diagnostics if this is a WebSocket request
-		if c.Request().URL.Path == "/ws" || c.Request().Header.Get("Upgrade") == "websocket" {
-			logFields = append(logFields,
-				slog.String("upgrade_header", c.Request().Header.Get("Upgrade")),
-				slog.String("connection_header", c.Request().Header.Get("Connection")),
-				slog.String("sec_websocket_key", c.Request().Header.Get("Sec-WebSocket-Key")),
-				slog.String("sec_websocket_version", c.Request().Header.Get("Sec-WebSocket-Version")),
-			)
-
-			// Check if response writer supports hijacking
-			if _, ok := c.Response().Writer.(http.Hijacker); ok {
-				logFields = append(logFields, slog.Bool("response_writer_supports_hijack", true))
-			} else {
-				logFields = append(logFields,
-					slog.Bool("response_writer_supports_hijack", false),
-					slog.String("response_writer_type", fmt.Sprintf("%T", c.Response().Writer)),
-				)
-			}
-
-			// Check if original response writer supports hijacking
-			if responseCapture, ok := c.Response().Writer.(*responseBodyCapture); ok {
-				if _, ok := responseCapture.ResponseWriter.(http.Hijacker); ok {
-					logFields = append(logFields, slog.Bool("original_response_writer_supports_hijack", true))
-				} else {
-					logFields = append(logFields,
-						slog.Bool("original_response_writer_supports_hijack", false),
-						slog.String("original_response_writer_type", fmt.Sprintf("%T", responseCapture.ResponseWriter)),
-					)
-				}
-			}
-		}
-
-		logFields = append(logFields, slog.String("stack", string(stack)))
-
-		// Convert slog.Attr slice to individual arguments
-		args := make([]any, len(logFields)*2)
-		for i, attr := range logFields {
-			args[i*2] = attr.Key
-			args[i*2+1] = attr.Value
-		}
-
-		m.logger.ErrorContext(c.Request().Context(), "Panic recovered", args...)
-	}
-
-	// Report to APM if enabled
 	if txn != nil {
-		txn.NoticeError(fmt.Errorf("panic: %v", r))
+		txn.AddAttribute("panic", fmt.Sprintf("%v", r))
+		txn.AddAttribute("stack_trace", string(stack))
 	}
 
-	// Send simple error response
-	if !c.Response().Committed {
-		c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error":      "Internal Server Error",
-			"message":    "An unexpected error occurred",
-			"request_id": requestID,
-		})
-	}
+	c.JSON(http.StatusInternalServerError, map[string]interface{}{
+		"error":     "Internal server error",
+		"request_id": requestID,
+	})
 }
 
-// logRequest logs the HTTP request with essential information
+// logRequest logs request information
 func (m *Middleware) logRequest(c echo.Context, requestID string, duration time.Duration, err error, responseBody []byte) {
-	if m.logger == nil {
-		return
-	}
-
 	status := c.Response().Status
-
-	// Handle cases where we have a Go error
+	method := c.Request().Method
+	path := c.Request().URL.Path
+	userAgent := c.Request().UserAgent()
+	
+	// Extract error from response if needed
+	errorMessage := ""
 	if err != nil {
-		m.logger.ErrorContext(c.Request().Context(), "Request failed",
-			slog.String("request_id", requestID),
-			slog.String("method", c.Request().Method),
-			slog.String("path", c.Request().URL.Path),
-			slog.Int("status", status),
-			slog.Duration("duration", duration),
-			slog.String("ip", c.RealIP()),
-			slog.Int64("bytes_out", c.Response().Size),
-			slog.Any("error", err),
-		)
-		return
+		errorMessage = err.Error()
+	} else if status >= 400 {
+		errorMessage = m.extractErrorFromResponse(responseBody, status)
 	}
 
-	// Handle error status codes (4xx, 5xx) even when no Go error was returned
-	if status >= 400 {
-		// Try to extract error details from response body
-		errorDetails := m.extractErrorFromResponse(responseBody, status)
+	// Build log attributes
+	attributes := []slog.Attr{
+		slog.String("request_id", requestID),
+		slog.String("method", method),
+		slog.String("path", path),
+		slog.Int("status", status),
+		slog.Duration("duration", duration),
+		slog.String("user_agent", userAgent),
+	}
 
-		logMessage := "Request completed with error"
+	// Add user ID if available
+	if userID := c.Get("user_id"); userID != nil {
+		attributes = append(attributes, slog.String("user_id", userID.(string)))
+	}
 
-		// Use Error level for 5xx status codes
-		if status >= 500 {
-			logMessage = "Request failed with server error"
-		}
+	// Add error message if available
+	if errorMessage != "" {
+		attributes = append(attributes, slog.String("error", errorMessage))
+	}
 
-		if errorDetails != "" {
-			if status >= 500 {
-				m.logger.ErrorContext(c.Request().Context(), logMessage,
-					slog.String("request_id", requestID),
-					slog.String("method", c.Request().Method),
-					slog.String("path", c.Request().URL.Path),
-					slog.Int("status", status),
-					slog.Duration("duration", duration),
-					slog.String("ip", c.RealIP()),
-					slog.Int64("bytes_out", c.Response().Size),
-					slog.String("error_details", errorDetails),
-				)
-			} else {
-				m.logger.WarnContext(c.Request().Context(), logMessage,
-					slog.String("request_id", requestID),
-					slog.String("method", c.Request().Method),
-					slog.String("path", c.Request().URL.Path),
-					slog.Int("status", status),
-					slog.Duration("duration", duration),
-					slog.String("ip", c.RealIP()),
-					slog.Int64("bytes_out", c.Response().Size),
-					slog.String("error_details", errorDetails),
-				)
-			}
-		} else {
-			if status >= 500 {
-				m.logger.ErrorContext(c.Request().Context(), logMessage,
-					slog.String("request_id", requestID),
-					slog.String("method", c.Request().Method),
-					slog.String("path", c.Request().URL.Path),
-					slog.Int("status", status),
-					slog.Duration("duration", duration),
-					slog.String("ip", c.RealIP()),
-					slog.Int64("bytes_out", c.Response().Size),
-				)
-			} else {
-				m.logger.WarnContext(c.Request().Context(), logMessage,
-					slog.String("request_id", requestID),
-					slog.String("method", c.Request().Method),
-					slog.String("path", c.Request().URL.Path),
-					slog.Int("status", status),
-					slog.Duration("duration", duration),
-					slog.String("ip", c.RealIP()),
-					slog.Int64("bytes_out", c.Response().Size),
-				)
-			}
-		}
+	// Convert slog.Attr to []any for logging
+	args := make([]any, len(attributes)*2)
+	for i, attr := range attributes {
+		args[i*2] = attr.Key
+		args[i*2+1] = attr.Value
+	}
+	
+	// Log based on status code
+	if status >= 500 {
+		m.logger.Error("Request failed", args...)
+	} else if status >= 400 {
+		m.logger.Warn("Request error", args...)
 	} else {
-		// Log successful requests at debug level to reduce noise
-		m.logger.DebugContext(c.Request().Context(), "Request completed",
-			slog.String("request_id", requestID),
-			slog.String("method", c.Request().Method),
-			slog.String("path", c.Request().URL.Path),
-			slog.Int("status", status),
-			slog.Duration("duration", duration),
-			slog.String("ip", c.RealIP()),
-			slog.Int64("bytes_out", c.Response().Size),
-		)
+		m.logger.Info("Request completed", args...)
 	}
 }
 
-// responseBodyCapture wraps the response writer to capture the response body
+// responseBodyCapture captures the response body for logging
 type responseBodyCapture struct {
 	http.ResponseWriter
-	body []byte
+	body       []byte
+	statusCode int
+}
+
+func (r *responseBodyCapture) Header() http.Header {
+	return r.ResponseWriter.Header()
 }
 
 func (r *responseBodyCapture) Write(b []byte) (int, error) {
-	// Capture the response body (limit to first 1KB to avoid memory issues)
+	// Capture response body (limit to 1KB to avoid memory issues)
 	if len(r.body) < 1024 {
 		remaining := 1024 - len(r.body)
 		if len(b) <= remaining {
@@ -402,80 +300,47 @@ func (r *responseBodyCapture) Write(b []byte) (int, error) {
 	return r.ResponseWriter.Write(b)
 }
 
-// Hijack implements http.Hijacker interface to support WebSocket connections
+func (r *responseBodyCapture) WriteHeader(statusCode int) {
+	r.statusCode = statusCode
+	r.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (r *responseBodyCapture) Bytes() []byte {
+	return r.body
+}
+
+func (r *responseBodyCapture) StatusCode() int {
+	if r.statusCode != 0 {
+		return r.statusCode
+	}
+	return http.StatusOK // default status code
+}
+
 func (r *responseBodyCapture) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	if hijacker, ok := r.ResponseWriter.(http.Hijacker); ok {
 		return hijacker.Hijack()
 	}
-	return nil, nil, fmt.Errorf("response writer does not support hijacking")
+	return nil, nil, fmt.Errorf("response writer cannot hijack")
 }
 
-// extractErrorFromResponse attempts to extract error details from the response body
+// extractErrorFromResponse extracts error message from response body
 func (m *Middleware) extractErrorFromResponse(responseBody []byte, status int) string {
 	if len(responseBody) == 0 {
-		switch {
-		case status >= 500:
-			return fmt.Sprintf("Internal server error (HTTP %d)", status)
-		case status >= 400:
-			return fmt.Sprintf("Client error (HTTP %d)", status)
-		default:
-			return ""
-		}
+		return fmt.Sprintf("HTTP %d", status)
 	}
 
-	// Try to parse as JSON to extract error message
-	var errorResp map[string]interface{}
-	if err := json.Unmarshal(responseBody, &errorResp); err != nil {
-		// If not JSON, return the raw body (truncated if too long)
-		bodyStr := string(responseBody)
-		if len(bodyStr) > 500 {
-			bodyStr = bodyStr[:500] + "..."
-		}
-		return bodyStr
+	var response map[string]interface{}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return fmt.Sprintf("HTTP %d: %s", status, string(responseBody))
 	}
 
-	// Extract error message from common error response formats
-	if errorMsg, exists := errorResp["error"]; exists {
-		if errorStr, ok := errorMsg.(string); ok {
-			return errorStr
-		}
+	if errorMsg, ok := response["error"].(string); ok {
+		return errorMsg
 	}
 
-	// Try alternative error field names
-	if errorMsg, exists := errorResp["message"]; exists {
-		if errorStr, ok := errorMsg.(string); ok {
-			return errorStr
-		}
+	if errorMsg, ok := response["message"].(string); ok {
+		return errorMsg
 	}
 
-	// If we can't extract a specific error, return the JSON as string (truncated)
-	jsonStr, _ := json.Marshal(errorResp)
-	if len(jsonStr) > 500 {
-		return string(jsonStr[:500]) + "..."
-	}
-
-	return string(jsonStr)
-}
-
-// JWTHandler returns middleware for JWT token validation
-func (m *Middleware) JWTHandler() echo.MiddlewareFunc {
-	return echojwt.WithConfig(echojwt.Config{
-		SigningKey: []byte(m.config.JWT.Secret),
-		SuccessHandler: func(c echo.Context) {
-			// Get validated token from context (set by echo-jwt)
-			token, ok := c.Get("user").(*jwt.Token)
-			if !ok || !token.Valid {
-				return
-			}
-			
-			if claims, ok := token.Claims.(jwt.MapClaims); ok {
-				if userID, exists := claims["user_id"]; exists {
-					c.Set("user_id", userID)
-				}
-				if role, exists := claims["role"]; exists {
-					c.Set("role", role)
-				}
-			}
-		},
-	})
+	return fmt.Sprintf("HTTP %d", status)
 }

@@ -9,7 +9,8 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	models "github.com/piresc/nebengjek/internal/pkg/models"
+	core "github.com/piresc/nebengjek/internal/pkg/models/core"
+	user "github.com/piresc/nebengjek/internal/pkg/models/user"
 )
 
 // MockUserUC is a mock of UserUC interface.
@@ -50,10 +51,10 @@ func (mr *MockUserUCMockRecorder) GenerateOTP(arg0, arg1 interface{}) *gomock.Ca
 }
 
 // GetUserByID mocks base method.
-func (m *MockUserUC) GetUserByID(arg0 context.Context, arg1 string) (*models.User, error) {
+func (m *MockUserUC) GetUserByID(arg0 context.Context, arg1 string) (*user.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetUserByID", arg0, arg1)
-	ret0, _ := ret[0].(*models.User)
+	ret0, _ := ret[0].(*user.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -65,7 +66,7 @@ func (mr *MockUserUCMockRecorder) GetUserByID(arg0, arg1 interface{}) *gomock.Ca
 }
 
 // RegisterDriver mocks base method.
-func (m *MockUserUC) RegisterDriver(arg0 context.Context, arg1 *models.User) error {
+func (m *MockUserUC) RegisterDriver(arg0 context.Context, arg1 *user.User) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RegisterDriver", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -79,7 +80,7 @@ func (mr *MockUserUCMockRecorder) RegisterDriver(arg0, arg1 interface{}) *gomock
 }
 
 // RegisterUser mocks base method.
-func (m *MockUserUC) RegisterUser(arg0 context.Context, arg1 *models.User) error {
+func (m *MockUserUC) RegisterUser(arg0 context.Context, arg1 *user.User) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RegisterUser", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -93,7 +94,7 @@ func (mr *MockUserUCMockRecorder) RegisterUser(arg0, arg1 interface{}) *gomock.C
 }
 
 // UpdateBeaconStatus mocks base method.
-func (m *MockUserUC) UpdateBeaconStatus(arg0 context.Context, arg1 *models.BeaconRequest) error {
+func (m *MockUserUC) UpdateBeaconStatus(arg0 context.Context, arg1 *core.BeaconRequest) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateBeaconStatus", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -107,7 +108,7 @@ func (mr *MockUserUCMockRecorder) UpdateBeaconStatus(arg0, arg1 interface{}) *go
 }
 
 // UpdateFinderStatus mocks base method.
-func (m *MockUserUC) UpdateFinderStatus(arg0 context.Context, arg1 *models.FinderRequest) error {
+func (m *MockUserUC) UpdateFinderStatus(arg0 context.Context, arg1 *core.FinderRequest) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateFinderStatus", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -121,10 +122,10 @@ func (mr *MockUserUCMockRecorder) UpdateFinderStatus(arg0, arg1 interface{}) *go
 }
 
 // VerifyOTP mocks base method.
-func (m *MockUserUC) VerifyOTP(arg0 context.Context, arg1, arg2 string) (*models.AuthResponse, error) {
+func (m *MockUserUC) VerifyOTP(arg0 context.Context, arg1, arg2 string) (*core.AuthResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "VerifyOTP", arg0, arg1, arg2)
-	ret0, _ := ret[0].(*models.AuthResponse)
+	ret0, _ := ret[0].(*core.AuthResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

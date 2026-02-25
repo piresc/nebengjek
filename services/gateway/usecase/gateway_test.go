@@ -7,8 +7,10 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
-	"github.com/piresc/nebengjek/internal/pkg/models"
-	gatewaymocks "github.com/piresc/nebengjek/services/gateway/mocks"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
+	"github.com/piresc/nebengjek/internal/pkg/models/location"
+	"github.com/piresc/nebengjek/internal/pkg/models/match"
+		gatewaymocks "github.com/piresc/nebengjek/services/gateway/mocks"
 	usersmocks "github.com/piresc/nebengjek/services/users/mocks"
 	"github.com/stretchr/testify/assert"
 )
@@ -32,20 +34,20 @@ func TestNewGatewayUC(t *testing.T) {
 func TestGatewayUseCase_UpdateBeaconStatus(t *testing.T) {
 	tests := []struct {
 		name          string
-		request       *models.BeaconRequest
-		mockResponse  *models.ProxyResponse
+		request       *coremodels.BeaconRequest
+		mockResponse  *coremodels.ProxyResponse
 		mockError     error
 		expectedError string
 	}{
 		{
 			name: "successful beacon update",
-			request: &models.BeaconRequest{
+			request: &coremodels.BeaconRequest{
 				MSISDN:    "1234567890",
 				IsActive:  true,
 				Latitude:  -6.175392,
 				Longitude: 106.827153,
 			},
-			mockResponse: &models.ProxyResponse{
+			mockResponse: &coremodels.ProxyResponse{
 				StatusCode: 200,
 				Body:       []byte(`{"success": true}`),
 			},
@@ -53,7 +55,7 @@ func TestGatewayUseCase_UpdateBeaconStatus(t *testing.T) {
 		},
 		{
 			name: "users service returns error",
-			request: &models.BeaconRequest{
+			request: &coremodels.BeaconRequest{
 				MSISDN:    "1234567890",
 				IsActive:  true,
 				Latitude:  -6.175392,
@@ -64,13 +66,13 @@ func TestGatewayUseCase_UpdateBeaconStatus(t *testing.T) {
 		},
 		{
 			name: "users service returns error status code",
-			request: &models.BeaconRequest{
+			request: &coremodels.BeaconRequest{
 				MSISDN:    "1234567890",
 				IsActive:  true,
 				Latitude:  -6.175392,
 				Longitude: 106.827153,
 			},
-			mockResponse: &models.ProxyResponse{
+			mockResponse: &coremodels.ProxyResponse{
 				StatusCode: 400,
 				Body:       []byte(`{"error": "invalid request"}`),
 			},
@@ -115,26 +117,26 @@ func TestGatewayUseCase_UpdateBeaconStatus(t *testing.T) {
 func TestGatewayUseCase_UpdateFinderStatus(t *testing.T) {
 	tests := []struct {
 		name          string
-		request       *models.FinderRequest
-		mockResponse  *models.ProxyResponse
+		request       *coremodels.FinderRequest
+		mockResponse  *coremodels.ProxyResponse
 		mockError     error
 		expectedError string
 	}{
 		{
 			name: "successful finder update",
-			request: &models.FinderRequest{
+			request: &coremodels.FinderRequest{
 				MSISDN:   "1234567890",
 				IsActive: true,
-				Location: models.Location{
+				Location: location.Location{
 					Latitude:  -6.175392,
 					Longitude: 106.827153,
 				},
-				TargetLocation: models.Location{
+				TargetLocation: location.Location{
 					Latitude:  -6.200000,
 					Longitude: 106.850000,
 				},
 			},
-			mockResponse: &models.ProxyResponse{
+			mockResponse: &coremodels.ProxyResponse{
 				StatusCode: 200,
 				Body:       []byte(`{"success": true}`),
 			},
@@ -142,14 +144,14 @@ func TestGatewayUseCase_UpdateFinderStatus(t *testing.T) {
 		},
 		{
 			name: "service error",
-			request: &models.FinderRequest{
+			request: &coremodels.FinderRequest{
 				MSISDN:   "1234567890",
 				IsActive: true,
-				Location: models.Location{
+				Location: location.Location{
 					Latitude:  -6.175392,
 					Longitude: 106.827153,
 				},
-				TargetLocation: models.Location{
+				TargetLocation: location.Location{
 					Latitude:  -6.200000,
 					Longitude: 106.850000,
 				},
@@ -199,23 +201,23 @@ func TestGatewayUseCase_ConfirmMatch(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		request        *models.MatchConfirmRequest
-		mockResponse   *models.ProxyResponse
+		request        *match.MatchConfirmRequest
+		mockResponse   *coremodels.ProxyResponse
 		mockError      error
-		expectedResult *models.MatchProposal
+		expectedResult *match.MatchProposal
 		expectedError  string
 	}{
 		{
 			name: "successful match confirmation",
-			request: &models.MatchConfirmRequest{
+			request: &match.MatchConfirmRequest{
 				ID:     matchID,
 				UserID: userID,
 			},
-			mockResponse: &models.ProxyResponse{
+			mockResponse: &coremodels.ProxyResponse{
 				StatusCode: 200,
 				Body:       []byte(`{"match_id": "` + matchID + `", "driver_id": "driver-123", "passenger_id": "passenger-456"}`),
 			},
-			expectedResult: &models.MatchProposal{
+			expectedResult: &match.MatchProposal{
 				ID:          matchID,
 				DriverID:    "driver-123",
 				PassengerID: "passenger-456",
@@ -224,7 +226,7 @@ func TestGatewayUseCase_ConfirmMatch(t *testing.T) {
 		},
 		{
 			name: "match service error",
-			request: &models.MatchConfirmRequest{
+			request: &match.MatchConfirmRequest{
 				ID:     matchID,
 				UserID: userID,
 			},
@@ -233,11 +235,11 @@ func TestGatewayUseCase_ConfirmMatch(t *testing.T) {
 		},
 		{
 			name: "match service returns error status",
-			request: &models.MatchConfirmRequest{
+			request: &match.MatchConfirmRequest{
 				ID:     matchID,
 				UserID: userID,
 			},
-			mockResponse: &models.ProxyResponse{
+			mockResponse: &coremodels.ProxyResponse{
 				StatusCode: 404,
 				Body:       []byte(`{"error": "match not found"}`),
 			},
@@ -245,11 +247,11 @@ func TestGatewayUseCase_ConfirmMatch(t *testing.T) {
 		},
 		{
 			name: "invalid response JSON",
-			request: &models.MatchConfirmRequest{
+			request: &match.MatchConfirmRequest{
 				ID:     matchID,
 				UserID: userID,
 			},
-			mockResponse: &models.ProxyResponse{
+			mockResponse: &coremodels.ProxyResponse{
 				StatusCode: 200,
 				Body:       []byte(`invalid json`),
 			},
@@ -301,21 +303,21 @@ func TestGatewayUseCase_ConfirmMatch(t *testing.T) {
 func TestGatewayUseCase_UpdateUserLocation(t *testing.T) {
 	tests := []struct {
 		name          string
-		request       *models.LocationUpdate
-		mockResponse  *models.ProxyResponse
+		request       *location.LocationUpdate
+		mockResponse  *coremodels.ProxyResponse
 		mockError     error
 		expectedError string
 	}{
 		{
 			name: "successful location update",
-			request: &models.LocationUpdate{
+			request: &location.LocationUpdate{
 				DriverID: uuid.New().String(),
-				Location: models.Location{
+				Location: location.Location{
 					Latitude:  -6.175392,
 					Longitude: 106.827153,
 				},
 			},
-			mockResponse: &models.ProxyResponse{
+			mockResponse: &coremodels.ProxyResponse{
 				StatusCode: 200,
 				Body:       []byte(`{"success": true}`),
 			},
@@ -323,9 +325,9 @@ func TestGatewayUseCase_UpdateUserLocation(t *testing.T) {
 		},
 		{
 			name: "location service error",
-			request: &models.LocationUpdate{
+			request: &location.LocationUpdate{
 				DriverID: uuid.New().String(),
-				Location: models.Location{
+				Location: location.Location{
 					Latitude:  -6.175392,
 					Longitude: 106.827153,
 				},
@@ -384,7 +386,7 @@ func TestGatewayUseCase_ProxyOperations(t *testing.T) {
 	headers := map[string]string{"Content-Type": "application/json"}
 	queryParams := map[string]string{"param": "value"}
 
-	expectedResponse := &models.ProxyResponse{
+	expectedResponse := &coremodels.ProxyResponse{
 		StatusCode: 200,
 		Body:       []byte(`{"success": true}`),
 	}

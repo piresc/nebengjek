@@ -10,7 +10,7 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
-	models "github.com/piresc/nebengjek/internal/pkg/models"
+	matchmodels "github.com/piresc/nebengjek/internal/pkg/models/match"
 )
 
 // MockMatchRepo is a mock of MatchRepo interface.
@@ -37,7 +37,7 @@ func (m *MockMatchRepo) EXPECT() *MockMatchRepoMockRecorder {
 }
 
 // BatchUpdateMatchStatus mocks base method.
-func (m *MockMatchRepo) BatchUpdateMatchStatus(arg0 context.Context, arg1 []string, arg2 models.MatchStatus) error {
+func (m *MockMatchRepo) BatchUpdateMatchStatus(arg0 context.Context, arg1 []string, arg2 matchmodels.MatchStatus) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BatchUpdateMatchStatus", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -51,10 +51,10 @@ func (mr *MockMatchRepoMockRecorder) BatchUpdateMatchStatus(arg0, arg1, arg2 int
 }
 
 // ConfirmMatchByUser mocks base method.
-func (m *MockMatchRepo) ConfirmMatchByUser(arg0 context.Context, arg1, arg2 string, arg3 bool) (*models.Match, error) {
+func (m *MockMatchRepo) ConfirmMatchByUser(arg0 context.Context, arg1, arg2 string, arg3 bool) (*matchmodels.Match, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ConfirmMatchByUser", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].(*models.Match)
+	ret0, _ := ret[0].(*matchmodels.Match)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -66,10 +66,10 @@ func (mr *MockMatchRepoMockRecorder) ConfirmMatchByUser(arg0, arg1, arg2, arg3 i
 }
 
 // CreateMatch mocks base method.
-func (m *MockMatchRepo) CreateMatch(arg0 context.Context, arg1 *models.Match) (*models.Match, error) {
+func (m *MockMatchRepo) CreateMatch(arg0 context.Context, arg1 *matchmodels.Match) (*matchmodels.Match, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateMatch", arg0, arg1)
-	ret0, _ := ret[0].(*models.Match)
+	ret0, _ := ret[0].(*matchmodels.Match)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -111,10 +111,10 @@ func (mr *MockMatchRepoMockRecorder) GetActiveRideByPassenger(arg0, arg1 interfa
 }
 
 // GetMatch mocks base method.
-func (m *MockMatchRepo) GetMatch(arg0 context.Context, arg1 string) (*models.Match, error) {
+func (m *MockMatchRepo) GetMatch(arg0 context.Context, arg1 string) (*matchmodels.Match, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMatch", arg0, arg1)
-	ret0, _ := ret[0].(*models.Match)
+	ret0, _ := ret[0].(*matchmodels.Match)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -126,10 +126,10 @@ func (mr *MockMatchRepoMockRecorder) GetMatch(arg0, arg1 interface{}) *gomock.Ca
 }
 
 // ListMatchesByPassenger mocks base method.
-func (m *MockMatchRepo) ListMatchesByPassenger(arg0 context.Context, arg1 uuid.UUID) ([]*models.Match, error) {
+func (m *MockMatchRepo) ListMatchesByPassenger(arg0 context.Context, arg1 uuid.UUID) ([]*matchmodels.Match, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListMatchesByPassenger", arg0, arg1)
-	ret0, _ := ret[0].([]*models.Match)
+	ret0, _ := ret[0].([]*matchmodels.Match)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -169,7 +169,7 @@ func (mr *MockMatchRepoMockRecorder) SetActiveRide(arg0, arg1, arg2, arg3 interf
 }
 
 // UpdateMatchStatus mocks base method.
-func (m *MockMatchRepo) UpdateMatchStatus(arg0 context.Context, arg1 string, arg2 models.MatchStatus) error {
+func (m *MockMatchRepo) UpdateMatchStatus(arg0 context.Context, arg1 string, arg2 matchmodels.MatchStatus) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateMatchStatus", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)

@@ -6,10 +6,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/piresc/nebengjek/internal/pkg/constants"
 	"github.com/piresc/nebengjek/internal/pkg/database"
-	"github.com/piresc/nebengjek/internal/pkg/models"
-	"github.com/piresc/nebengjek/services/location"
+	locationmodels "github.com/piresc/nebengjek/internal/pkg/models/location"
+	matchmodels "github.com/piresc/nebengjek/internal/pkg/models/match"
+	coremodels "github.com/piresc/nebengjek/internal/pkg/models/core"
+	locationsvc "github.com/piresc/nebengjek/services/location"
 )
 
 const (
@@ -24,7 +25,7 @@ type locationRepo struct {
 }
 
 // NewLocationRepository creates a new location repository
-func NewLocationRepository(redisClient *database.RedisClient, config *models.Config) location.LocationRepo {
+func NewLocationRepository(redisClient *database.RedisClient, config *coremodels.Config) locationsvc.LocationRepo {
 	// Default TTL to 30 minutes if not configured
 	ttlMinutes := 30
 	if config != nil && config.Location.AvailabilityTTLMinutes > 0 {
@@ -38,13 +39,13 @@ func NewLocationRepository(redisClient *database.RedisClient, config *models.Con
 }
 
 // StoreLocation stores a location update in Redis for a ride
-func (r *locationRepo) StoreLocation(ctx context.Context, rideID string, location models.Location) error {
+func (r *locationRepo) StoreLocation(ctx context.Context, rideID string, location locationmodels.Location) error {
 	// Store in ride location hash
-	locationKey := fmt.Sprintf(constants.KeyRideLocation, rideID)
+	locationKey := fmt.Sprintf(database.KeyRideLocation, rideID)
 	locationData := map[string]interface{}{
-		constants.FieldLatitude:  strconv.FormatFloat(location.Latitude, 'f', -1, 64),
-		constants.FieldLongitude: strconv.FormatFloat(location.Longitude, 'f', -1, 64),
-		constants.FieldTimestamp: strconv.FormatInt(location.Timestamp.Unix(), 10),
+		database.FieldLatitude:  strconv.FormatFloat(location.Latitude, 'f', -1, 64),
+		database.FieldLongitude: strconv.FormatFloat(location.Longitude, 'f', -1, 64),
+		database.FieldTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
 	}
 
 	err := r.redisClient.HMSet(ctx, locationKey, locationData)
@@ -62,14 +63,14 @@ func (r *locationRepo) StoreLocation(ctx context.Context, rideID string, locatio
 }
 
 // GetLastLocation gets the last stored location for a ride
-func (r *locationRepo) GetLastLocation(ctx context.Context, rideID string) (*models.Location, error) {
-	locationKey := fmt.Sprintf(constants.KeyRideLocation, rideID)
+func (r *locationRepo) GetLastLocation(ctx context.Context, rideID string) (*locationmodels.Location, error) {
+	locationKey := fmt.Sprintf(database.KeyRideLocation, rideID)
 
 	// Get specific location fields from Redis hash using HMGET
 	fields := []string{
-		constants.FieldLatitude,
-		constants.FieldLongitude,
-		constants.FieldTimestamp,
+		database.FieldLatitude,
+		database.FieldLongitude,
+		database.FieldTimestamp,
 	}
 
 	values, err := r.redisClient.HMGet(ctx, locationKey, fields...)
@@ -102,21 +103,14 @@ func (r *locationRepo) GetLastLocation(ctx context.Context, rideID string) (*mod
 		return nil, fmt.Errorf("invalid longitude: %w", err)
 	}
 
-	// Parse timestamp
-	ts, err := strconv.ParseInt(values[2], 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("invalid timestamp: %w", err)
-	}
-
-	return &models.Location{
+	return &locationmodels.Location{
 		Latitude:  lat,
 		Longitude: lng,
-		Timestamp: time.Unix(ts, 0),
 	}, nil
 }
 
 // addToRedisGeo adds a user to Redis geospatial index with TTL
-func (r *locationRepo) addToRedisGeo(ctx context.Context, geoKey, availableKey, locationKeyTemplate, userID string, location *models.Location) error {
+func (r *locationRepo) addToRedisGeo(ctx context.Context, geoKey, availableKey, locationKeyTemplate, userID string, location *locationmodels.Location) error {
 	// Add to geo set
 	if err := r.redisClient.GeoAdd(ctx, geoKey, location.Longitude, location.Latitude, userID); err != nil {
 		return fmt.Errorf("failed to add to geo index: %w", err)
@@ -140,9 +134,9 @@ func (r *locationRepo) addToRedisGeo(ctx context.Context, geoKey, availableKey, 
 	// Store individual location
 	locationKey := fmt.Sprintf(locationKeyTemplate, userID)
 	locationData := map[string]interface{}{
-		constants.FieldLatitude:  location.Latitude,
-		constants.FieldLongitude: location.Longitude,
-		constants.FieldTimestamp: time.Now().Unix(),
+		database.FieldLatitude:  location.Latitude,
+		database.FieldLongitude: location.Longitude,
+		database.FieldTimestamp: time.Now().Unix(),
 	}
 	if err := r.redisClient.HMSet(ctx, locationKey, locationData); err != nil {
 		return fmt.Errorf("failed to store location: %w", err)
@@ -178,11 +172,11 @@ func (r *locationRepo) removeFromRedisGeo(ctx context.Context, geoKey, available
 }
 
 // AddAvailableDriver adds a driver to the available drivers geo set
-func (r *locationRepo) AddAvailableDriver(ctx context.Context, driverID string, location *models.Location) error {
+func (r *locationRepo) AddAvailableDriver(ctx context.Context, driverID string, location *locationmodels.Location) error {
 	err := r.addToRedisGeo(ctx,
-		constants.KeyDriverGeo,
-		constants.KeyAvailableDrivers,
-		constants.KeyDriverLocation,
+		database.KeyDriverGeo,
+		database.KeyAvailableDrivers,
+		database.KeyDriverLocation,
 		driverID,
 		location)
 
@@ -196,18 +190,18 @@ func (r *locationRepo) AddAvailableDriver(ctx context.Context, driverID string, 
 // RemoveAvailableDriver removes a driver from the available drivers sets
 func (r *locationRepo) RemoveAvailableDriver(ctx context.Context, driverID string) error {
 	return r.removeFromRedisGeo(ctx,
-		constants.KeyDriverGeo,
-		constants.KeyAvailableDrivers,
-		constants.KeyDriverLocation,
+		database.KeyDriverGeo,
+		database.KeyAvailableDrivers,
+		database.KeyDriverLocation,
 		driverID)
 }
 
 // AddAvailablePassenger adds a passenger to the Redis geospatial index
-func (r *locationRepo) AddAvailablePassenger(ctx context.Context, passengerID string, location *models.Location) error {
+func (r *locationRepo) AddAvailablePassenger(ctx context.Context, passengerID string, location *locationmodels.Location) error {
 	return r.addToRedisGeo(ctx,
-		constants.KeyPassengerGeo,
-		constants.KeyAvailablePassengers,
-		constants.KeyPassengerLocation,
+		database.KeyPassengerGeo,
+		database.KeyAvailablePassengers,
+		database.KeyPassengerLocation,
 		passengerID,
 		location)
 }
@@ -215,27 +209,27 @@ func (r *locationRepo) AddAvailablePassenger(ctx context.Context, passengerID st
 // RemoveAvailablePassenger removes a passenger from the Redis geospatial index
 func (r *locationRepo) RemoveAvailablePassenger(ctx context.Context, passengerID string) error {
 	return r.removeFromRedisGeo(ctx,
-		constants.KeyPassengerGeo,
-		constants.KeyAvailablePassengers,
-		constants.KeyPassengerLocation,
+		database.KeyPassengerGeo,
+		database.KeyAvailablePassengers,
+		database.KeyPassengerLocation,
 		passengerID)
 }
 
 // findNearbyUsers finds available users within the specified radius
-func (r *locationRepo) findNearbyUsers(ctx context.Context, geoKey, availableKey string, location *models.Location, radiusKm float64) ([]*models.NearbyUser, error) {
+func (r *locationRepo) findNearbyUsers(ctx context.Context, geoKey, availableKey string, location *locationmodels.Location, radiusKm float64) ([]*matchmodels.NearbyUser, error) {
 	results, err := r.redisClient.GeoRadius(
 		ctx,
 		geoKey,
 		location.Longitude,
 		location.Latitude,
 		radiusKm,
-		"km",
+	"km",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find nearby users: %w", err)
 	}
 
-	nearbyUsers := make([]*models.NearbyUser, 0, len(results))
+	nearbyUsers := make([]*matchmodels.NearbyUser, 0, len(results))
 	for _, result := range results {
 		isMember, err := r.redisClient.SIsMember(ctx, availableKey, result.Name)
 		if err != nil {
@@ -243,12 +237,11 @@ func (r *locationRepo) findNearbyUsers(ctx context.Context, geoKey, availableKey
 		}
 
 		if isMember {
-			nearbyUsers = append(nearbyUsers, &models.NearbyUser{
+			nearbyUsers = append(nearbyUsers, &matchmodels.NearbyUser{
 				ID: result.Name,
-				Location: models.Location{
+				Location: locationmodels.Location{
 					Latitude:  result.Latitude,
 					Longitude: result.Longitude,
-					Timestamp: time.Now(),
 				},
 				Distance: result.Dist,
 			})
@@ -259,8 +252,8 @@ func (r *locationRepo) findNearbyUsers(ctx context.Context, geoKey, availableKey
 }
 
 // FindNearbyDrivers finds available drivers within the specified radius
-func (r *locationRepo) FindNearbyDrivers(ctx context.Context, location *models.Location, radiusKm float64) ([]*models.NearbyUser, error) {
-	nearbyUsers, err := r.findNearbyUsers(ctx, constants.KeyDriverGeo, constants.KeyAvailableDrivers, location, radiusKm)
+func (r *locationRepo) FindNearbyDrivers(ctx context.Context, location *locationmodels.Location, radiusKm float64) ([]*matchmodels.NearbyUser, error) {
+	nearbyUsers, err := r.findNearbyUsers(ctx, database.KeyDriverGeo, database.KeyAvailableDrivers, location, radiusKm)
 	if err != nil {
 		return nil, err
 	}
@@ -269,75 +262,65 @@ func (r *locationRepo) FindNearbyDrivers(ctx context.Context, location *models.L
 }
 
 // GetDriverLocation retrieves a driver's last known location
-func (r *locationRepo) GetDriverLocation(ctx context.Context, driverID string) (models.Location, error) {
+func (r *locationRepo) GetDriverLocation(ctx context.Context, driverID string) (locationmodels.Location, error) {
 	// Try to get from the Redis location key
-	locationKey := fmt.Sprintf(constants.KeyDriverLocation, driverID)
+	locationKey := fmt.Sprintf(database.KeyDriverLocation, driverID)
 	fields, err := r.redisClient.HGetAll(ctx, locationKey)
 	if err != nil {
-		return models.Location{}, fmt.Errorf("failed to get location from Redis: %w", err)
+		return locationmodels.Location{}, fmt.Errorf("failed to get location from Redis: %w", err)
 	}
 
 	// If we got data from Redis, parse it
 	if len(fields) > 0 {
 		var lat, lng float64
-		var timestamp int64
 
-		if latStr, ok := fields[constants.FieldLatitude]; ok {
+		if latStr, ok := fields[database.FieldLatitude]; ok {
 			lat, _ = strconv.ParseFloat(latStr, 64)
 		}
 
-		if lngStr, ok := fields[constants.FieldLongitude]; ok {
+		if lngStr, ok := fields[database.FieldLongitude]; ok {
 			lng, _ = strconv.ParseFloat(lngStr, 64)
 		}
 
-		if tsStr, ok := fields[constants.FieldTimestamp]; ok {
-			timestamp, _ = strconv.ParseInt(tsStr, 10, 64)
-		}
 
-		return models.Location{
+		return locationmodels.Location{
 			Latitude:  lat,
 			Longitude: lng,
-			Timestamp: time.Unix(timestamp, 0),
 		}, nil
 	}
 
 	// If not in Redis, return error since location service doesn't have database access
-	return models.Location{}, fmt.Errorf("no location data found for driver %s", driverID)
+	return locationmodels.Location{}, fmt.Errorf("no location data found for driver %s", driverID)
 }
 
 // GetPassengerLocation retrieves a passenger's last known location
-func (r *locationRepo) GetPassengerLocation(ctx context.Context, passengerID string) (models.Location, error) {
+func (r *locationRepo) GetPassengerLocation(ctx context.Context, passengerID string) (locationmodels.Location, error) {
 	// Try to get from the Redis location key
-	locationKey := fmt.Sprintf(constants.KeyPassengerLocation, passengerID)
+	locationKey := fmt.Sprintf(database.KeyPassengerLocation, passengerID)
 	fields, err := r.redisClient.HGetAll(ctx, locationKey)
 	if err != nil {
-		return models.Location{}, fmt.Errorf("failed to get location from Redis: %w", err)
+		return locationmodels.Location{}, fmt.Errorf("failed to get location from Redis: %w", err)
 	}
 
 	// If we got data from Redis, parse it
 	if len(fields) > 0 {
 		var lat, lng float64
-		var timestamp int64
 
-		if latStr, ok := fields[constants.FieldLatitude]; ok {
+		if latStr, ok := fields[database.FieldLatitude]; ok {
 			lat, _ = strconv.ParseFloat(latStr, 64)
 		}
 
-		if lngStr, ok := fields[constants.FieldLongitude]; ok {
+		if lngStr, ok := fields[database.FieldLongitude]; ok {
 			lng, _ = strconv.ParseFloat(lngStr, 64)
 		}
 
-		if tsStr, ok := fields[constants.FieldTimestamp]; ok {
-			timestamp, _ = strconv.ParseInt(tsStr, 10, 64)
-		}
 
-		return models.Location{
+		return locationmodels.Location{
 			Latitude:  lat,
 			Longitude: lng,
-			Timestamp: time.Unix(timestamp, 0),
 		}, nil
 	}
 
 	// If not in Redis, return error since location service doesn't have database access
-	return models.Location{}, fmt.Errorf("no location data found for passenger %s", passengerID)
+	return locationmodels.Location{}, fmt.Errorf("no location data found for passenger %s", passengerID)
 }

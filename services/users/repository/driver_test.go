@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	usermodels "github.com/piresc/nebengjek/internal/pkg/models/user"
 )
 
 func TestGetDriverInfo(t *testing.T) {
@@ -19,7 +19,7 @@ func TestGetDriverInfo(t *testing.T) {
 		name       string
 		userID     uuid.UUID
 		mockSetup  func(mock sqlmock.Sqlmock)
-		assertFunc func(t *testing.T, driver *models.Driver, err error)
+		assertFunc func(t *testing.T, driver *usermodels.Driver, err error)
 	}{
 		{
 			name:   "Success",
@@ -32,7 +32,7 @@ func TestGetDriverInfo(t *testing.T) {
 					WithArgs(userID).
 					WillReturnRows(rows)
 			},
-			assertFunc: func(t *testing.T, driver *models.Driver, err error) {
+			assertFunc: func(t *testing.T, driver *usermodels.Driver, err error) {
 				assert.NoError(t, err)
 				assert.NotNil(t, driver)
 				assert.Equal(t, "car", driver.VehicleType)
@@ -48,7 +48,7 @@ func TestGetDriverInfo(t *testing.T) {
 					WithArgs(userID).
 					WillReturnError(sql.ErrNoRows)
 			},
-			assertFunc: func(t *testing.T, driver *models.Driver, err error) {
+			assertFunc: func(t *testing.T, driver *usermodels.Driver, err error) {
 				assert.NoError(t, err)
 				assert.Nil(t, driver)
 			},
@@ -62,7 +62,7 @@ func TestGetDriverInfo(t *testing.T) {
 					WithArgs(userID).
 					WillReturnError(errors.New("database error"))
 			},
-			assertFunc: func(t *testing.T, driver *models.Driver, err error) {
+			assertFunc: func(t *testing.T, driver *usermodels.Driver, err error) {
 				assert.Error(t, err)
 				assert.Nil(t, driver)
 				assert.Contains(t, err.Error(), "failed to get driver info")
@@ -94,19 +94,19 @@ func TestGetDriverInfo(t *testing.T) {
 func TestUpdateToDriver(t *testing.T) {
 	testCases := []struct {
 		name       string
-		user       models.User
+		user       usermodels.User
 		mockSetup  func(mock sqlmock.Sqlmock)
 		assertFunc func(t *testing.T, err error)
 	}{
 		{
 			name: "Success",
-			user: models.User{
+			user: usermodels.User{
 				ID:       uuid.MustParse("550e8400-e29b-41d4-a716-446655440001"),
 				MSISDN:   "+628123456789",
 				FullName: "John Doe",
 				Role:     "driver",
 				IsActive: true,
-				DriverInfo: &models.Driver{
+				DriverInfo: &usermodels.Driver{
 					VehicleType:  "car",
 					VehiclePlate: "B 1234 ABC",
 				},
@@ -125,12 +125,12 @@ func TestUpdateToDriver(t *testing.T) {
 		},
 		{
 			name: "Begin Transaction Error",
-			user: models.User{
+			user: usermodels.User{
 				ID:       uuid.MustParse("550e8400-e29b-41d4-a716-446655440002"),
 				MSISDN:   "+628123456790",
 				FullName: "Jane Doe",
 				Role:     "driver",
-				DriverInfo: &models.Driver{
+				DriverInfo: &usermodels.Driver{
 					VehicleType:  "motorcycle",
 					VehiclePlate: "B 5678 DEF",
 				},
@@ -145,12 +145,12 @@ func TestUpdateToDriver(t *testing.T) {
 		},
 		{
 			name: "Update User Error",
-			user: models.User{
+			user: usermodels.User{
 				ID:       uuid.MustParse("550e8400-e29b-41d4-a716-446655440003"),
 				MSISDN:   "+628123456791",
 				FullName: "Error User",
 				Role:     "driver",
-				DriverInfo: &models.Driver{
+				DriverInfo: &usermodels.Driver{
 					VehicleType:  "car",
 					VehiclePlate: "B 9012 GHI",
 				},
@@ -168,12 +168,12 @@ func TestUpdateToDriver(t *testing.T) {
 		},
 		{
 			name: "Insert Driver Info Error",
-			user: models.User{
+			user: usermodels.User{
 				ID:       uuid.MustParse("550e8400-e29b-41d4-a716-446655440004"),
 				MSISDN:   "+628123456792",
 				FullName: "Driver Info Error",
 				Role:     "driver",
-				DriverInfo: &models.Driver{
+				DriverInfo: &usermodels.Driver{
 					VehicleType:  "car",
 					VehiclePlate: "B 3456 JKL",
 				},
@@ -193,12 +193,12 @@ func TestUpdateToDriver(t *testing.T) {
 		},
 		{
 			name: "Commit Error",
-			user: models.User{
+			user: usermodels.User{
 				ID:       uuid.MustParse("550e8400-e29b-41d4-a716-446655440005"),
 				MSISDN:   "+628123456793",
 				FullName: "Commit Error",
 				Role:     "driver",
-				DriverInfo: &models.Driver{
+				DriverInfo: &usermodels.Driver{
 					VehicleType:  "car",
 					VehiclePlate: "B 7890 MNO",
 				},
@@ -244,7 +244,7 @@ func TestGetUserByID(t *testing.T) {
 		name       string
 		userID     string
 		mockSetup  func(mock sqlmock.Sqlmock)
-		assertFunc func(t *testing.T, user *models.User, err error)
+		assertFunc func(t *testing.T, user *usermodels.User, err error)
 	}{
 		{
 			name:   "Success",
@@ -257,7 +257,7 @@ func TestGetUserByID(t *testing.T) {
 					WithArgs("550e8400-e29b-41d4-a716-446655440001").
 					WillReturnRows(rows)
 			},
-			assertFunc: func(t *testing.T, user *models.User, err error) {
+			assertFunc: func(t *testing.T, user *usermodels.User, err error) {
 				assert.NoError(t, err)
 				assert.NotNil(t, user)
 				assert.Equal(t, "+628123456789", user.MSISDN)
@@ -273,7 +273,7 @@ func TestGetUserByID(t *testing.T) {
 					WithArgs("550e8400-e29b-41d4-a716-446655440099").
 					WillReturnError(sql.ErrNoRows)
 			},
-			assertFunc: func(t *testing.T, user *models.User, err error) {
+			assertFunc: func(t *testing.T, user *usermodels.User, err error) {
 				assert.Error(t, err)
 				assert.Nil(t, user)
 				assert.Contains(t, err.Error(), "user not found")

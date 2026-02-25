@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/piresc/nebengjek/internal/pkg/logger"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 )
 
 // UpdateFinderStatus updates a user's finder status and location with Redis caching to prevent duplicate events
-func (uc *UserUC) UpdateFinderStatus(ctx context.Context, finderReq *models.FinderRequest) error {
+func (uc *UserUC) UpdateFinderStatus(ctx context.Context, finderReq *core.FinderRequest) error {
 	// Validate the request
 	user, err := uc.userRepo.GetUserByMSISDN(ctx, finderReq.MSISDN)
 	if err != nil {
@@ -37,10 +37,10 @@ func (uc *UserUC) UpdateFinderStatus(ctx context.Context, finderReq *models.Find
 		logger.Bool("is_active", finderReq.IsActive),
 		logger.Float64("target_lat", finderReq.TargetLocation.Latitude),
 		logger.Float64("target_lon", finderReq.TargetLocation.Longitude),
-		logger.String("target_timestamp", finderReq.TargetLocation.Timestamp.String()))
+		logger.String("target_timestamp", time.Now().String()))
 
 	// Create and publish finder event
-	finderEvent := &models.FinderEvent{
+	finderEvent := &core.FinderEvent{
 		UserID:         user.ID.String(),
 		IsActive:       finderReq.IsActive,
 		Location:       finderReq.Location,

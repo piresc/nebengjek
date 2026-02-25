@@ -9,7 +9,10 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	models "github.com/piresc/nebengjek/internal/pkg/models"
+	core "github.com/piresc/nebengjek/internal/pkg/models/core"
+	location "github.com/piresc/nebengjek/internal/pkg/models/location"
+	match "github.com/piresc/nebengjek/internal/pkg/models/match"
+	ride "github.com/piresc/nebengjek/internal/pkg/models/ride"
 )
 
 // MockGatewayUC is a mock of GatewayUC interface.
@@ -36,10 +39,10 @@ func (m *MockGatewayUC) EXPECT() *MockGatewayUCMockRecorder {
 }
 
 // ConfirmMatch mocks base method.
-func (m *MockGatewayUC) ConfirmMatch(arg0 context.Context, arg1 *models.MatchConfirmRequest) (*models.MatchProposal, error) {
+func (m *MockGatewayUC) ConfirmMatch(arg0 context.Context, arg1 *match.MatchConfirmRequest) (*match.MatchProposal, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ConfirmMatch", arg0, arg1)
-	ret0, _ := ret[0].(*models.MatchProposal)
+	ret0, _ := ret[0].(*match.MatchProposal)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -51,10 +54,10 @@ func (mr *MockGatewayUCMockRecorder) ConfirmMatch(arg0, arg1 interface{}) *gomoc
 }
 
 // ProcessPayment mocks base method.
-func (m *MockGatewayUC) ProcessPayment(arg0 context.Context, arg1 *models.PaymentProccessRequest) (*models.Payment, error) {
+func (m *MockGatewayUC) ProcessPayment(arg0 context.Context, arg1 *ride.PaymentProccessRequest) (*ride.Payment, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ProcessPayment", arg0, arg1)
-	ret0, _ := ret[0].(*models.Payment)
+	ret0, _ := ret[0].(*ride.Payment)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -66,10 +69,10 @@ func (mr *MockGatewayUCMockRecorder) ProcessPayment(arg0, arg1 interface{}) *gom
 }
 
 // ProxyToLocationService mocks base method.
-func (m *MockGatewayUC) ProxyToLocationService(arg0 context.Context, arg1, arg2 string, arg3 interface{}, arg4, arg5 map[string]string) (*models.ProxyResponse, error) {
+func (m *MockGatewayUC) ProxyToLocationService(arg0 context.Context, arg1, arg2 string, arg3 interface{}, arg4, arg5 map[string]string) (*core.ProxyResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ProxyToLocationService", arg0, arg1, arg2, arg3, arg4, arg5)
-	ret0, _ := ret[0].(*models.ProxyResponse)
+	ret0, _ := ret[0].(*core.ProxyResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -81,10 +84,10 @@ func (mr *MockGatewayUCMockRecorder) ProxyToLocationService(arg0, arg1, arg2, ar
 }
 
 // ProxyToMatchService mocks base method.
-func (m *MockGatewayUC) ProxyToMatchService(arg0 context.Context, arg1, arg2 string, arg3 interface{}, arg4, arg5 map[string]string) (*models.ProxyResponse, error) {
+func (m *MockGatewayUC) ProxyToMatchService(arg0 context.Context, arg1, arg2 string, arg3 interface{}, arg4, arg5 map[string]string) (*core.ProxyResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ProxyToMatchService", arg0, arg1, arg2, arg3, arg4, arg5)
-	ret0, _ := ret[0].(*models.ProxyResponse)
+	ret0, _ := ret[0].(*core.ProxyResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -96,10 +99,10 @@ func (mr *MockGatewayUCMockRecorder) ProxyToMatchService(arg0, arg1, arg2, arg3,
 }
 
 // ProxyToRidesService mocks base method.
-func (m *MockGatewayUC) ProxyToRidesService(arg0 context.Context, arg1, arg2 string, arg3 interface{}, arg4, arg5 map[string]string) (*models.ProxyResponse, error) {
+func (m *MockGatewayUC) ProxyToRidesService(arg0 context.Context, arg1, arg2 string, arg3 interface{}, arg4, arg5 map[string]string) (*core.ProxyResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ProxyToRidesService", arg0, arg1, arg2, arg3, arg4, arg5)
-	ret0, _ := ret[0].(*models.ProxyResponse)
+	ret0, _ := ret[0].(*core.ProxyResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -111,10 +114,10 @@ func (mr *MockGatewayUCMockRecorder) ProxyToRidesService(arg0, arg1, arg2, arg3,
 }
 
 // ProxyToUsersService mocks base method.
-func (m *MockGatewayUC) ProxyToUsersService(arg0 context.Context, arg1, arg2 string, arg3 interface{}, arg4, arg5 map[string]string) (*models.ProxyResponse, error) {
+func (m *MockGatewayUC) ProxyToUsersService(arg0 context.Context, arg1, arg2 string, arg3 interface{}, arg4, arg5 map[string]string) (*core.ProxyResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ProxyToUsersService", arg0, arg1, arg2, arg3, arg4, arg5)
-	ret0, _ := ret[0].(*models.ProxyResponse)
+	ret0, _ := ret[0].(*core.ProxyResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -126,10 +129,10 @@ func (mr *MockGatewayUCMockRecorder) ProxyToUsersService(arg0, arg1, arg2, arg3,
 }
 
 // RideArrived mocks base method.
-func (m *MockGatewayUC) RideArrived(arg0 context.Context, arg1 *models.RideArrivalReq) (*models.PaymentRequest, error) {
+func (m *MockGatewayUC) RideArrived(arg0 context.Context, arg1 *ride.RideArrivalReq) (*ride.PaymentRequest, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RideArrived", arg0, arg1)
-	ret0, _ := ret[0].(*models.PaymentRequest)
+	ret0, _ := ret[0].(*ride.PaymentRequest)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -141,10 +144,10 @@ func (mr *MockGatewayUCMockRecorder) RideArrived(arg0, arg1 interface{}) *gomock
 }
 
 // RideStart mocks base method.
-func (m *MockGatewayUC) RideStart(arg0 context.Context, arg1 *models.RideStartRequest) (*models.Ride, error) {
+func (m *MockGatewayUC) RideStart(arg0 context.Context, arg1 *ride.RideStartRequest) (*ride.Ride, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RideStart", arg0, arg1)
-	ret0, _ := ret[0].(*models.Ride)
+	ret0, _ := ret[0].(*ride.Ride)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -156,7 +159,7 @@ func (mr *MockGatewayUCMockRecorder) RideStart(arg0, arg1 interface{}) *gomock.C
 }
 
 // UpdateBeaconStatus mocks base method.
-func (m *MockGatewayUC) UpdateBeaconStatus(arg0 context.Context, arg1 *models.BeaconRequest) error {
+func (m *MockGatewayUC) UpdateBeaconStatus(arg0 context.Context, arg1 *core.BeaconRequest) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateBeaconStatus", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -170,7 +173,7 @@ func (mr *MockGatewayUCMockRecorder) UpdateBeaconStatus(arg0, arg1 interface{}) 
 }
 
 // UpdateFinderStatus mocks base method.
-func (m *MockGatewayUC) UpdateFinderStatus(arg0 context.Context, arg1 *models.FinderRequest) error {
+func (m *MockGatewayUC) UpdateFinderStatus(arg0 context.Context, arg1 *core.FinderRequest) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateFinderStatus", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -184,7 +187,7 @@ func (mr *MockGatewayUCMockRecorder) UpdateFinderStatus(arg0, arg1 interface{}) 
 }
 
 // UpdateUserLocation mocks base method.
-func (m *MockGatewayUC) UpdateUserLocation(arg0 context.Context, arg1 *models.LocationUpdate) error {
+func (m *MockGatewayUC) UpdateUserLocation(arg0 context.Context, arg1 *location.LocationUpdate) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateUserLocation", arg0, arg1)
 	ret0, _ := ret[0].(error)

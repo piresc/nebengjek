@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/piresc/nebengjek/internal/pkg/models"
+	"github.com/piresc/nebengjek/internal/pkg/models/core"
 	"github.com/piresc/nebengjek/internal/utils"
 	"github.com/piresc/nebengjek/services/users"
 	usererrors "github.com/piresc/nebengjek/services/users/errors"
@@ -35,7 +35,7 @@ func NewAuthHandler(userUC users.UserUC) *AuthHandler {
 
 // GenerateOTP handles OTP generation requests via SMS
 func (h *AuthHandler) GenerateOTP(c echo.Context) error {
-	var request models.LoginRequest
+	var request core.LoginRequest
 	if err := c.Bind(&request); err != nil {
 		return utils.BadRequestResponse(c, "Invalid request payload")
 	}
@@ -66,7 +66,7 @@ func (h *AuthHandler) GenerateOTP(c echo.Context) error {
 
 // VerifyOTP handles OTP verification requests
 func (h *AuthHandler) VerifyOTP(c echo.Context) error {
-	var request models.VerifyRequest
+	var request core.VerifyRequest
 	if err := c.Bind(&request); err != nil {
 		return utils.BadRequestResponse(c, "Invalid request payload")
 	}
