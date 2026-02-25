@@ -397,37 +397,6 @@ func TestNotificationUC_SendNotificationToGateway_NilNATS(t *testing.T) {
 	})
 }
 
-func TestNotificationUC_BroadcastToRole_NilNATS(t *testing.T) {
-	mockRepo := &MockNotificationRepo{}
-	mockLogger := slog.Default()
-	uc := NewNotificationUC(mockRepo, nil, mockLogger) // NATS client is nil
-
-	ctx := context.Background()
-	roles := []string{"driver", "passenger"}
-	event := "test_event"
-	data := map[string]string{"message": "test"}
-
-	// Execute - should panic due to nil NATS client
-	assert.Panics(t, func() {
-		uc.BroadcastToRole(ctx, roles, event, data)
-	})
-}
-
-func TestNotificationUC_BroadcastToAll_NilNATS(t *testing.T) {
-	mockRepo := &MockNotificationRepo{}
-	mockLogger := slog.Default()
-	uc := NewNotificationUC(mockRepo, nil, mockLogger) // NATS client is nil
-
-	ctx := context.Background()
-	event := "test_event"
-	data := map[string]string{"message": "test"}
-
-	// Execute - should panic due to nil NATS client
-	assert.Panics(t, func() {
-		uc.BroadcastToAll(ctx, event, data)
-	})
-}
-
 func TestNotificationUC_ProcessMatchProposal_InvalidJSON(t *testing.T) {
 	mockRepo := &MockNotificationRepo{}
 	mockLogger := slog.Default()

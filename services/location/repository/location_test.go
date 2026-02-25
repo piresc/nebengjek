@@ -220,7 +220,7 @@ func TestGetLastLocation_InvalidLongitude(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid longitude")
 }
 
-func TestGetLastLocation_InvalidTimestamp(t *testing.T) {
+func TestGetLastLocation_IgnoresUnknownRedisFields(t *testing.T) {
 	// Setup miniredis
 	mr, client := setupMiniredis(t)
 	defer mr.Close()

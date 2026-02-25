@@ -39,6 +39,7 @@ type EchoWebSocketHandler struct {
 	missedPings     map[string]int            // Count failed pings
 	connectedSince  map[string]time.Time      // Connection start time
 	heartbeatCancel map[string]context.CancelFunc // Cancel heartbeat goroutines
+	removeOnce      map[string]*sync.Once     // Ensure removeClient runs only once per connection
 	mu              sync.RWMutex
 }
 
@@ -55,6 +56,7 @@ func NewEchoWebSocketHandler(gatewayUC gateway.GatewayUC, userUC users.UserUC, s
 		missedPings:     make(map[string]int),
 		connectedSince:  make(map[string]time.Time),
 		heartbeatCancel: make(map[string]context.CancelFunc),
+		removeOnce:      make(map[string]*sync.Once),
 	}
 }
 
@@ -150,6 +152,7 @@ func (h *EchoWebSocketHandler) addClient(userID string, role string, ws *websock
 	h.lastPing[userID] = now
 	h.missedPings[userID] = 0
 	h.connectedSince[userID] = now
+	h.removeOnce[userID] = &sync.Once{}
 	h.mu.Unlock()
 	
 	// Create session data for Redis storage
@@ -173,6 +176,7 @@ func (h *EchoWebSocketHandler) addClient(userID string, role string, ws *websock
 		delete(h.lastPing, userID)
 		delete(h.missedPings, userID)
 		delete(h.connectedSince, userID)
+		delete(h.removeOnce, userID)
 		h.mu.Unlock()
 		return fmt.Errorf("failed to register session in Redis: %w", err)
 	}
@@ -183,29 +187,36 @@ func (h *EchoWebSocketHandler) addClient(userID string, role string, ws *websock
 	return nil
 }
 
-// removeClient safely removes a client and stops heartbeat
+// removeClient safely removes a client and stops heartbeat (idempotent via sync.Once)
 func (h *EchoWebSocketHandler) removeClient(userID string) {
-	h.mu.Lock()
-	// Cancel heartbeat routine
-	if cancel, exists := h.heartbeatCancel[userID]; exists {
-		cancel()
-		delete(h.heartbeatCancel, userID)
+	h.mu.RLock()
+	once, exists := h.removeOnce[userID]
+	h.mu.RUnlock()
+	if !exists {
+		return
 	}
-	// Clean up all tracking data
-	delete(h.clients, userID)
-	delete(h.lastActivity, userID)
-	delete(h.lastPing, userID)
-	delete(h.missedPings, userID)
-	delete(h.connectedSince, userID)
-	h.mu.Unlock()
-	
-	// Remove from Redis session storage
-	if err := h.sessionRepo.UnregisterConnection(context.Background(), userID); err != nil {
-		logger.Error("Failed to unregister session from Redis",
-			logger.String("user_id", userID),
-			logger.String("server_id", h.serverID),
-			logger.ErrorField(err))
-	}
+
+	once.Do(func() {
+		h.mu.Lock()
+		if cancel, ok := h.heartbeatCancel[userID]; ok {
+			cancel()
+			delete(h.heartbeatCancel, userID)
+		}
+		delete(h.clients, userID)
+		delete(h.lastActivity, userID)
+		delete(h.lastPing, userID)
+		delete(h.missedPings, userID)
+		delete(h.connectedSince, userID)
+		delete(h.removeOnce, userID)
+		h.mu.Unlock()
+
+		if err := h.sessionRepo.UnregisterConnection(context.Background(), userID); err != nil {
+			logger.Error("Failed to unregister session from Redis",
+				logger.String("user_id", userID),
+				logger.String("server_id", h.serverID),
+				logger.ErrorField(err))
+		}
+	})
 }
 
 // IsUserConnected checks if a user is currently connected
@@ -776,15 +787,20 @@ func (h *EchoWebSocketHandler) sendPing(userID string, ws *websocket.Conn, seque
 		return fmt.Errorf("ping failed: %w", err)
 	}
 
-	// Update ping tracking
+	now := time.Now()
+
+	// Update in-memory tracking
 	h.mu.Lock()
-	h.lastPing[userID] = time.Now()
+	h.lastPing[userID] = now
 	h.mu.Unlock()
 
-	logger.Debug("Ping sent successfully",
-		logger.String("user_id", userID),
-		logger.Int64("sequence", sequence))
-	
+	// Sync heartbeat state to Redis (refreshes session TTL)
+	if err := h.sessionRepo.UpdateHeartbeat(context.Background(), userID, now, now, 0); err != nil {
+		logger.Warn("Failed to update heartbeat in Redis",
+			logger.String("user_id", userID),
+			logger.ErrorField(err))
+	}
+
 	return nil
 }
 

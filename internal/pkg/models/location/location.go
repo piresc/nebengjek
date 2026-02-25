@@ -4,8 +4,8 @@ import "time"
 
 // Location represents a geographic location
 type Location struct {
-	Latitude  float64 `json:"latitude"`
-	Longitude float64 `json:"longitude"`
+	Latitude  float64 `json:"latitude"`  // Valid range: [-90, 90]
+	Longitude float64 `json:"longitude"` // Valid range: [-180, 180]
 }
 
 // LocationUpdate represents a location update event

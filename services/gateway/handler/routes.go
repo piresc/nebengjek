@@ -66,7 +66,7 @@ func (h *Handler) registerPublicRoutes(e *echo.Echo, mw *middleware.Middleware) 
 
 	// Payment routes (proxy to Rides Service) - JWT required
 	payments := e.Group("/payments", mw.JWTHandler())
-	payments.GET("/process", h.proxyHandler.ProxyToRidesService)
+	payments.POST("/process", h.proxyHandler.ProxyToRidesService)
 	payments.GET("/:id", h.proxyHandler.ProxyToRidesService)
 }
 

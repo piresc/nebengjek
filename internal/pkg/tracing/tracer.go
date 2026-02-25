@@ -56,7 +56,7 @@ type Config struct {
 // ShouldExclude checks if a path should be excluded from tracing
 func (c *Config) ShouldExclude(path string) bool {
 	for _, excluded := range c.ExcludePaths {
-		if contains(path, excluded) {
+		if hasPrefix(path, excluded) {
 			return true
 		}
 	}
@@ -64,6 +64,6 @@ func (c *Config) ShouldExclude(path string) bool {
 }
 
 // contains checks if a string starts with a substring
-func contains(s, substr string) bool {
+func hasPrefix(s, substr string) bool {
 	return len(s) >= len(substr) && s[:len(substr)] == substr
 }

@@ -121,7 +121,7 @@ func TestConfig_ExcludePathsEdgeCases(t *testing.T) {
 			name:         "Prefix match",
 			excludePaths: []string{"/api"},
 			testPath:     "/api/users",
-			expected:     true, // contains() checks prefix
+			expected:     true, // hasPrefix() checks prefix
 		},
 	}
 
@@ -134,7 +134,7 @@ func TestConfig_ExcludePathsEdgeCases(t *testing.T) {
 	}
 }
 
-func TestContainsFunction(t *testing.T) {
+func TestHasPrefixFunction(t *testing.T) {
 	tests := []struct {
 		name     string
 		s        string
@@ -151,7 +151,7 @@ func TestContainsFunction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := contains(tt.s, tt.substr)
+			result := hasPrefix(tt.s, tt.substr)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
